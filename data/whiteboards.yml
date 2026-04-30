@@ -1,0 +1,67 @@
+category_id: whiteboards
+category_name: ✏️ 屏幕批注与白板软件
+description: 替代系统自带臃肿白板，提供更轻量的屏幕画笔和批注功能。
+projects:
+  - name: Ink Canvas
+    developer: WXRIW
+    status: 停更
+    status_badge: https://img.shields.io/badge/%E5%81%9C%E6%9B%B4-%23b91c1c?style=flat&label=
+    recommendation: 🥈
+    recommendation_badge: https://img.shields.io/badge/%E9%9D%9E%E5%B8%B8%E6%8E%A8%E8%8D%90-orange
+    github_url: https://github.com/WXRIW/Ink-Canvas/
+    developer_avatar: https://images.weserv.nl/?url=github.com/WXRIW.png
+    description: >
+      Ink Canvas 画板是一款轻量级画板软件，基于 WPF/C#，其针对希沃一体机进行了特别优化，与预装的“希沃白板 5”软件相比，启动速度大幅度提升（提升 5-10 倍），系统资源占用更小，使用体验更佳。
+    notes:
+      - 该项目已经停更。
+    keywords:
+      - 屏幕批注
+      - 屏幕画板
+      - 桌面批注
+      - Ink Canvas
+      - 白板软件
+      - 形状识别
+    reviews:
+      - author: Dubi906w
+        content: 某种意义上来说，如果你想要一个纯粹的屏幕画板，IC 可以是你的选择之一，同时它的诞生，也才有了后面 ICA 和 ICC 的诞生。如果要在教室里面使用不是很合适。
+    links:
+      - name: GitHub 1
+        url: https://github.com/WXRIW/Ink-Canvas/
+        icon: images/github-icon.svg
+      - name: GitHub 2
+        url: https://github.com/InkCanvas/Ink-Canvas/
+        icon: images/github-icon.svg
+      - name: 微软商店
+        url: https://www.microsoft.com/store/apps/9NXJFDD97XJ3?cid=ghreadme
+        icon: images/microsoft-store.png
+
+  - name: Ink Canvas Plus
+    developer: Clover Yan
+    status: 活跃
+    status_badge: https://img.shields.io/github/commit-activity/y/clover-yan/Ink-Canvas-Plus?label=
+    recommendation: 🥈
+    recommendation_badge: https://img.shields.io/badge/%E9%9D%9E%E5%B8%B8%E6%8E%A8%E8%8D%90-orange
+    github_url: https://github.com/clover-yan/Ink-Canvas-Plus
+    developer_avatar: https://images.weserv.nl/?url=github.com/clover-yan.png
+    description: >
+      Ink Canvas Plus 是一款由 Clover Yan 维护、复刻自 WXRIW/Ink Canvas 的 Windows 画板应用，旨在优化各方面的使用体验，并尽可能保留原版 Ink Canvas 的操作体验。
+    keywords:
+      - 屏幕绘图
+      - 屏幕批注
+      - 桌面批注
+      - PPT批注
+      - 白板软件
+      - 边缘手势屏蔽
+      - Ink Canvas
+    reviews:
+      - author: 2,2,3-三甲基戊烷
+        content: 俗话说的好：“要稳定inkeys，要好用icp。”而其中的icp便是原版ic的延续，继承了原版ic简洁易用的特点。
+      - author: Makitoid
+        content: 作为批注软件还是很不错的，但是作为白板软件还是差一点。希望持续的优化！
+    links:
+      - name: GitHub
+        url: https://github.com/clover-yan/Ink-Canvas-Plus
+        icon: images/github-icon.svg
+      - name: 蓝奏云下载
+        url: https://cloveryan.lanzoum.com/b00y42aebi
+        icon: images/download/123yunpan-dark.svg

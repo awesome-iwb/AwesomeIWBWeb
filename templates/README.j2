@@ -1,0 +1,84 @@
+<div align="center">
+
+<img width="156" src="./images/aiwb-icon.png">
+
+<h1>
+<picture>
+      <source media="(prefers-color-scheme: dark)" srcset="./images/fontlogo/aiwb-font-white.png">
+      <img alt="aiwb-logo" src="./images/fontlogo/aiwb-font-dark.png" height="28">
+    </picture>
+</h1>
+
+专为广大中小学电教打造的班级希沃/鸿合等<br/>一体机/数字白板/班班通一站式软件推荐清单<br/>和实用知识手册，助你在新学期快速上手<br/>班级一体机新玩法！
+<br/>**为广大电教倾情撰写，让班级大屏更好用！**
+
+**🌟 风带来故事的种子，时间使之发芽 🌟**
+
+<a href="./CONTRIBUTING.md">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="./images/navigation/贡献指南-白.svg">
+      <img alt="贡献指南" src="./images/navigation/贡献指南-黑.svg" height="52">
+    </picture>
+</a>&nbsp;
+<a href="https://github.com/awesome-iwb/awesome-iwb/issues/57">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="./images/navigation/最新项目-白.svg">
+      <img alt="最新项目" src="./images/navigation/最新项目-黑.svg" height="52">
+    </picture>
+</a>&nbsp;
+<img alt="分隔符" height="52" src="./images/navigation/分隔符.svg">&nbsp;
+{% for category in categories %}
+<a href="docs/{{ category.category_id }}.md">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="./images/navigation/{% if loop.index == 1 %}白板软件{% elif loop.index == 2 %}课表看板{% else %}工具辅助{% endif %}-白.svg">
+      <img alt="{{ category.category_name }}" src="./images/navigation/{% if loop.index == 1 %}白板软件{% elif loop.index == 2 %}课表看板{% else %}工具辅助{% endif %}-黑.svg" height="52">
+    </picture>
+</a>&nbsp;
+{% endfor %}
+
+<br/>
+<br/>
+
+[![Awesome](https://cdn.rawgit.com/sindresorhus/awesome/d7305f38d29fed78fa85652e3a63e154dd8e8829/media/badge.svg)](https://github.com/sindresorhus/awesome)
+[![CC BY-NC-SA 4.0](https://img.shields.io/badge/License-CC_BY--NC--SA_4.0-blue.svg)](https://creativecommons.org/licenses/by-nc-sa/4.0)
+![Maintenance](https://img.shields.io/badge/Maintained%3F-YES-green.svg)<br/>
+![GitHub last commit](https://img.shields.io/github/last-commit/awesome-iwb/awesome-iwb)
+![Visitors](https://api.visitorbadge.io/api/combined?path=https://github.com/awesome-iwb/awesome-iwb&label=Visitors&countColor=%23263759&style=flat)
+[![交流群](https://img.shields.io/badge/-%E4%BA%A4%E6%B5%81%E7%BE%A4%201004548404-white?style=flat&logo=qq)](https://qm.qq.com/q/im8ZtJpkZy)
+
+</div>
+
+> [!note]
+> 诚邀各位开发者加入 Awesome Iwb 的交流群。如果你的项目在 Awesome Iwb 上面上榜了，请加入开发者交流群：1004548404。
+
+> [!note]
+> 本项目已采用**数据驱动化 (Data-Driven)**和**模块化**管理。项目数据存放在 `data/` 目录下，并使用脚本自动生成文档。目前正在开发网页版，README 版本后续将减缓维护频率。
+
+---
+
+## ⚠️ 注意
+
+> [!IMPORTANT]
+> 在使用任何软件之前，应仔细阅读其仓库中的 README 或其他形式的说明。本文档旨在推荐以下优质软件，尽可能详细展现其功能，如欲提出问题，请前往对应开源仓库/交流平台。
+
+> [!WARNING]
+> 以下软件均为免费或非买断制，如遇收费提示请注意甄别是否为盗版软件！
+
+## 📚 速览
+
+- 🥇 是指最推荐使用的、必装软件推荐，每个类别下至少有一个被标记的软件或项目。
+- 🥈 是指推荐尝试体验的，功能基本完善的软件。基本上这些被标注的项目大多比被 🥇 标注的项目稍微逊色一些或体验略微欠缺一些，但依旧做得很不错。
+- 🌟 是指那些目前看来发展不怎么样的，但前景远大的软件或项目。
+- 🔴 是指最近几天内收录的新软件或新项目。
+
+{% for category in categories %}
+### {{ category.category_name }}
+
+| 名称 | 开发者 |
+| - | - |
+{% for project in category.projects %}
+| {{ project.recommendation }} [{{ project.name }}](docs/{{ category.category_id }}.md#{{ project.name | replace(" ", "-") | lower }}) ![{{ project.status }}]({{ project.status_badge }}) | <picture><source media="(prefers-color-scheme: dark)" srcset="{{ project.developer_avatar }}&s=64&v=4"><img src="{{ project.developer_avatar }}&s=64&v=4" width="20" height="20"/></picture>&nbsp;<a href="{{ project.github_url }}">{{ project.developer }}</a> |
+{% endfor %}
+{% endfor %}
+
+> **点击以上项目名称，或进入 [docs/](docs/) 目录查看具体分类和项目详情！**

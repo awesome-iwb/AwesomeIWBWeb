@@ -1,0 +1,26 @@
+<h2>如何定义应用之间的血缘关系？</h2>
+<p class="subtitle">我们需要在数据中增加关系字段，然后在前端进行可视化。你倾向于哪种数据结构设计？</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>单向引用 (Parent)</h3>
+      <p>在项目中只记录 <code>parent: "Ink Canvas"</code>，简单直观，适合绝大多数 Fork 场景。</p>
+    </div>
+  </div>
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>双向/图结构 (Related/Forks)</h3>
+      <p>记录 <code>forks: ["ICP", "ICA"]</code> 和 <code>parent: "IC"</code>，数据更完备，但维护成本稍高。</p>
+    </div>
+  </div>
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>GitHub API 自动推导</h3>
+      <p>完全不修改 data.json，仅通过 GitHub API 自动抓取 fork 关系，完全自动化但可能抓到不相关的库。</p>
+    </div>
+  </div>
+</div>

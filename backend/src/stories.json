@@ -1,0 +1,81 @@
+[
+  {
+    "id": "feature-classisland",
+    "category": "Editors' Choice",
+    "title": "重新定义班级大屏",
+    "subtitle": "探索 ClassIsland 带来的智能灵动体验",
+    "coverImage": "/banner/classisland-banner.webp",
+    "date": "SATURDAY, APRIL 25",
+    "projects": [
+      { "name": "ClassIsland", "icon": "/local_images/icons/bfb5aacef78141036b715cecb31a4d57.svg" }
+    ],
+    "theme": "dark",
+    "content": "\n      <p class=\"text-xl leading-relaxed text-slate-600 dark:text-slate-300 mb-8 font-medium\">\n        如果你曾留意过课间的班级大屏，大概率会看到杂乱的桌面、尚未关闭的课件，或是毫无美感的默认壁纸。屏幕虽然变大了，但它并没有变得更“聪明”。<br><br>\n        而 <strong>ClassIsland</strong> 的出现，打破了这种沉闷。它巧妙地借用了“灵动岛”的交互语言，将原本枯燥的课表、时间、倒计时等信息，变成了一个悬浮在屏幕顶端的智能中枢。它不仅极具秩序美，更在无形中掌控着整个班级的节奏。<br><br>\n        今天，我们非常高兴能和 ClassIsland 的幕后开发者坐下来聊聊。我们将深入探讨这款极具人气的开源神器是如何诞生的，以及它如何一步步“重新定义”了班级大屏的交互体验。\n      </p>\n      \n      <img src=\"/banner/classisland-banner.webp\" class=\"w-full rounded-[2rem] mb-12 shadow-2xl object-cover\" alt=\"ClassIsland 界面\">\n      \n      <div class=\"space-y-12 my-12\">\n        \n        <div class=\"interview-block\">\n          <h3 class=\"text-2xl font-bold text-slate-900 dark:text-white mb-6 leading-snug flex items-start gap-3\">\n            <span class=\"text-emerald-500 font-serif text-3xl\">Q:</span> \n            <span>最初是怎么萌生出，要把手机上的“灵动岛”概念，搬到尺寸巨大的班级一体机屏幕上的想法的？</span>\n          </h3>\n          <div class=\"text-lg leading-relaxed text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-800/40 p-8 rounded-3xl border border-slate-100 dark:border-slate-800/60 relative mt-6\">\n            <div class=\"absolute -top-3 left-8 bg-emerald-500 text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider shadow-sm\">开发者</div>\n            <p class=\"italic opacity-60 mt-2\">（请在此处填入您采访开发者后获得的回答，例如关于灵感来源、最初的痛点等...）</p>\n          </div>\n        </div>\n\n        <div class=\"interview-block\">\n          <h3 class=\"text-2xl font-bold text-slate-900 dark:text-white mb-6 leading-snug flex items-start gap-3\">\n            <span class=\"text-emerald-500 font-serif text-3xl\">Q:</span> \n            <span>对于多媒体管理员或课代表来说，ClassIsland 最能“击中”他们的痛点是什么？在实际课堂中，它改变了什么？</span>\n          </h3>\n          <div class=\"text-lg leading-relaxed text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-800/40 p-8 rounded-3xl border border-slate-100 dark:border-slate-800/60 relative mt-6\">\n            <div class=\"absolute -top-3 left-8 bg-emerald-500 text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider shadow-sm\">开发者</div>\n            <p class=\"italic opacity-60 mt-2\">（请在此处填入您采访开发者后获得的回答，例如关于解决忘打铃、课表混乱、纪律管理等实际场景...）</p>\n          </div>\n        </div>\n\n        <blockquote class=\"border-l-4 border-emerald-500 pl-8 my-16 text-2xl font-medium text-slate-800 dark:text-slate-200 italic leading-relaxed bg-gradient-to-r from-emerald-500/10 to-transparent py-4 rounded-r-2xl\">\n          \"在这里放一句开发者说过的最打动人心的话，比如'让每一块屏幕都有灵魂'。\"\n        </blockquote>\n\n        <div class=\"interview-block\">\n          <h3 class=\"text-2xl font-bold text-slate-900 dark:text-white mb-6 leading-snug flex items-start gap-3\">\n            <span class=\"text-emerald-500 font-serif text-3xl\">Q:</span> \n            <span>ClassIsland 拥有非常强大的插件生态。未来，您对它的形态还有哪些更宏大的想象？还会加入哪些激动人心的新功能？</span>\n          </h3>\n          <div class=\"text-lg leading-relaxed text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-800/40 p-8 rounded-3xl border border-slate-100 dark:border-slate-800/60 relative mt-6\">\n            <div class=\"absolute -top-3 left-8 bg-emerald-500 text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider shadow-sm\">开发者</div>\n            <p class=\"italic opacity-60 mt-2\">（请在此处填入您采访开发者后获得的回答，关于未来的规划、社区共建的愿景等...）</p>\n          </div>\n        </div>\n      </div>\n\n      <p class=\"text-lg leading-relaxed text-slate-600 dark:text-slate-300 mt-12 pt-8 border-t border-slate-200 dark:border-slate-800\">\n        在等待开发者回答的同时，您现在就可以去下载体验这款改变课堂规则的软件。正是这种对日常痛点的敏锐洞察，让 ClassIsland 正在成为现代化教室里不可或缺的“数字大脑”。\n      </p>\n    "
+  },
+  {
+    "id": "feature-inkcanvas",
+    "category": "Open Source Software",
+    "title": "开源白板软件大赏",
+    "subtitle": "从经典到新锐，探索桌面批注的无限可能",
+    "coverImage": "/local_images/banners/42421e173e6bb6201f5cf60f91206c05.webp",
+    "date": "FRIDAY, APRIL 24",
+    "projects": [
+      { "name": "Ink Canvas", "icon": "/local_images/icons/255e39858ba64bc5838894505fbee808.webp" },
+      { "name": "Ink Canvas Plus", "icon": "/local_images/icons/d82a23a79921529d914b484b7e72a822.webp" },
+      { "name": "ICC-Re", "icon": "/local_images/icons/b6206c0e2af704460ccb705e891346bc.webp" },
+      { "name": "智绘教Inkeys", "icon": "/local_images/icons/93e02864d2416a18d56cce95b8fc855d.webp" },
+      { "name": "ppInk", "icon": "" },
+      { "name": "ShowWrite视频展台", "icon": "https://github.com/wwcrdrvf6u/ShowWrite/raw/main/logo-SW.png" },
+      { "name": "LanStartWrite", "icon": "" }
+    ],
+    "theme": "dark",
+    "content": "\n      <p class=\"text-xl leading-relaxed text-slate-600 dark:text-slate-300 mb-8 font-medium\">当学校从传统投影仪换成了智能一体机，自带的商业白板软件往往过于臃肿，启动缓慢。在商业软件的夹缝中，一批极其优秀的开源白板和屏幕批注软件正在野蛮生长。今天，我们为您盘点 Awesome IWB 收录的全部开源书写利器。</p>\n      \n      <h3 class=\"text-2xl font-bold text-slate-900 dark:text-white mt-12 mb-6\">经典与传承：Ink Canvas 家族</h3>\n      <p class=\"text-lg leading-relaxed text-slate-600 dark:text-slate-300 mb-6\">提到开源白板，不得不提 <strong>Ink Canvas</strong>。它基于 WPF/C# 开发，针对希沃等一体机特别优化，启动速度提升了惊人的 5-10 倍。随着原版停更，社区接过了接力棒：</p>\n      \n      <ul class=\"list-disc pl-6 space-y-4 text-lg text-slate-600 dark:text-slate-300 mb-10\">\n        <li><strong>Ink Canvas Plus (ICP)</strong>：目前最为主流的接任者，提供更为简洁直观的用户界面。</li>\n        <li><strong>ICC-CE & ICC-Re</strong>：分别为兼容性极强的社区版和致力于现代化重构的教学演示工具。</li>\n        <li><strong>Artistry & Better</strong>：专注于纯粹的绘图体验，剔除多余组件。</li>\n      </ul>\n\n      <h3 class=\"text-2xl font-bold text-slate-900 dark:text-white mt-12 mb-6\">高性能新锐：智绘教 Inkeys</h3>\n      <p class=\"text-lg leading-relaxed text-slate-600 dark:text-slate-300 mb-6\">如果说 C# 赋予了白板易用性，那么 C++20 则赋予了它极致的性能。<strong>智绘教Inkeys</strong> 是一款专为 Windows 打造的全新白板软件，拥有丝滑流畅的高性能画笔和丰富强大的功能，全面提升书写体验。</p>\n\n      <h3 class=\"text-2xl font-bold text-slate-900 dark:text-white mt-12 mb-6\">多面手与海外佳作</h3>\n      <div class=\"grid grid-cols-1 md:grid-cols-2 gap-6 mb-10\">\n        <div class=\"bg-slate-100 dark:bg-slate-800 rounded-3xl p-6\">\n          <h4 class=\"text-lg font-bold mb-2\">ppInk</h4>\n          <p class=\"text-slate-600 dark:text-slate-300\">源自著名的 gInk，对鼠标、触摸屏和压感数位板支持极佳。设计秉承简洁理念，不会在演示过程中分散注意力。</p>\n        </div>\n        <div class=\"bg-slate-100 dark:bg-slate-800 rounded-3xl p-6\">\n          <h4 class=\"text-lg font-bold mb-2\">ShowWrite视频展台</h4>\n          <p class=\"text-slate-600 dark:text-slate-300\">不仅是白板，更是为直播教学设计的展台软件，支持文档展台、实物展台、屏幕批注和画面录制无缝对接。</p>\n        </div>\n      </div>\n\n      <h3 class=\"text-2xl font-bold text-slate-900 dark:text-white mt-12 mb-6\">跨平台探索：LanStartWrite</h3>\n      <p class=\"text-lg leading-relaxed text-slate-600 dark:text-slate-300 mb-6\">值得一提的还有基于 Electron 开发的 <strong>LanStartWrite</strong>。它集成了高性能画布和智能图形识别，支持白板创作与透明批注双模式切换，代表了新一代 Web 技术在桌面端书写应用上的探索。</p>\n\n      <p class=\"text-xl leading-relaxed text-slate-600 dark:text-slate-300 font-medium italic mt-12 border-l-4 border-emerald-500 pl-6\">\"从 WPF 到 C++，再到 Web 技术，这些开源软件用代码证明了：一块好用的白板，不应该成为奢侈品。\"</p>\n    "
+  },
+  {
+    "id": "feature-random-picker",
+    "category": "Classroom Interactions",
+    "title": "让点名充满悬念",
+    "subtitle": "Awesome IWB 课堂抽签工具大赏",
+    "coverImage": "/local_images/banners/ebdb3c42d33afb8bd9299636b85390cc.webp",
+    "date": "THURSDAY, APRIL 23",
+    "projects": [
+      { "name": "SecRandom", "icon": "/images/secrandom-icon.webp" },
+      { "name": "Rand 抽号器", "icon": "/images/rand-icon.webp" },
+      { "name": "OpenLuckyRandom", "icon": "/local_images/icons/841adb579bc1cdc72815f486fae7d8fc.webp" },
+      { "name": "ClassNamePicker", "icon": "" },
+      { "name": "NamePicker", "icon": "/local_images/icons/0c0f9b18608f565d2591e1e5874fc1f3.webp" },
+      { "name": "IslandCaller", "icon": "/images/islandcaller-icon.webp" },
+      { "name": "RandPicker", "icon": "/images/randpicker-icon.webp" },
+      { "name": "蓝屏抽奖机", "icon": "" },
+      { "name": "随机点名Plus 3", "icon": "" },
+      { "name": "ex-caller", "icon": "" },
+      { "name": "Class-Roster-Picker-NEXT", "icon": "/images/Class-Roster-Picker-icon.webp" }
+    ],
+    "theme": "dark",
+    "content": "\n      <p class=\"text-xl leading-relaxed text-slate-600 dark:text-slate-300 mb-8 font-medium\">在课堂上，随机点名提问是活跃气氛、检验学习成果的重要环节。如果还在使用简陋的随机数生成器或者手工抽签，那你就落伍了。Awesome IWB 收录了海量极具“仪式感”的开源点名软件，总有一款适合你。</p>\n      \n      <img src=\"/local_images/banners/ebdb3c42d33afb8bd9299636b85390cc.webp\" class=\"w-full rounded-3xl mb-10 shadow-xl\" alt=\"SecRandom 界面\">\n      \n      <h3 class=\"text-2xl font-bold text-slate-900 dark:text-white mb-6\">全能型点名利器</h3>\n      <p class=\"text-lg leading-relaxed text-slate-600 dark:text-slate-300 mb-6\">如果你需要一款功能拉满、满足各种复杂场景的抽签工具，以下几款绝对是首选：</p>\n      <ul class=\"list-disc pl-6 space-y-3 text-lg text-slate-600 dark:text-slate-300 mb-10\">\n        <li><strong>SecRandom & RandPicker</strong>：现代化的随机抽取工具，不仅界面精美，还支持抽单人、多人、小组甚至指定性别。内置语音提示和不重复记录，让你轻松应对走班教学。</li>\n        <li><strong>ClassNamePicker</strong>：使用 PyQt5 编写，支持保存抽取概率、统计抽取次数，可以让你对课堂互动数据了如指掌。</li>\n        <li><strong>NamePicker & 随机点名Plus 3</strong>：基于 Python 开发，提供人性化的配置和概率调整，确保点名公平高效。</li>\n      </ul>\n      \n      <h3 class=\"text-2xl font-bold text-slate-900 dark:text-white mb-6\">极致简约与创意</h3>\n      <div class=\"grid grid-cols-1 md:grid-cols-2 gap-6 mb-10\">\n        <div class=\"bg-slate-100 dark:bg-slate-800 rounded-3xl p-6\">\n          <h4 class=\"text-lg font-bold mb-2\">Rand 抽号器</h4>\n          <p class=\"text-slate-600 dark:text-slate-300\">主打 Fluent Design 的现代设计，不仅操作无感、极简美观，更兼顾了对 Windows 7 及旧设备的兼容。</p>\n        </div>\n        <div class=\"bg-slate-100 dark:bg-slate-800 rounded-3xl p-6\">\n          <h4 class=\"text-lg font-bold mb-2\">IslandCaller</h4>\n          <p class=\"text-slate-600 dark:text-slate-300\">与 ClassIsland 深度绑定，通过 URL 协议注册桌面快捷方式，实现点名“一触即发”，轻量到了极致。</p>\n        </div>\n      </div>\n\n      <h3 class=\"text-2xl font-bold text-slate-900 dark:text-white mb-6\">黑科技：人脸识别点名</h3>\n      <p class=\"text-lg leading-relaxed text-slate-600 dark:text-slate-300 mb-6\"><strong>OpenLuckyRandom</strong> 启发于某品牌一体机中的人脸识别随机抽人。它使用 OpenCvSharp4 开发，只要教室电脑带有摄像头，它就能通过人脸识别捕捉画面来进行随机抽签，彻底将课堂点名变成了一场充满科技感的互动游戏！</p>\n\n      <p class=\"text-lg leading-relaxed text-slate-600 dark:text-slate-300\">此外，还有 <strong>蓝屏抽奖机</strong>、<strong>ex-caller</strong> 等众多创意十足的小工具。赶紧挑选一款，让你的下一堂课充满悬念吧！</p>\n    "
+  },
+  {
+    "id": "feature-dashboards",
+    "category": "Information Display",
+    "title": "信息展示的新方式",
+    "subtitle": "从考试看板到桌面组件，重塑班级大屏视觉体验",
+    "coverImage": "/local_images/banners/c651fb6bceb34b2c092b4b068b92abdf.webp",
+    "date": "WEDNESDAY, APRIL 22",
+    "projects": [
+      { "name": "考试看板", "icon": "/local_images/icons/191e86d5abd6e71b1f716529766a2af6.webp" },
+      { "name": "ExamSchedule", "icon": "/images/examschedule-icon.webp" },
+      { "name": "考试语音播报系统", "icon": "" },
+      { "name": "ExamClock", "icon": "" },
+      { "name": "ClassBoardSharp", "icon": "/local_images/icons/7efa0122b0222202a4ff91d4d5530a50.ico" },
+      { "name": "Class Widgets", "icon": "/local_images/icons/42b2647b40e0cf157bbc5968c2b74a5e.webp" },
+      { "name": "凌云班级组件", "icon": "/local_images/icons/5ecaea19f1ee36246b80073f73c2dd38.ico" },
+      { "name": "ZongziTEK 黑板贴", "icon": "/local_images/icons/2e10bbd0961d5fad3944bee410c0e1c1.webp" },
+      { "name": "StickyHomeworks2", "icon": "/local_images/icons/26fd63ebadcc564ed96d1eeb0c135e32.webp" },
+      { "name": "ClassPaper", "icon": "/images/ClassPaper-icon.webp" },
+      { "name": "沉浸式时钟", "icon": "/images/immersive-clock-icon.svg" },
+      { "name": "LanMountainDesktop", "icon": "" }
+    ],
+    "theme": "dark",
+    "content": "\n      <p class=\"text-xl leading-relaxed text-slate-600 dark:text-slate-300 mb-8 font-medium\">班级一体机的大屏幕，在非授课时间往往处于闲置状态。如何利用这块屏幕高效地展示课表、作业、倒计时甚至是严肃的考试信息？开源社区给出了无数种极具创意的“看板”方案。</p>\n      \n      <img src=\"/local_images/banners/c651fb6bceb34b2c092b4b068b92abdf.webp\" class=\"w-full rounded-3xl mb-10 shadow-xl\" alt=\"考试看板\">\n\n      <h3 class=\"text-2xl font-bold text-slate-900 dark:text-white mb-6\">严肃考场：专业的考试看板</h3>\n      <p class=\"text-lg leading-relaxed text-slate-600 dark:text-slate-300 mb-6\">在考试场景下，时间的精准度和信息的清晰度至关重要：</p>\n      <ul class=\"list-disc pl-6 space-y-3 text-lg text-slate-600 dark:text-slate-300 mb-10\">\n        <li><strong>考试看板 (DSZ)</strong>：提供简单明了的 UI，展示当前科目、起止时间、考试状态及结束前 15 分钟预警，是大型考试的镇屏之宝。</li>\n        <li><strong>ExamSchedule</strong>：网页版的考试看板服务，支持设置时间偏移和保存考场信息，跨平台且免安装。</li>\n        <li><strong>考试语音播报系统 & ExamClock</strong>：不仅有视觉展示，还加入了语音播报和年级文理科切换，将考务工作彻底自动化。</li>\n      </ul>\n\n      <h3 class=\"text-2xl font-bold text-slate-900 dark:text-white mb-6\">日常管理：桌面组件与作业贴</h3>\n      <p class=\"text-lg leading-relaxed text-slate-600 dark:text-slate-300 mb-6\">在平时的自习和课间，美观的桌面组件能让班级管理井井有条：</p>\n      <div class=\"grid grid-cols-1 md:grid-cols-2 gap-6 mb-10\">\n        <div class=\"bg-slate-100 dark:bg-slate-800 rounded-3xl p-6 border-t-4 border-emerald-500\">\n          <h4 class=\"text-lg font-bold mb-2\">Class Widgets & 凌云班级组件</h4>\n          <p class=\"text-slate-600 dark:text-slate-300\">采用现代化的 Fluent Design，支持插件系统、息屏显示和云同步，是目前最成熟的课表和值日生展示方案。</p>\n        </div>\n        <div class=\"bg-slate-100 dark:bg-slate-800 rounded-3xl p-6 border-t-4 border-emerald-500\">\n          <h4 class=\"text-lg font-bold mb-2\">ZongziTEK 黑板贴 & StickyHomeworks2</h4>\n          <p class=\"text-slate-600 dark:text-slate-300\">专为作业布置设计，支持富文本、按科目分组、自动清理过期作业，彻底取代黑板角落的粉笔字。</p>\n        </div>\n      </div>\n\n      <h3 class=\"text-2xl font-bold text-slate-900 dark:text-white mb-6\">沉浸美学与底层壳层</h3>\n      <p class=\"text-lg leading-relaxed text-slate-600 dark:text-slate-300 mb-6\">如果你追求极致的视觉体验，可以尝试 <strong>ClassPaper</strong> 或 <strong>沉浸式时钟</strong>。它们接管了整个屏幕背景，甚至内置了基于心理声学的噪音监测模块来维持自习纪律。</p>\n      \n      <p class=\"text-lg leading-relaxed text-slate-600 dark:text-slate-300\">更有像 <strong>LanMountainDesktop</strong> 这样直接基于 Avalonia 重构的桌面壳层项目，彻底把一体机桌面变成了一个可编排的信息与交互空间。这些各具特色的信息展示工具，正在悄然改变着每一个教室的数字风景。</p>\n    "
+  }
+]

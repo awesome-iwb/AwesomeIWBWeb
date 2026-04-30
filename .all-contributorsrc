@@ -1,0 +1,127 @@
+{
+  "projectName": "Awesome-Iwb",
+  "projectOwner": "Awesome-Iwb",
+  "files": [
+    "README.md"
+  ],
+  "commitType": "docs",
+  "commitConvention": "angular",
+  "contributorsPerLine": 7,
+  "contributors": [
+    {
+      "login": "dubi906w",
+      "name": "Dubi906w",
+      "avatar_url": "https://avatars.githubusercontent.com/u/185512682?v=4",
+      "profile": "https://github.com/dubi906w",
+      "contributions": [
+        "content",
+        "data",
+        "doc",
+        "ideas",
+        "maintenance"
+      ]
+    },
+    {
+      "login": "LiPolymer",
+      "name": "LiPolymer",
+      "avatar_url": "https://avatars.githubusercontent.com/u/110595296?v=4",
+      "profile": "http://lipoly.ink",
+      "contributions": [
+        "content",
+        "data",
+        "doc"
+      ]
+    },
+    {
+      "login": "unDefFtr",
+      "name": "谭麒峰",
+      "avatar_url": "https://avatars.githubusercontent.com/u/83688818?v=4",
+      "profile": "https://github.com/unDefFtr",
+      "contributions": [
+        "content",
+        "data",
+        "doc"
+      ]
+    },
+    {
+      "login": "Aris-Offline",
+      "name": "Aris",
+      "avatar_url": "https://avatars.githubusercontent.com/u/65645068?v=4",
+      "profile": "https://github.com/Aris-Offline",
+      "contributions": [
+        "content",
+        "data",
+        "doc",
+        "maintenance"
+      ]
+    },
+    {
+      "login": "typed-sigterm",
+      "name": "Typed SIGTERM",
+      "avatar_url": "https://avatars.githubusercontent.com/u/145281501?v=4",
+      "profile": "https://blog.typed-sigterm.me/",
+      "contributions": [
+        "content"
+      ]
+    },
+    {
+      "login": "Jursin",
+      "name": "Jursin",
+      "avatar_url": "https://avatars.githubusercontent.com/u/127487914?v=4",
+      "profile": "https://github.com/Jursin",
+      "contributions": [
+        "doc"
+      ]
+    },
+    {
+      "login": "iuu6",
+      "name": "IUU6",
+      "avatar_url": "https://avatars.githubusercontent.com/u/60139353?v=4",
+      "profile": "https://www.rzly.net",
+      "contributions": [
+        "content",
+        "doc"
+      ]
+    },
+    {
+      "login": "DryIce-cc",
+      "name": "干冰DryIce",
+      "avatar_url": "https://avatars.githubusercontent.com/u/165131008?v=4",
+      "profile": "https://github.com/DryIce-cc",
+      "contributions": [
+        "doc"
+      ]
+    },
+    {
+      "login": "alovelydoge",
+      "name": "alovelydoge",
+      "avatar_url": "https://avatars.githubusercontent.com/u/156295679?v=4",
+      "profile": "https://github.com/alovelydoge",
+      "contributions": [
+        "doc",
+        "bug"
+      ]
+    },
+    {
+      "login": "Makitoid",
+      "name": "SJB.w",
+      "avatar_url": "https://avatars.githubusercontent.com/u/123004192?v=4",
+      "profile": "https://github.com/makitoid",
+      "contributions": [
+        "doc",
+        "bug"
+      ]
+    },
+    {
+      "login": "SunWuyuan",
+      "name": "孙悟元",
+      "avatar_url": "https://avatars.githubusercontent.com/u/88357633?v=4",
+      "profile": "https://wuyuan.dev",
+      "contributions": [
+        "doc",
+        "bug",
+        "content"
+      ]
+    }
+  ]
+}

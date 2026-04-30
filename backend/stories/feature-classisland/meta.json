@@ -1,0 +1,15 @@
+{
+  "id": "feature-classisland",
+  "category": "Editors' Choice",
+  "title": "重新定义班级大屏",
+  "subtitle": "探索 ClassIsland 带来的智能灵动体验",
+  "coverImage": "/api/stories/feature-classisland/cover.webp",
+  "date": "SATURDAY, APRIL 25",
+  "projects": [
+    {
+      "name": "ClassIsland",
+      "icon": "/local_images/icons/bfb5aacef78141036b715cecb31a4d57.svg"
+    }
+  ],
+  "theme": "dark"
+}

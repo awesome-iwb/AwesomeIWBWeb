@@ -1,0 +1,49 @@
+<h2>设计方案：详情页的 Git 风格分支图</h2>
+<p class="subtitle">下面是具体的技术实现方案。请确认这些细节是否符合你的期望。</p>
+
+<div class="section">
+  <h3>1. 数据结构 (Data Structure)</h3>
+  <p>在 <code>data.json</code> 中，为有血缘关系的项目增加 <code>parent</code> 字段：</p>
+  <pre class="bg-slate-900 text-emerald-400 p-4 rounded-xl overflow-x-auto">
+{
+  "name": "Ink Canvas Plus",
+  "parent": "Ink Canvas" // 指向被 Fork 的上游项目
+}
+  </pre>
+</div>
+
+<div class="section">
+  <h3>2. 核心逻辑 (Core Logic)</h3>
+  <p>在前端 <code>ProjectDetailView.vue</code> 渲染时：</p>
+  <ul class="list-disc pl-6 space-y-2 mt-2 text-slate-600">
+    <li>遍历 <code>allProjects</code>，找到当前应用的所有上游（Parent）和下游（Children）。</li>
+    <li>使用 DFS 或简单的树形结构，重建整个“家族树”（Lineage Tree）。</li>
+  </ul>
+</div>
+
+<div class="section">
+  <h3>3. 视觉表现 (Visual Design)</h3>
+  <p>我们会使用 HTML/CSS 配合 SVG 连线（或者纯 TailwindCSS Flex 布局）来绘制一个类似 GitHub Network / Git Graph 的节点图：</p>
+  <ul class="list-disc pl-6 space-y-2 mt-2 text-slate-600">
+    <li><strong>节点 (Nodes)</strong>：显示应用的图标和名称，当前应用高亮显示。</li>
+    <li><strong>连线 (Edges)</strong>：带有方向的曲线，表示派生关系。</li>
+    <li><strong>交互 (Interactions)</strong>：点击任何节点，平滑路由跳转到该项目的详情页。</li>
+  </ul>
+</div>
+
+<div class="options">
+  <div class="option" data-choice="approve" onclick="toggleSelect(this)">
+    <div class="letter">👍</div>
+    <div class="content">
+      <h3>方案很棒，可以直接开干</h3>
+      <p>我已经准备好实施这套设计了。</p>
+    </div>
+  </div>
+  <div class="option" data-choice="revise" onclick="toggleSelect(this)">
+    <div class="letter">✏️</div>
+    <div class="content">
+      <h3>需要修改</h3>
+      <p>在开始之前，我想补充或修改一些要求。</p>
+    </div>
+  </div>
+</div>

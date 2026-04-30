@@ -1,0 +1,14 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: awesome_iwb
+      POSTGRES_USER: awesome_iwb
+      POSTGRES_PASSWORD: awesome_iwb_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - awesome_iwb_pgdata:/var/lib/postgresql/data
+
+volumes:
+  awesome_iwb_pgdata:

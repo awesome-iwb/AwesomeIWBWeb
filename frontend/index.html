@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Awesome IWB</title>
+    <!-- 增加 GitHub 的 DNS 预解析，加快 Giscus 在国内环境的解析速度 -->
+    <link rel="dns-prefetch" href="https://github.com">
+    <link rel="dns-prefetch" href="https://api.github.com">
+    <link rel="dns-prefetch" href="https://giscus.app">
+    <link rel="preconnect" href="https://giscus.app" crossorigin>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+    <script>
+      // 当 giscus iframe 加载完成时，隐藏 fallback 动画
+      window.addEventListener('message', function(event) {
+        if (event.origin !== 'https://giscus.app') return;
+        if (!(typeof event.data === 'object' && event.data.giscus)) return;
+        
+        const fallback = document.getElementById('giscus-loading-fallback');
+        if (fallback) {
+          fallback.style.display = 'none';
+        }
+      });
+    </script>
+  </body>
+</html>
