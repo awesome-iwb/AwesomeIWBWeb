@@ -9,6 +9,7 @@ type FooterOrg = {
 };
 
 const hzLogoOk = ref(true);
+const stcnLogoOk = ref(true);
 
 const orgs: FooterOrg[] = [
   {
@@ -18,7 +19,7 @@ const orgs: FooterOrg[] = [
   },
   {
     key: 'smart-teach',
-    name: 'Smart Teach',
+    name: '智教联盟',
     href: '#'
   },
   {
@@ -52,9 +53,16 @@ const orgs: FooterOrg[] = [
             </div>
           </div>
           <div v-else-if="org.key === 'smart-teach'" class="shrink-0 h-10 w-full max-w-64 flex items-center justify-center">
-            <span class="text-slate-800 dark:text-slate-100 font-black tracking-tight text-lg">
-              {{ org.name }}
-            </span>
+            <img
+              v-if="stcnLogoOk"
+              src="/images/stcn.png"
+              alt="智教联盟"
+              class="h-full w-full object-contain scale-100 sm:scale-[1.5]"
+              @error="stcnLogoOk = false"
+            />
+            <div v-else class="h-full w-full flex items-center justify-center text-slate-500 dark:text-slate-300 font-extrabold text-xs">
+              LOGO
+            </div>
           </div>
           <div v-else-if="org.key === 'awesome-iwb'" class="shrink-0 w-full flex items-center justify-center">
             <BrandMark variant="footer" />

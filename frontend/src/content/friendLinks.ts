@@ -17,7 +17,8 @@ export const friendLinks: FriendLink[] = [
     key: 'zhijiaolianmeng',
     name: '智教联盟',
     href: 'https://forum.smart-teach.cn',
-    description: '面向一线电教与教师的交流社区，分享工具、经验与问题解决方案。'
+    description: '面向一线电教与教师的交流社区，分享工具、经验与问题解决方案。',
+    logo: '/images/stcn.png'
   },
   {
     key: 'classisland',
