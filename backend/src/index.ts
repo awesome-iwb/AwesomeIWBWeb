@@ -27,6 +27,11 @@ import { logAudit, listAuditLogs } from "./services/audit";
 import { createProjectRevision, listProjectRevisions, rollbackProject } from "./services/revisions";
 import { createSubmission, getSubmission, listSubmissions, updateSubmissionStatus } from "./services/submissions";
 import { normalizeAiUsageState, readAiUsageStateField } from "./domain/aiUsage";
+import { applyProjectPatch } from "./domain/projectUpdate";
+import { normalizeProjectInput } from "./domain/normalizeProjectInput";
+import { createFeedback, listFeedback, updateFeedback } from "./services/feedback";
+import { sanitizeIssueLabels } from "./domain/feedbackLabels";
+import { normalizeProjectTags } from "./domain/projectTags";
 
 /**
  * Awesome-IWB backend API.
@@ -43,10 +48,14 @@ await fs.mkdir(STORIES_DIR, { recursive: true });
 const RUNTIME_DIR = path.join(__dirname, "../runtime");
 await fs.mkdir(RUNTIME_DIR, { recursive: true });
 
+const UPLOADS_DIR = path.join(RUNTIME_DIR, "uploads");
+await fs.mkdir(UPLOADS_DIR, { recursive: true });
+
 const DATA_PATH = path.join(RUNTIME_DIR, "data.json");
 const SUBMISSIONS_PATH = path.join(RUNTIME_DIR, "submissions.json");
 const AUDIT_PATH = path.join(RUNTIME_DIR, "audit.json");
 const REVISIONS_PATH = path.join(RUNTIME_DIR, "revisions.json");
+const FEEDBACK_PATH = path.join(RUNTIME_DIR, "feedback.json");
 
 /**
  * Toggle DB mode via environment.
@@ -85,6 +94,7 @@ const data = await loadJsonFile<any>(DATA_PATH, structuredClone(seedData as any)
 const submissionsFile = await loadJsonFile<any[]>(SUBMISSIONS_PATH, []);
 const auditFile = await loadJsonFile<any[]>(AUDIT_PATH, []);
 const revisionsFile = await loadJsonFile<Record<string, any[]>>(REVISIONS_PATH, {});
+const feedbackFile = await loadJsonFile<any[]>(FEEDBACK_PATH, []);
 
 /**
  * Ensure every project payload returned by JSON mode has a stable `ai_usage_state`.
@@ -93,7 +103,8 @@ const revisionsFile = await loadJsonFile<Record<string, any[]>>(REVISIONS_PATH, 
  * (`ai_generated`, `human_verified`).
  */
 function withAiUsageState(p: any) {
-  return { ...p, ai_usage_state: normalizeAiUsageState(p) };
+  const next = { ...p, ai_usage_state: normalizeAiUsageState(p) };
+  return normalizeProjectTags(next);
 }
 
 /**
@@ -189,6 +200,121 @@ const app = new Elysia()
     }
     return await getStats();
   })
+  .get("/api/feedback", async ({ query }) => {
+    const project_name = typeof (query as any)?.project_name === "string" ? String((query as any).project_name) : "";
+    const kind = typeof (query as any)?.kind === "string" ? String((query as any).kind) : "";
+    const status = typeof (query as any)?.status === "string" ? String((query as any).status) : "";
+    const limit = typeof (query as any)?.limit === "string" ? Number((query as any).limit) : undefined;
+
+    if (dbEnabled) {
+      return await listFeedback({
+        project_name: project_name || undefined,
+        kind: kind === "comment" || kind === "bug" ? (kind as any) : undefined,
+        status: status === "open" || status === "closed" ? (status as any) : undefined,
+        limit
+      });
+    }
+
+    const items = feedbackFile
+      .filter((e: any) => (!project_name ? true : String(e.project_name ?? "") === project_name))
+      .filter((e: any) => (!kind ? true : String(e.kind ?? "") === kind))
+      .filter((e: any) => {
+        if (status === "open") return String(e.status ?? "open") !== "done";
+        if (status === "closed") return String(e.status ?? "open") === "done";
+        return true;
+      })
+      .sort((a: any, b: any) => String(b.created_at ?? "").localeCompare(String(a.created_at ?? "")));
+    return items.slice(0, Math.min(Math.max(limit ?? 100, 1), 200));
+  })
+  .post("/api/feedback", async ({ body, set }) => {
+    const payload: any = body as any;
+    const kind = payload?.kind === "bug" ? "bug" : "comment";
+    const project_name = String(payload?.project_name ?? "").trim();
+    const actor_username = String(payload?.actor?.username ?? "").trim();
+    const actor_role = String(payload?.actor?.role ?? "").trim();
+    const title = String(payload?.title ?? "").trim();
+    const bodyText = String(payload?.body ?? "").trim();
+    const labels = sanitizeIssueLabels(payload?.labels ?? []);
+
+    if (!project_name || !actor_username) {
+      set.status = 400;
+      return { error: "project_name and actor.username are required" };
+    }
+    if (kind === "bug" && (!title || !bodyText)) {
+      set.status = 400;
+      return { error: "title and body are required for bug" };
+    }
+    if (kind === "comment" && !bodyText) {
+      set.status = 400;
+      return { error: "body is required" };
+    }
+
+    if (dbEnabled) {
+      const created = await createFeedback({
+        project_name,
+        kind,
+        title: kind === "bug" ? title : "",
+        body: bodyText,
+        labels: kind === "bug" ? labels : [],
+        status: "open",
+        actor_username,
+        actor_role
+      } as any);
+      return created;
+    }
+
+    const now = new Date().toISOString();
+    const created = {
+      id: randomUUID(),
+      project_name,
+      kind,
+      title: kind === "bug" ? title : "",
+      body: bodyText,
+      labels: kind === "bug" ? labels : [],
+      status: "open",
+      actor_username,
+      actor_role,
+      created_at: now,
+      updated_at: now
+    };
+    feedbackFile.unshift(created);
+    await saveJsonFile(FEEDBACK_PATH, feedbackFile);
+    return created;
+  })
+  .patch("/api/feedback/:id", async ({ params: { id }, body, set }) => {
+    const payload: any = body as any;
+    const status = typeof payload?.status === "string" ? payload.status : undefined;
+    const labels = payload?.labels ? sanitizeIssueLabels(payload.labels) : undefined;
+    if (status && status !== "open" && status !== "doing" && status !== "done") {
+      set.status = 400;
+      return { error: "invalid status" };
+    }
+
+    if (dbEnabled) {
+      const updated = await updateFeedback({ id, status, labels } as any);
+      if (!updated) {
+        set.status = 404;
+        return { error: "Not found" };
+      }
+      return updated;
+    }
+
+    const idx = feedbackFile.findIndex((e: any) => e.id === id);
+    if (idx === -1) {
+      set.status = 404;
+      return { error: "Not found" };
+    }
+    const before = feedbackFile[idx];
+    const next = {
+      ...before,
+      status: status ?? before.status,
+      labels: labels ?? before.labels,
+      updated_at: new Date().toISOString()
+    };
+    feedbackFile[idx] = next;
+    await saveJsonFile(FEEDBACK_PATH, feedbackFile);
+    return next;
+  })
   .post("/api/admin/categories", async ({ body, set }) => {
     const input = body as any;
     if (!input?.name) {
@@ -273,6 +399,7 @@ const app = new Elysia()
         recommendation: Array.isArray(normalized.recommendation) ? normalized.recommendation.join(", ") : "",
         ai_usage_state: normalized.ai_usage_state ?? "unknown",
         github_url: normalized.github_url,
+        platform_developers: normalized.platform_developers ?? [],
         avatar: normalized.avatar,
         icon: normalized.icon,
         banner: normalized.banner,
@@ -326,6 +453,7 @@ const app = new Elysia()
         recommendation: Array.isArray(normalized.recommendation) ? normalized.recommendation.join(", ") : before.recommendation,
         ai_usage_state: normalized.ai_usage_state ?? before.ai_usage_state ?? normalizeAiUsageState(before),
         github_url: normalized.github_url,
+        platform_developers: normalized.platform_developers ?? before.platform_developers ?? [],
         avatar: normalized.avatar,
         icon: normalized.icon,
         banner: normalized.banner,
@@ -759,6 +887,29 @@ const app = new Elysia()
     await logAuditCompat({ action: "submit", entity_type: "submission", entity_id: created.id });
     return { success: true, submissionId: created.id };
   })
+  .post("/api/dev/submissions", async ({ body, set }) => {
+    const payload: any = body as any;
+    if (payload?.kind !== "project_update") {
+      set.status = 400;
+      return { error: "kind must be project_update" };
+    }
+    if (!payload?.project_name || !payload?.patch || !payload?.actor?.username) {
+      set.status = 400;
+      return { error: "project_name, patch, actor.username are required" };
+    }
+
+    if (!dbEnabled) {
+      const created = { id: randomUUID(), status: "pending", payload, review_note: "", created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
+      submissionsFile.unshift(created);
+      await saveJsonFile(SUBMISSIONS_PATH, submissionsFile);
+      await logAuditCompat({ action: "submit", entity_type: "submission", entity_id: created.id, diff: { kind: "project_update" } });
+      return { success: true, submissionId: created.id };
+    }
+
+    const created = await createSubmission(payload);
+    await logAuditCompat({ action: "submit", entity_type: "submission", entity_id: created.id, diff: { kind: "project_update" } });
+    return { success: true, submissionId: created.id };
+  })
   .post("/api/submit", async ({ body, set }) => {
     const payload: any = body as any;
     if (!payload?.name || !payload?.developer || !payload?.github_url) {
@@ -833,6 +984,77 @@ const app = new Elysia()
       if (!submission) {
         set.status = 404;
         return { error: "Submission not found" };
+      }
+
+      const sp: any = submission.payload ?? {};
+      if (sp?.kind === "project_update") {
+        const projectName = String(sp.project_name ?? "").trim();
+        if (!projectName) {
+          set.status = 400;
+          return { error: "payload.project_name is required" };
+        }
+        const patch = sp.patch ?? {};
+
+        if (!dbEnabled) {
+          let foundCat: any = null;
+          let foundIdx = -1;
+          for (const c of (data as any).categories) {
+            const idx = (c.projects ?? []).findIndex((p: any) => String(p.name).toLowerCase() === projectName.toLowerCase());
+            if (idx !== -1) {
+              foundCat = c;
+              foundIdx = idx;
+              break;
+            }
+          }
+          if (!foundCat || foundIdx === -1) {
+            set.status = 404;
+            return { error: "Project not found" };
+          }
+          const before = structuredClone(foundCat.projects[foundIdx]);
+          const next = applyProjectPatch(before, patch);
+
+          const revisionsKey = encodeURIComponent(before.name);
+          const list = revisionsFile[revisionsKey] ?? [];
+          list.unshift({ id: randomUUID(), created_at: new Date().toISOString(), snapshot: before });
+          revisionsFile[revisionsKey] = list.slice(0, 20);
+
+          foundCat.projects[foundIdx] = next;
+          submission.status = "approved";
+          submission.review_note = "";
+          submission.updated_at = new Date().toISOString();
+
+          setTimeout(() => {
+            void saveJsonFile(REVISIONS_PATH, revisionsFile);
+            void saveJsonFile(DATA_PATH, data);
+            void saveJsonFile(SUBMISSIONS_PATH, submissionsFile);
+          }, 0);
+
+          const projectId = encodeURIComponent(next.name);
+          void logAuditCompat({ action: "approve", entity_type: "submission", entity_id: id, diff: { project_id: projectId, kind: "project_update" } });
+          void logAuditCompat({ action: "update", entity_type: "project", entity_id: projectId, diff: { before, after: next, from_submission: id } });
+          set.headers["content-type"] = "application/json; charset=utf-8";
+          return JSON.stringify({ success: true, project_id: projectId });
+        }
+
+        const before = await getProjectByKey(projectName);
+        if (!before) {
+          set.status = 404;
+          return { error: "Project not found" };
+        }
+        await createProjectRevision(before.id);
+        const next = await updateProject(before.id, {
+          description: typeof patch.description === "string" ? patch.description : undefined,
+          keywords: Array.isArray(patch.keywords) ? patch.keywords : typeof patch.keywords === "string" ? patch.keywords.split(/[,，;]/).map((x: any) => String(x).trim()).filter(Boolean) : undefined
+        } as any);
+        if (!next) {
+          set.status = 500;
+          return { error: "Update failed" };
+        }
+        await updateSubmissionStatus(id, "approved", "");
+        await logAuditCompat({ action: "approve", entity_type: "submission", entity_id: id, diff: { project_id: before.id, kind: "project_update" } });
+        await logAuditCompat({ action: "update", entity_type: "project", entity_id: before.id, diff: { before, after: next, from_submission: id } });
+        set.headers["content-type"] = "application/json; charset=utf-8";
+        return JSON.stringify({ success: true, project_id: before.id });
       }
       const input: any = body as any;
       const projectInput = normalizeProjectInput(input?.project ?? submission.payload ?? {});
@@ -984,13 +1206,25 @@ const app = new Elysia()
 
     return { success: true };
   })
+  .get("/api/uploads/:filename", async ({ params: { filename }, set }) => {
+    const safe = path.basename(filename);
+    const filePath = path.join(UPLOADS_DIR, safe);
+    try {
+      await fs.access(filePath);
+      set.headers["cache-control"] = "public, max-age=31536000, immutable";
+      return Bun.file(filePath);
+    } catch {
+      set.status = 404;
+      return { error: "Not found" };
+    }
+  })
   .post("/api/upload", async ({ body: { image } }) => {
     if (!image) throw new Error("No image provided");
     const ext = image.name.split('.').pop() || 'png';
     const filename = `${randomUUID()}.${ext}`;
-    const uploadPath = path.join(__dirname, '../../frontend/public/uploads', filename);
-    await write(uploadPath, image);
-    return { url: `/uploads/${filename}` };
+    const uploadPath = path.join(UPLOADS_DIR, filename);
+    await Bun.write(uploadPath, image);
+    return { url: `/api/uploads/${filename}` };
   }, {
     body: t.Object({
       image: t.File()
@@ -1041,55 +1275,6 @@ function normalizeCsvRow(row: Record<string, string>) {
 
   if (typeof out.stars === "string" && out.stars.trim().length) out.stars = Number(out.stars);
   return out;
-}
-
-/**
- * Sanitize project input from API payloads and CSV import.
- *
- * Conventions:
- * - List-like fields accept arrays or delimiter-separated strings (`; , ，`).
- * - `ai_usage_state` is only accepted when explicitly present in the payload; otherwise it is left
- *   undefined so JSON-mode updates can preserve existing values and/or fall back to legacy flags.
- * - Unknown / missing fields are normalized to stable empty values for the frontend.
- */
-function normalizeProjectInput(p: any) {
-  const normalizeList = (v: any) => {
-    if (Array.isArray(v)) return v.map((x) => String(x).trim()).filter(Boolean);
-    if (typeof v !== "string") return [];
-    const s = v.trim();
-    if (!s) return [];
-    if (s.startsWith("[") && s.endsWith("]")) {
-      try {
-        const arr = JSON.parse(s);
-        if (Array.isArray(arr)) return arr.map((x) => String(x).trim()).filter(Boolean);
-      } catch {}
-    }
-    return s.split(/[;,，]/).map((x) => x.trim()).filter(Boolean);
-  };
-
-  return {
-    slug: typeof p.slug === "string" ? p.slug.trim() : undefined,
-    name: String(p.name ?? "").trim(),
-    category_id: typeof p.category_id === "string" ? p.category_id : null,
-    developer: typeof p.developer === "string" ? p.developer : "",
-    status: typeof p.status === "string" ? p.status : "",
-    version: typeof p.version === "string" ? p.version : "",
-    ai_usage_state: readAiUsageStateField(p),
-    description: typeof p.description === "string" ? p.description : "",
-    keywords: normalizeList(p.keywords),
-    recommendation: normalizeList(p.recommendation),
-    github_url: typeof p.github_url === "string" ? p.github_url : "",
-    avatar: typeof p.avatar === "string" ? p.avatar : "",
-    icon: typeof p.icon === "string" ? p.icon : "",
-    banner: typeof p.banner === "string" ? p.banner : "",
-    stars: typeof p.stars === "number" && !Number.isNaN(p.stars) ? p.stars : 0,
-    language: typeof p.language === "string" ? p.language : "",
-    last_update: typeof p.last_update === "string" ? p.last_update : null,
-    github_is_fork: typeof p.github_is_fork === "boolean" ? p.github_is_fork : false,
-    github_parent_url: typeof p.github_parent_url === "string" ? p.github_parent_url : "",
-    github_source_url: typeof p.github_source_url === "string" ? p.github_source_url : "",
-    extra: typeof p.extra === "object" && p.extra ? p.extra : {}
-  };
 }
 
 console.log(

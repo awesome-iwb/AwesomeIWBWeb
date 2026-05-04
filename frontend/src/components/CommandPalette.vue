@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router';
 import { Search, X, Folder, Hash, ArrowRight } from 'lucide-vue-next';
 
 import { useProjects } from '../composables/useProjects';
+import { includesNormalized } from '../utils/search';
 
 const props = defineProps<{
   isOpen: boolean;
@@ -19,13 +20,12 @@ const searchInput = ref<HTMLInputElement | null>(null);
 
 const searchResults = computed(() => {
   if (!query.value.trim()) return [];
-  const lowerQuery = query.value.toLowerCase();
   
   return allProjects.value.filter(p => 
-    p.name.toLowerCase().includes(lowerQuery) || 
-    p.description.toLowerCase().includes(lowerQuery) ||
-    p.keywords.some(k => k.toLowerCase().includes(lowerQuery)) ||
-    p.developer.toLowerCase().includes(lowerQuery)
+    includesNormalized(p.name, query.value) || 
+    includesNormalized(p.description, query.value) ||
+    p.keywords.some(k => includesNormalized(k, query.value)) ||
+    includesNormalized(p.developer, query.value)
   ).slice(0, 8); // Max 8 results
 });
 
@@ -48,7 +48,7 @@ onMounted(() => {
 const getFallbackImage = (name: string) => {
   const initial = name ? name.charAt(0).toUpperCase() : '?';
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect fill="#cbd5e1" width="100" height="100" rx="24"/><text fill="#475569" font-family="sans-serif" font-size="40" font-weight="bold" x="50%" y="50%" dominant-baseline="middle" text-anchor="middle">${initial}</text></svg>`;
-  return `data:image/svg+xml;base64,${btoa(svg)}`;
+  return `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svg)))}`;
 };
 </script>
 

@@ -52,6 +52,13 @@
             >
               项目审核
             </button>
+            <button 
+              @click="activeTab = 'feedback'" 
+              class="px-4 py-2 rounded-full font-bold transition-colors"
+              :class="activeTab === 'feedback' ? 'bg-emerald-500 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-300 dark:hover:bg-slate-700'"
+            >
+              评论与反馈
+            </button>
           </div>
         </div>
         <div class="flex gap-4">
@@ -283,6 +290,26 @@
               <input type="text" v-model="projectDraft.github_url" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-blue-500" />
             </div>
 
+            <div class="col-span-2">
+              <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2 flex items-center justify-between">
+                <span>关联开发者账号（平台）</span>
+                <button @click="addPlatformDeveloper" type="button" class="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-extrabold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+                  添加
+                </button>
+              </label>
+              <div class="space-y-2">
+                <div v-for="(d, idx) in (projectDraft.platform_developers || [])" :key="idx" class="grid grid-cols-1 sm:grid-cols-5 gap-2 p-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white/70 dark:bg-slate-900/30">
+                  <input v-model="d.username" type="text" placeholder="username（如 cjk_mkp）" class="sm:col-span-4 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 outline-none focus:border-blue-500 text-sm" />
+                  <button @click="removePlatformDeveloper(Number(idx))" type="button" class="sm:col-span-1 px-3 py-2 rounded-xl bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 font-extrabold hover:bg-rose-100 dark:hover:bg-rose-500/20 transition-colors">
+                    删除
+                  </button>
+                </div>
+                <div v-if="!(projectDraft.platform_developers || []).length" class="text-sm text-slate-400">
+                  暂无关联账号
+                </div>
+              </div>
+            </div>
+
             <div class="col-span-2 sm:col-span-1">
               <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">编程语言 (Language)</label>
               <input type="text" v-model="projectDraft.language" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-blue-500" />
@@ -367,8 +394,14 @@
               class="p-3 rounded-xl border cursor-pointer transition-all duration-200"
               :class="selectedSubmissionId === s.id ? 'bg-emerald-500 text-white border-emerald-500 shadow-md shadow-emerald-500/20' : 'bg-slate-50 dark:bg-slate-900/50 border-transparent hover:border-emerald-300'"
             >
-              <div class="font-bold text-sm truncate">{{ s.payload?.name || '未命名' }}</div>
-              <div class="text-xs opacity-80 truncate mt-1">{{ s.payload?.github_url || '' }}</div>
+              <div class="font-bold text-sm truncate">
+                <span v-if="s.payload?.kind === 'project_update'">变更：{{ s.payload?.project_name || '未命名' }}</span>
+                <span v-else>{{ s.payload?.name || '未命名' }}</span>
+              </div>
+              <div class="text-xs opacity-80 truncate mt-1">
+                <span v-if="s.payload?.kind === 'project_update'">{{ s.payload?.actor?.username ? `开发者：${s.payload.actor.username}` : '' }}</span>
+                <span v-else>{{ s.payload?.github_url || '' }}</span>
+              </div>
             </div>
             <div v-if="submissionsPage.items.length === 0" class="text-sm text-slate-400 text-center py-10">暂无待审核</div>
           </div>
@@ -383,7 +416,35 @@
           <div class="p-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50">
             <h2 class="text-xl font-bold text-slate-800 dark:text-white">审核项目提交</h2>
           </div>
-          <div class="p-8 grid grid-cols-2 gap-8">
+          <div v-if="submissionKind === 'project_update'" class="p-8 space-y-6">
+            <div class="p-5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
+              <div class="text-sm font-extrabold text-slate-800 dark:text-slate-200 mb-2">目标项目</div>
+              <div class="text-lg font-extrabold text-slate-900 dark:text-white">{{ submissionDraft.project_name }}</div>
+              <div class="text-sm text-slate-500 dark:text-slate-400 mt-1">开发者：{{ submissionDraft.actor?.username || '-' }}</div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <div class="space-y-2">
+                <div class="text-sm font-extrabold text-slate-700 dark:text-slate-300">新简介</div>
+                <div class="p-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 whitespace-pre-wrap text-sm">{{ submissionDraft.patch?.description || '' }}</div>
+              </div>
+              <div class="space-y-2">
+                <div class="text-sm font-extrabold text-slate-700 dark:text-slate-300">新关键词</div>
+                <div class="p-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 whitespace-pre-wrap text-sm">{{ submissionDraft.patch?.keywords || '' }}</div>
+              </div>
+            </div>
+
+            <div class="space-y-2">
+              <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">驳回原因（可选）</label>
+              <textarea v-model="submissionReviewNote" rows="2" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-emerald-500 resize-none"></textarea>
+            </div>
+
+            <div class="flex flex-col sm:flex-row gap-3">
+              <button @click="approveSubmission" class="flex-1 px-4 py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold transition-colors">通过并应用</button>
+              <button @click="rejectSubmission" class="flex-1 px-4 py-3 rounded-2xl bg-rose-500 hover:bg-rose-600 text-white font-bold transition-colors">驳回</button>
+            </div>
+          </div>
+          <div v-else class="p-8 grid grid-cols-2 gap-8">
             <div class="col-span-2 sm:col-span-1">
               <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">项目名称</label>
               <input type="text" v-model="submissionDraft.name" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-emerald-500" />
@@ -432,6 +493,10 @@
         <div v-else class="col-span-3 flex items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-3xl h-[700px]">
           <p class="text-slate-400">请在左侧选择一个待审核项目</p>
         </div>
+      </div>
+
+      <div v-else-if="activeTab === 'feedback'" class="max-w-5xl mx-auto">
+        <CommentPanel project-name="__admin__" variant="ops" />
       </div>
 
       <div v-if="showCategoryManager" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
@@ -513,6 +578,7 @@ import { useRouter } from 'vue-router';
 import { Save, Plus, Bold, Italic, Heading, Quote, List, Image as ImageIcon } from 'lucide-vue-next';
 import MarkdownIt from 'markdown-it';
 import DOMPurify from 'dompurify';
+import CommentPanel from '../components/CommentPanel.vue';
 
 const router = useRouter();
 const md = new MarkdownIt({ html: true, breaks: true });
@@ -546,7 +612,7 @@ const selectedIndex = ref<number | null>(null);
 const viewMode = ref<'edit' | 'split' | 'preview'>('split');
 const isSaving = ref(false);
 
-const activeTab = ref<'stories' | 'projects' | 'submissions'>('stories');
+const activeTab = ref<'stories' | 'projects' | 'submissions' | 'feedback'>('stories');
 
 const adminCategories = ref<any[]>([]);
 const projectsPage = ref<{ items: any[]; page: number; pageSize: number; total: number }>({
@@ -586,6 +652,7 @@ const submissionsPage = ref<{ items: any[]; page: number; pageSize: number; tota
 const submissionQuery = ref<{ q: string; page: number; pageSize: number }>({ q: '', page: 1, pageSize: 20 });
 const selectedSubmissionId = ref<string | null>(null);
 const submissionDraft = ref<any | null>(null);
+const submissionKind = ref<'new_project' | 'project_update'>('new_project');
 const submissionReviewNote = ref('');
 const submissionCategoryId = ref('');
 const submissionNewCategoryName = ref('');
@@ -594,8 +661,6 @@ const currentStory = computed(() => {
   if (selectedIndex.value === null) return null;
   return stories.value[selectedIndex.value];
 });
-
-const currentProject = computed(() => projectDraft.value);
 
 const renderedMarkdown = computed(() => {
   if (!currentStory.value?.content) return '';
@@ -797,10 +862,33 @@ const normalizeProjectDraft = (p: any) => {
   const clone = { ...p };
   if (Array.isArray(clone.keywords)) clone.keywords = clone.keywords.join(', ');
   if (Array.isArray(clone.recommendation)) clone.recommendation = clone.recommendation.join(', ');
+  if (!Array.isArray(clone.platform_developers)) clone.platform_developers = [];
+  clone.platform_developers = clone.platform_developers.map((d: any) => {
+    const legacy = typeof d?.user_id === 'string' ? d.user_id : '';
+    const stcn = typeof d?.stcn_user_id === 'string' ? d.stcn_user_id : legacy;
+    return {
+      username: typeof d?.username === 'string' ? d.username : '',
+      stcn_user_id: stcn,
+      sectl_user_id: typeof d?.sectl_user_id === 'string' ? d.sectl_user_id : '',
+      lincube_user_id: typeof d?.lincube_user_id === 'string' ? d.lincube_user_id : ''
+    };
+  });
   if (clone.ai_usage_state !== 'unknown' && clone.ai_usage_state !== 'over50' && clone.ai_usage_state !== 'under50') {
     clone.ai_usage_state = 'unknown';
   }
   return clone;
+};
+
+const addPlatformDeveloper = () => {
+  if (!projectDraft.value) return;
+  if (!Array.isArray(projectDraft.value.platform_developers)) projectDraft.value.platform_developers = [];
+  projectDraft.value.platform_developers.push({ username: '', stcn_user_id: '', sectl_user_id: '', lincube_user_id: '' });
+};
+
+const removePlatformDeveloper = (idx: number) => {
+  if (!projectDraft.value) return;
+  if (!Array.isArray(projectDraft.value.platform_developers)) return;
+  projectDraft.value.platform_developers.splice(idx, 1);
 };
 
 const fetchAdminCategories = async () => {
@@ -1050,6 +1138,20 @@ const fetchSubmissions = async () => {
 const selectSubmission = (s: any) => {
   selectedSubmissionId.value = s.id;
   const payload = s.payload ?? {};
+  if (payload.kind === 'project_update') {
+    submissionKind.value = 'project_update';
+    submissionDraft.value = {
+      kind: 'project_update',
+      project_name: payload.project_name ?? '',
+      patch: payload.patch ?? {},
+      actor: payload.actor ?? {}
+    };
+    submissionReviewNote.value = '';
+    submissionCategoryId.value = '';
+    submissionNewCategoryName.value = '';
+    return;
+  }
+  submissionKind.value = 'new_project';
   submissionDraft.value = normalizeProjectDraft({
     name: payload.name ?? '',
     developer: payload.developer ?? '',
@@ -1070,6 +1172,25 @@ const selectSubmission = (s: any) => {
 
 const approveSubmission = async () => {
   if (!selectedSubmissionId.value || !submissionDraft.value) return;
+  if (submissionKind.value === 'project_update') {
+    const res = await fetch(`/api/admin/submissions/${selectedSubmissionId.value}/approve`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({})
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      alert(json?.error ?? '审核失败');
+      return;
+    }
+    alert('已通过并应用变更');
+    submissionDraft.value = null;
+    selectedSubmissionId.value = null;
+    await fetchAdminProjects();
+    await fetchSubmissions();
+    activeTab.value = 'projects';
+    return;
+  }
   const toList = (v: any) => {
     if (Array.isArray(v)) return v;
     if (typeof v !== 'string') return [];

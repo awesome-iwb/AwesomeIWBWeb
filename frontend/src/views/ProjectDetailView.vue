@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from 'vue';
+import { ref, onMounted, computed, watch, onBeforeUnmount } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useHead } from '@vueuse/head';
 import MarkdownIt from 'markdown-it';
 import DOMPurify from 'dompurify';
 import ProjectLineageGraph from '../components/ProjectLineageGraph.vue';
+import CommentPanel from '../components/CommentPanel.vue';
+import { computeCursorFrames } from '../utils/captchaCursor';
 import { useProjects } from '../composables/useProjects';
 import type { Project } from '../composables/useProjects';
 import { 
@@ -25,7 +27,6 @@ const route = useRoute();
 const router = useRouter();
 const { fetchProjectByName, allProjects, fetchProjects } = useProjects();
 const loading = ref(true);
-const isSearchOpen = ref(false);
 
 const project = ref<Project | null>(null);
 
@@ -46,11 +47,78 @@ let aiBadgeTimeout: ReturnType<typeof setTimeout>;
 
 const cursorState = ref({
   show: false,
-  x: 120,
-  y: 60,
+  x: 0,
+  y: 0,
   clicking: false,
-  moving: false
+  transitionMs: 0
 });
+
+const cursorAccent = ref<string>('#10b981');
+const developerAvatarUrl = computed(() => {
+  if (!project.value) return '';
+  return project.value.avatar || '';
+});
+
+const organizationName = computed(() => {
+  return project.value?.organization || (project.value as any)?.extra?.feishu?.organization || '';
+});
+
+const techStack = computed(() => {
+  const tech = (project.value as any)?.extra?.feishu?.tech_stack;
+  if (Array.isArray(tech) && tech.length) return tech as string[];
+  return project.value?.language ? [project.value.language] : [];
+});
+
+const deriveAccentFromImage = (url: string) => {
+  return new Promise<string>((resolve) => {
+    if (typeof window === 'undefined' || !url) return resolve('#10b981');
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        const w = 16;
+        const h = 16;
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return resolve('#10b981');
+        ctx.drawImage(img, 0, 0, w, h);
+        const data = ctx.getImageData(0, 0, w, h).data;
+        let r = 0, g = 0, b = 0, n = 0;
+        for (let i = 0; i < data.length; i += 4) {
+          const a = data[i + 3];
+          if (a < 10) continue;
+          r += data[i];
+          g += data[i + 1];
+          b += data[i + 2];
+          n += 1;
+        }
+        if (!n) return resolve('#10b981');
+        r = Math.round(r / n);
+        g = Math.round(g / n);
+        b = Math.round(b / n);
+        resolve(`rgb(${r} ${g} ${b})`);
+      } catch {
+        resolve('#10b981');
+      }
+    };
+    img.onerror = () => resolve('#10b981');
+    img.src = url;
+  });
+};
+
+let cursorLoopTimer: ReturnType<typeof setInterval> | null = null;
+let cursorLoopRunning = false;
+let cursorBadgeEl: HTMLElement | null = null;
+let cursorKind: CursorDemoKind | null = null;
+const cursorTimers: ReturnType<typeof setTimeout>[] = [];
+const aiBadgeRef = ref<HTMLElement | null>(null);
+const humanBadgeRef = ref<HTMLElement | null>(null);
+const unknownBadgeRef = ref<HTMLElement | null>(null);
+void aiBadgeRef;
+void humanBadgeRef;
+void unknownBadgeRef;
 
 const handleAiBadgeClick = () => {
   if (showAiError.value) return;
@@ -75,36 +143,120 @@ const handleUnknownBadgeClick = () => {
   unknownLoading.value = true;
 };
 
-const runCursorAnimation = (isAi: boolean) => {
-  cursorState.value = { show: true, x: 120, y: 60, clicking: false, moving: false };
-  
-  setTimeout(() => {
-    cursorState.value.moving = true;
-    cursorState.value.x = 18;
-    cursorState.value.y = 18;
-  }, 100);
+type CursorDemoKind = "ai" | "human" | "unknown";
 
-  setTimeout(() => {
-    cursorState.value.clicking = true;
-  }, 900);
+const clearCursorTimers = () => {
+  while (cursorTimers.length) {
+    const t = cursorTimers.pop();
+    if (t) clearTimeout(t);
+  }
+};
 
-  setTimeout(() => {
-    cursorState.value.clicking = false;
-    if (isAi) {
-      handleAiBadgeClick();
-    } else {
-      handleHumanBadgeClick();
+const runCursorAnimation = (kind: CursorDemoKind, badge: HTMLElement) => {
+  if (typeof window === "undefined") return;
+  const checkbox = badge.querySelector("[data-captcha-checkbox]") as HTMLElement | null;
+  if (!checkbox) return;
+
+  const badgeRect = badge.getBoundingClientRect();
+  const checkboxRect = checkbox.getBoundingClientRect();
+  const frames = computeCursorFrames({
+    badge: { width: badgeRect.width, height: badgeRect.height },
+    checkbox: {
+      x: checkboxRect.left - badgeRect.left,
+      y: checkboxRect.top - badgeRect.top,
+      width: checkboxRect.width,
+      height: checkboxRect.height
     }
-  }, 1100);
+  });
 
-  setTimeout(() => {
-    cursorState.value.x = 80;
-    cursorState.value.y = 60;
-  }, 1400);
+  clearCursorTimers();
+  cursorState.value = { show: true, x: badgeRect.left + frames.start.x, y: badgeRect.top + frames.start.y, clicking: false, transitionMs: 0 };
 
-  setTimeout(() => {
-    cursorState.value.show = false;
-  }, 1900);
+  cursorTimers.push(
+    setTimeout(() => {
+      cursorState.value.transitionMs = 650;
+      cursorState.value.x = badgeRect.left + frames.target.x;
+      cursorState.value.y = badgeRect.top + frames.target.y;
+    }, 160)
+  );
+
+  cursorTimers.push(
+    setTimeout(() => {
+      cursorState.value.transitionMs = 120;
+      cursorState.value.clicking = true;
+    }, 980)
+  );
+
+  cursorTimers.push(
+    setTimeout(() => {
+      cursorState.value.transitionMs = 120;
+      cursorState.value.clicking = false;
+      if (kind === "ai") handleAiBadgeClick();
+      else if (kind === "human") handleHumanBadgeClick();
+      else handleUnknownBadgeClick();
+    }, 1140)
+  );
+
+  cursorTimers.push(
+    setTimeout(() => {
+      cursorState.value.transitionMs = 520;
+      cursorState.value.x = badgeRect.left + frames.exit.x;
+      cursorState.value.y = badgeRect.top + frames.exit.y;
+    }, 1420)
+  );
+
+  cursorTimers.push(
+    setTimeout(() => {
+      cursorState.value.show = false;
+    }, 2050)
+  );
+};
+
+const runCursorLoop = async (kind: CursorDemoKind, badge: HTMLElement) => {
+  cursorBadgeEl = badge;
+  cursorKind = kind;
+
+  if (cursorLoopTimer) clearInterval(cursorLoopTimer);
+  clearCursorTimers();
+
+  const avatar = developerAvatarUrl.value;
+  cursorAccent.value = await deriveAccentFromImage(avatar);
+
+  cursorLoopRunning = true;
+  runCursorAnimation(kind, badge);
+  cursorLoopTimer = setInterval(() => {
+    if (!cursorLoopRunning) return;
+    if (!cursorBadgeEl || !cursorKind) return;
+    runCursorAnimation(cursorKind, cursorBadgeEl);
+  }, 3200);
+};
+
+const stopCursorLoop = () => {
+  cursorLoopRunning = false;
+  if (cursorLoopTimer) clearInterval(cursorLoopTimer);
+  cursorLoopTimer = null;
+  cursorBadgeEl = null;
+  cursorKind = null;
+  clearCursorTimers();
+  cursorState.value.show = false;
+};
+
+const stopCursorLoopGraceful = () => {
+  cursorLoopRunning = false;
+  if (cursorLoopTimer) clearInterval(cursorLoopTimer);
+  cursorLoopTimer = null;
+  cursorBadgeEl = null;
+  cursorKind = null;
+};
+
+const onBadgeEnter = (kind: CursorDemoKind, e: MouseEvent) => {
+  const badge = e.currentTarget as HTMLElement | null;
+  if (!badge) return;
+  void runCursorLoop(kind, badge);
+};
+
+const onBadgeLeave = () => {
+  stopCursorLoopGraceful();
 };
 
 /**
@@ -123,14 +275,9 @@ const aiUsageState = computed(() => {
   return 'unknown';
 });
 
-watch(() => aiUsageState.value, (state) => {
+watch(() => aiUsageState.value, () => {
   unknownLoading.value = false;
-  if (state !== 'unknown') {
-    setTimeout(() => {
-      runCursorAnimation(state === 'over50');
-    }, 1000);
-  }
-}, { immediate: true });
+});
 
 const renderMarkdown = (text: string) => {
   if (!text) return '';
@@ -157,7 +304,7 @@ const formatDate = (isoString: string) => {
 const getFallbackImage = (name: string) => {
   const initial = name ? name.charAt(0).toUpperCase() : '?';
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect fill="#cbd5e1" width="100" height="100" rx="24"/><text fill="#475569" font-family="sans-serif" font-size="40" font-weight="bold" x="50%" y="50%" dominant-baseline="middle" text-anchor="middle">${initial}</text></svg>`;
-  return `data:image/svg+xml;base64,${btoa(svg)}`;
+  return `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svg)))}`;
 };
 
 const fetchAndSetProject = async () => {
@@ -188,6 +335,10 @@ watch(() => route.params.name, () => {
   if (route.name === 'project-detail') {
     fetchAndSetProject();
   }
+});
+
+onBeforeUnmount(() => {
+  stopCursorLoop();
 });
 
 // Need allProjects for the lineage graph component
@@ -254,6 +405,9 @@ if (allProjects.value.length === 0) {
               />
               <span class="text-sm font-semibold text-slate-700 dark:text-slate-300">{{ project?.developer }}</span>
             </div>
+            <div v-if="organizationName" class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100 dark:bg-slate-800/80 border border-slate-200/50 dark:border-slate-700 w-fit">
+              <span class="text-sm font-semibold text-slate-700 dark:text-slate-300 max-w-[240px] truncate">{{ organizationName }}</span>
+            </div>
             <div v-if="project?.recommendation.includes('推荐')" class="flex items-center gap-1 text-xs font-bold text-amber-600 bg-amber-50 dark:bg-amber-500/10 px-2.5 py-1 rounded-md border border-amber-200/50 dark:border-amber-500/20">
               <Star class="w-3.5 h-3.5 fill-current" /> Editors' Choice
             </div>
@@ -289,33 +443,15 @@ if (allProjects.value.length === 0) {
             </a>
 
             <!-- AI Generated Badge (reCAPTCHA style) -->
-            <div 
+            <div
               v-if="aiUsageState === 'over50'" 
               @click="handleAiBadgeClick"
+              @mouseenter="(e) => onBadgeEnter('ai', e)"
+              @mouseleave="onBadgeLeave"
               class="ml-auto flex items-center gap-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md p-2 px-3 shadow-sm select-none cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors relative group" 
               title="Click to verify"
+              ref="aiBadgeRef"
             >
-              <!-- Fake Figma Cursor -->
-              <div 
-                v-if="cursorState.show"
-                class="absolute z-50 flex flex-col pointer-events-none transition-all ease-out"
-                :class="[
-                  cursorState.moving ? 'opacity-100' : 'opacity-0',
-                  cursorState.clicking ? 'scale-90' : 'scale-100'
-                ]"
-                :style="{ 
-                  transform: `translate(${cursorState.x}px, ${cursorState.y}px)`,
-                  transitionDuration: cursorState.clicking ? '100ms' : '800ms'
-                }"
-              >
-                <svg class="w-6 h-6 text-emerald-500 drop-shadow-md -ml-1 -mt-1" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M1 1L6.5 15L8.5 9L14.5 7L1 1Z" stroke="white" stroke-width="1.5" stroke-linejoin="round"/>
-                </svg>
-                <div class="bg-emerald-500 text-white text-[10px] px-2 py-0.5 rounded-sm rounded-tl-none font-bold whitespace-nowrap shadow-md ml-3 -mt-1">
-                  {{ project.developer }}
-                </div>
-              </div>
-
               <!-- Error Overlay -->
               <div class="absolute inset-0 overflow-hidden rounded-md pointer-events-none">
                 <div 
@@ -329,6 +465,7 @@ if (allProjects.value.length === 0) {
 
               <!-- Checkbox with checkmark -->
               <div 
+                data-captcha-checkbox
                 class="w-6 h-6 border-2 rounded flex items-center justify-center bg-white dark:bg-slate-800 transition-colors duration-300"
                 :class="showAiError ? 'border-red-500' : 'border-slate-300 dark:border-slate-600 group-hover:border-slate-400 dark:group-hover:border-slate-500'"
               >
@@ -336,7 +473,10 @@ if (allProjects.value.length === 0) {
               </div>
               <span class="text-sm font-medium text-slate-700 dark:text-slate-300">I'm not a robot</span>
               <div class="flex flex-col items-center ml-2 border-l border-slate-200 dark:border-slate-700 pl-3">
-                <img src="https://www.gstatic.com/recaptcha/api2/logo_48.png" alt="reCAPTCHA logo" class="w-6 h-6 opacity-80 mb-0.5" />
+                <svg class="w-6 h-6 opacity-80 mb-0.5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M21 12a9 9 0 1 1-2.64-6.36" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                  <path d="M21 5v6h-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
                 <span class="text-[9px] text-slate-400 dark:text-slate-500 leading-none">reCAPTCHA</span>
               </div>
             </div>
@@ -345,32 +485,15 @@ if (allProjects.value.length === 0) {
             <div
               v-else-if="aiUsageState === 'under50'"
               @click="handleHumanBadgeClick"
+              @mouseenter="(e) => onBadgeEnter('human', e)"
+              @mouseleave="onBadgeLeave"
               class="ml-auto flex items-center gap-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md p-2 px-3 shadow-sm select-none cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors relative group"
               title="Click to verify"
+              ref="humanBadgeRef"
             >
-              <!-- Fake Figma Cursor -->
-              <div 
-                v-if="cursorState.show"
-                class="absolute z-50 flex flex-col pointer-events-none transition-all ease-out"
-                :class="[
-                  cursorState.moving ? 'opacity-100' : 'opacity-0',
-                  cursorState.clicking ? 'scale-90' : 'scale-100'
-                ]"
-                :style="{ 
-                  transform: `translate(${cursorState.x}px, ${cursorState.y}px)`,
-                  transitionDuration: cursorState.clicking ? '100ms' : '800ms'
-                }"
-              >
-                <svg class="w-6 h-6 text-emerald-500 drop-shadow-md -ml-1 -mt-1" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M1 1L6.5 15L8.5 9L14.5 7L1 1Z" stroke="white" stroke-width="1.5" stroke-linejoin="round"/>
-                </svg>
-                <div class="bg-emerald-500 text-white text-[10px] px-2 py-0.5 rounded-sm rounded-tl-none font-bold whitespace-nowrap shadow-md ml-3 -mt-1">
-                  {{ project.developer }}
-                </div>
-              </div>
-
               <!-- Checkbox with dynamic checkmark -->
               <div
+                data-captcha-checkbox
                 class="w-6 h-6 border-2 rounded flex items-center justify-center transition-colors duration-300"
                 :class="showHumanSuccess ? 'border-transparent bg-emerald-500' : 'bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 group-hover:border-slate-400 dark:group-hover:border-slate-500'"
               >
@@ -384,7 +507,10 @@ if (allProjects.value.length === 0) {
               </div>
               <span class="text-sm font-medium text-slate-700 dark:text-slate-300">I'm not a robot</span>
               <div class="flex flex-col items-center ml-2 border-l border-slate-200 dark:border-slate-700 pl-3">
-                <img src="https://www.gstatic.com/recaptcha/api2/logo_48.png" alt="reCAPTCHA logo" class="w-6 h-6 opacity-80 mb-0.5" />
+                <svg class="w-6 h-6 opacity-80 mb-0.5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M21 12a9 9 0 1 1-2.64-6.36" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                  <path d="M21 5v6h-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
                 <span class="text-[9px] text-slate-400 dark:text-slate-500 leading-none">reCAPTCHA</span>
               </div>
             </div>
@@ -393,19 +519,49 @@ if (allProjects.value.length === 0) {
             <div
               v-else
               @click="handleUnknownBadgeClick"
+              @mouseenter="(e) => onBadgeEnter('unknown', e)"
+              @mouseleave="onBadgeLeave"
               class="ml-auto flex items-center gap-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md p-2 px-3 shadow-sm select-none cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors relative group"
               title="Click to verify"
+              ref="unknownBadgeRef"
             >
-              <div class="w-6 h-6 border-2 rounded flex items-center justify-center bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 group-hover:border-slate-400 dark:group-hover:border-slate-500">
+              <div data-captcha-checkbox class="w-6 h-6 border-2 rounded flex items-center justify-center bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 group-hover:border-slate-400 dark:group-hover:border-slate-500">
                 <div v-if="unknownLoading" class="w-4 h-4 rounded-full border-2 border-slate-300 dark:border-slate-600 border-t-emerald-500 animate-spin"></div>
               </div>
               <span class="text-sm font-medium text-slate-700 dark:text-slate-300">I'm not a robot</span>
               <div class="flex flex-col items-center ml-2 border-l border-slate-200 dark:border-slate-700 pl-3">
-                <img src="https://www.gstatic.com/recaptcha/api2/logo_48.png" alt="reCAPTCHA logo" class="w-6 h-6 opacity-80 mb-0.5" />
+                <svg class="w-6 h-6 opacity-80 mb-0.5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M21 12a9 9 0 1 1-2.64-6.36" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                  <path d="M21 5v6h-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
                 <span class="text-[9px] text-slate-400 dark:text-slate-500 leading-none">reCAPTCHA</span>
               </div>
             </div>
           </div>
+        </div>
+      </div>
+
+      <div
+        v-if="cursorState.show"
+        class="fixed z-[60] flex flex-col pointer-events-none transition-all ease-out"
+        :class="[
+          'opacity-100',
+          cursorState.clicking ? 'scale-90' : 'scale-100'
+        ]"
+        :style="{ 
+          transform: `translate(${cursorState.x}px, ${cursorState.y}px)`,
+          transitionDuration: cursorState.transitionMs + 'ms'
+        }"
+      >
+        <div class="relative -ml-1 -mt-1 drop-shadow-lg">
+          <svg class="w-7 h-7" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M6 4.5C5.4 4.2 4.7 4.7 4.9 5.4L9.9 23.9C10.1 24.6 11.1 24.7 11.5 24.1L14.8 18.9L20.6 16.4C21.3 16.1 21.3 15.1 20.6 14.8L6 4.5Z" :fill="cursorAccent"/>
+            <path d="M6 4.5C5.4 4.2 4.7 4.7 4.9 5.4L9.9 23.9C10.1 24.6 11.1 24.7 11.5 24.1L14.8 18.9L20.6 16.4C21.3 16.1 21.3 15.1 20.6 14.8L6 4.5Z" stroke="white" stroke-width="1.6" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="ml-3 -mt-1 inline-flex items-center gap-1.5 px-2 py-1 rounded-full border border-white/50 bg-white/90 dark:bg-slate-900/80 backdrop-blur text-[10px] font-extrabold text-slate-800 dark:text-slate-100 shadow-md">
+          <img :src="project?.avatar" class="w-4 h-4 rounded-full object-cover" @error="(e) => { (e.target as HTMLImageElement).src = getFallbackImage(project?.developer || '') }" />
+          <span class="max-w-[120px] truncate">@{{ project?.developer }}</span>
         </div>
       </div>
 
@@ -508,45 +664,7 @@ if (allProjects.value.length === 0) {
             </div>
           </section>
 
-          <!-- Community Discussions (Giscus) -->
-          <section class="mt-16 pt-10 border-t border-slate-200 dark:border-slate-800">
-            <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-2 flex items-center gap-2">
-              <Github class="w-6 h-6 text-slate-500" /> 社区讨论
-            </h2>
-            <p class="text-slate-500 mb-8">在这里留下你对 {{ project.name }} 的使用体验，或者向开发者反馈问题。</p>
-            
-            <div v-if="project.github_url && project.github_url.includes('github.com/')" class="min-h-[200px] bg-white dark:bg-[#111827] rounded-3xl p-4 sm:p-8 border border-slate-200/80 dark:border-slate-800/80 shadow-sm">
-              <!-- 引入 giscus 组件，对于网络问题可以使用镜像或者国内代理，但目前 giscus 官方提供的最稳定的方案是通过预加载和设置重试 -->
-              <component 
-                :is="'script'"
-                src="https://giscus.app/client.js"
-                :data-repo="project.github_url.replace('https://github.com/', '').replace(/\/$/, '')"
-                data-repo-id="" 
-                data-category="General"
-                data-category-id=""
-                data-mapping="title"
-                data-strict="0"
-                data-reactions-enabled="1"
-                data-emit-metadata="0"
-                data-input-position="top"
-                data-theme="preferred_color_scheme"
-                data-lang="zh-CN"
-                crossorigin="anonymous"
-                async
-                :key="project.github_url"
-              ></component>
-              <div id="giscus-loading-fallback" class="text-center py-10 text-slate-500">
-                <div class="inline-block animate-spin w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full mb-3"></div>
-                <p>正在连接 GitHub 加载评论区...</p>
-                <p class="text-xs mt-2 text-slate-400">如果长时间未加载，请检查您的网络连接或尝试开启网络加速工具。</p>
-                <p class="text-xs mt-1 text-slate-400">注：此项目需要开发者在其仓库中开启 Discussions 功能并安装 Giscus 才能正常显示评论区。</p>
-              </div>
-              <noscript>请启用 JavaScript 以查看评论区。</noscript>
-            </div>
-            <div v-else class="text-center py-10 text-slate-500 bg-slate-50 dark:bg-slate-800/30 rounded-2xl border border-slate-200 dark:border-slate-800">
-              <p>该项目未提供 GitHub 仓库地址，无法加载评论区。</p>
-            </div>
-          </section>
+          <CommentPanel :project-name="project.name" />
         </div>
 
         <!-- Sidebar -->
@@ -591,13 +709,17 @@ if (allProjects.value.length === 0) {
             </div>
 
             <!-- Tech Stack Section -->
-            <div v-if="project.language">
+            <div v-if="techStack.length">
               <h3 class="font-bold text-lg text-slate-900 dark:text-white mb-4 flex items-center gap-2">
                 <Code2 class="w-5 h-5 text-indigo-500" /> Tech Stack
               </h3>
               <div class="flex flex-wrap gap-2">
-                <span class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/20 rounded-lg text-sm font-bold text-indigo-600 dark:text-indigo-400">
-                  <Code2 class="w-4 h-4" /> {{ project.language }}
+                <span
+                  v-for="t in techStack"
+                  :key="t"
+                  class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/20 rounded-lg text-sm font-bold text-indigo-600 dark:text-indigo-400"
+                >
+                  <Code2 class="w-4 h-4" /> {{ t }}
                 </span>
               </div>
             </div>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useProjects } from '../composables/useProjects';
 import type { Project } from '../composables/useProjects';
@@ -8,7 +8,6 @@ import { Scale, Star, ShieldCheck, Code2, MessageCircle, Github, Tag } from 'luc
 const route = useRoute();
 const router = useRouter();
 const { allProjects, fetchProjects, loading } = useProjects();
-const isSearchOpen = ref(false);
 
 onMounted(async () => {
   await fetchProjects();
@@ -27,8 +26,10 @@ const projectsToCompare = computed(() => {
 const getFallbackImage = (name: string) => {
   const initial = name ? name.charAt(0).toUpperCase() : '?';
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect fill="#cbd5e1" width="100" height="100" rx="24"/><text fill="#475569" font-family="sans-serif" font-size="40" font-weight="bold" x="50%" y="50%" dominant-baseline="middle" text-anchor="middle">${initial}</text></svg>`;
-  return `data:image/svg+xml;base64,${btoa(svg)}`;
+  return `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svg)))}`;
 };
+
+const getOrg = (project: any) => project?.organization || project?.extra?.feishu?.organization || '';
 </script>
 
 <template>
@@ -81,7 +82,14 @@ const getFallbackImage = (name: string) => {
                     <img loading="lazy" :src="project.icon || project.avatar" :alt="project.name" class="w-full h-full object-contain" @error="(e) => { (e.target as HTMLImageElement).src = getFallbackImage(project.name) }" />
                   </div>
                   <h3 class="text-xl font-bold text-slate-900 dark:text-white mb-1">{{ project.name }}</h3>
-                  <p class="text-sm text-slate-500 dark:text-slate-400 mb-3">by {{ project.developer }}</p>
+                  <div class="flex flex-wrap items-center justify-center gap-2 mb-3">
+                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-slate-100 dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700/60 text-slate-700 dark:text-slate-200 max-w-[220px] truncate">
+                      {{ project.developer }}
+                    </span>
+                    <span v-if="getOrg(project)" class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-slate-100 dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700/60 text-slate-700 dark:text-slate-200 max-w-[260px] truncate">
+                      {{ getOrg(project) }}
+                    </span>
+                  </div>
                   <a :href="project.github_url" target="_blank" class="px-4 py-1.5 bg-slate-900 dark:bg-emerald-600 text-white text-xs font-bold rounded-lg hover:bg-slate-800 dark:hover:bg-emerald-500 transition-colors inline-flex items-center gap-1.5">
                     <Github class="w-3.5 h-3.5" /> 获取
                   </a>

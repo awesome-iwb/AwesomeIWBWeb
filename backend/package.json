@@ -5,7 +5,9 @@
     "test": "bun test",
     "dev": "bun run --watch src/index.ts",
     "start": "bun run src/index.ts",
-    "import:data-json": "bun run src/scripts/import-data-json.ts"
+    "import:data-json": "bun run src/scripts/import-data-json.ts",
+    "import:feishu-base": "bun run src/scripts/import-feishu-base.ts",
+    "sync:feishu-base": "bun run src/scripts/sync-feishu-base.ts"
   },
   "dependencies": {
     "@elysiajs/cors": "^1.4.2",

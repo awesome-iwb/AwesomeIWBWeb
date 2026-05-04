@@ -2,19 +2,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { ChevronLeft, ChevronRight, Star } from 'lucide-vue-next';
-
-interface Project {
-  name: string;
-  developer: string;
-  status: string;
-  recommendation: string;
-  github_url: string;
-  avatar: string;
-  icon: string;
-  banner: string;
-  description: string;
-  keywords: string[];
-}
+import type { Project } from '../composables/useProjects';
 
 const props = defineProps<{
   projects: Project[];
@@ -83,7 +71,7 @@ onUnmounted(() => {
 const getFallbackImage = (name: string) => {
   const initial = name ? name.charAt(0).toUpperCase() : '?';
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect fill="#cbd5e1" width="100" height="100" rx="24"/><text fill="#475569" font-family="sans-serif" font-size="40" font-weight="bold" x="50%" y="50%" dominant-baseline="middle" text-anchor="middle">${initial}</text></svg>`;
-  return `data:image/svg+xml;base64,${btoa(svg)}`;
+  return `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svg)))}`;
 };
 </script>
 
@@ -102,7 +90,7 @@ const getFallbackImage = (name: string) => {
         @click="navigateToProject(project.name)"
       >
         <!-- Background Banner -->
-        <img loading="lazy" :src="project.banner" :alt="project.name" class="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105" />
+        <img loading="lazy" :src="project.banner || ''" :alt="project.name" class="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105" />
         
         <!-- Gradient Overlays -->
         <div class="absolute inset-0 bg-gradient-to-t from-slate-900/90 via-slate-900/40 to-transparent"></div>
@@ -124,7 +112,7 @@ const getFallbackImage = (name: string) => {
               <div class="w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center shrink-0 drop-shadow-xl">
                 <img 
                   loading="lazy"
-                  :src="project.icon || project.avatar" 
+                  :src="project.icon || project.avatar || ''" 
                   class="w-full h-full object-contain"
                   @error="(e) => { (e.target as HTMLImageElement).src = getFallbackImage(project.name) }"
                 />
@@ -132,7 +120,7 @@ const getFallbackImage = (name: string) => {
               <div>
                 <h2 class="text-3xl sm:text-4xl font-extrabold text-white mb-1 line-clamp-1 drop-shadow-md">{{ project.name }}</h2>
                 <p class="text-slate-300 font-medium flex items-center gap-2 drop-shadow-md">
-                  <img :src="project.avatar" class="w-5 h-5 rounded-full" @error="(e) => { (e.target as HTMLImageElement).src = getFallbackImage(project.developer) }" />
+                  <img :src="project.avatar || ''" class="w-5 h-5 rounded-full" @error="(e) => { (e.target as HTMLImageElement).src = getFallbackImage(project.developer) }" />
                   {{ project.developer }}
                 </p>
               </div>

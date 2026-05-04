@@ -14,7 +14,6 @@ echarts.use([TitleComponent, TooltipComponent, LegendComponent, GraphChart, Canv
 
 const router = useRouter();
 const { allProjects, fetchProjects, loading } = useProjects();
-const isSearchOpen = ref(false);
 
 onMounted(async () => {
   await fetchProjects();

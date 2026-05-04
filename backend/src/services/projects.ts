@@ -1,5 +1,6 @@
 import { sql } from "../db/client";
 import { newSlug } from "../utils/slug";
+import { normalizeProjectTags } from "../domain/projectTags";
 
 export type CategoryRow = {
   id: string;
@@ -64,12 +65,13 @@ export async function getCatalog() {
     from projects
     order by name asc
   `;
+  const normalizedProjects = projects.map(normalizeProjectTags);
   return {
     categories: categories.map((c) => ({
       id: c.id,
       name: c.name,
       description: c.description,
-      projects: projects.filter((p) => p.category_id === c.id)
+      projects: normalizedProjects.filter((p) => p.category_id === c.id)
     }))
   };
 }
@@ -175,7 +177,7 @@ export async function listProjects(params: {
     select count(*)::text as count from projects where ${where}
   `;
 
-  return { items, page, pageSize, total: Number(count) };
+  return { items: items.map(normalizeProjectTags), page, pageSize, total: Number(count) };
 }
 
 /**
@@ -188,7 +190,7 @@ export async function getProjectById(id: string) {
     where id = ${id}
     limit 1
   `;
-  return rows[0] ?? null;
+  return rows[0] ? normalizeProjectTags(rows[0]) : null;
 }
 
 /**
@@ -204,7 +206,7 @@ export async function getProjectByKey(key: string) {
     where slug = ${keyTrim}
     limit 1
   `;
-  if (bySlug[0]) return bySlug[0];
+  if (bySlug[0]) return normalizeProjectTags(bySlug[0]);
 
   const byName = await sql()<ProjectRow[]>`
     select id, slug, name, category_id, developer, status, version, ai_usage_state, description, keywords, recommendation, github_url, avatar, icon, banner, stars, language, last_update, github_is_fork, github_parent_url, github_source_url, extra
@@ -212,7 +214,7 @@ export async function getProjectByKey(key: string) {
     where lower(name) = lower(${keyTrim})
     limit 2
   `;
-  return byName.length === 1 ? byName[0] : null;
+  return byName.length === 1 ? normalizeProjectTags(byName[0]) : null;
 }
 
 /**

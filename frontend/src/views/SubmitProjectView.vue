@@ -22,7 +22,6 @@ const form = ref({
 });
 
 const isSubmitted = ref(false);
-const isSearchOpen = ref(false);
 
 const categories = ref<string[]>([]);
 onMounted(async () => {
@@ -40,7 +39,7 @@ onMounted(async () => {
 const getFallbackImage = (name: string) => {
   const initial = name ? name.charAt(0).toUpperCase() : '?';
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect fill="#cbd5e1" width="100" height="100" rx="24"/><text fill="#475569" font-family="sans-serif" font-size="40" font-weight="bold" x="50%" y="50%" dominant-baseline="middle" text-anchor="middle">${initial}</text></svg>`;
-  return `data:image/svg+xml;base64,${btoa(svg)}`;
+  return `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svg)))}`;
 };
 
 const isSubmitting = ref(false);
@@ -126,7 +125,7 @@ const handleSubmit = async () => {
             <div class="flex items-center gap-3 mb-4">
               <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100 dark:bg-slate-800/80 border border-slate-200/50 dark:border-slate-700 w-fit">
                 <img 
-                  :src="form.developer ? `https://github.com/${form.developer}.png` : getFallbackImage('?')" 
+                  :src="getFallbackImage(form.developer || '?')" 
                   class="w-5 h-5 rounded-full object-cover"
                 />
                 <span class="text-sm font-semibold text-slate-700 dark:text-slate-300">{{ form.developer || '开发者' }}</span>

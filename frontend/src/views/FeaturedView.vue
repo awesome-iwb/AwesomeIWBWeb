@@ -23,7 +23,6 @@ interface FeaturedStory {
 const router = useRouter();
 const selectedStory = ref<FeaturedStory | null>(null);
 const isStoryOpen = ref(false);
-const isSearchOpen = ref(false);
 
 const stories = ref<FeaturedStory[]>([]);
 

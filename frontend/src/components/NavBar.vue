@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue';
+import { ref, onMounted, onUnmounted, watch, computed } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
-import { Sun, Moon, Search, Github, Plus, Menu, X, ArrowLeft } from 'lucide-vue-next';
+import { Sun, Moon, Search, Github, Plus, Menu, X, ArrowLeft, LogIn, LogOut, Shield, Wrench } from 'lucide-vue-next';
 import BrandMark from './BrandMark.vue';
+import { useAuth } from '../composables/useAuth';
 
 const props = defineProps<{
   title?: string;
@@ -17,11 +18,39 @@ const route = useRoute();
 
 const isDark = ref(false);
 const isMobileMenuOpen = ref(false);
+const isUserMenuOpen = ref(false);
+const userMenuCloseTimer = ref<number | null>(null);
+
+const { user, isAuthenticated, logout } = useAuth();
+
+const userInitial = computed(() => (user.value?.name ? user.value.name.charAt(0).toUpperCase() : '?'));
+
+const openUserMenu = () => {
+  if (userMenuCloseTimer.value) {
+    window.clearTimeout(userMenuCloseTimer.value);
+    userMenuCloseTimer.value = null;
+  }
+  isUserMenuOpen.value = true;
+};
+
+const closeUserMenuSoon = () => {
+  if (userMenuCloseTimer.value) window.clearTimeout(userMenuCloseTimer.value);
+  userMenuCloseTimer.value = window.setTimeout(() => {
+    isUserMenuOpen.value = false;
+    userMenuCloseTimer.value = null;
+  }, 120);
+};
+
+const closeUserMenuNow = () => {
+  if (userMenuCloseTimer.value) window.clearTimeout(userMenuCloseTimer.value);
+  userMenuCloseTimer.value = null;
+  isUserMenuOpen.value = false;
+};
 
 const navLinks = [
   { path: '/', name: '应用商场' },
   { path: '/today', name: 'Today 精选' },
-  { path: '/ecosystem', name: '开源生态' }
+  { path: '/about', name: '关于我们' }
 ];
 
 const linkRefs = ref<HTMLElement[]>([]);
@@ -94,6 +123,18 @@ onMounted(() => {
   onUnmounted(() => {
     window.removeEventListener('keydown', handleKeyDown);
   });
+});
+
+onMounted(() => {
+  const onDocClick = (e: MouseEvent) => {
+    if (!isUserMenuOpen.value) return;
+    const target = e.target as HTMLElement | null;
+    if (!target) return;
+    if (target.closest('[data-user-menu-root="1"]')) return;
+    closeUserMenuNow();
+  };
+  window.addEventListener('click', onDocClick);
+  onUnmounted(() => window.removeEventListener('click', onDocClick));
 });
 </script>
 
@@ -173,7 +214,97 @@ onMounted(() => {
           <Github class="w-5 h-5" />
         </a>
 
+        <div
+          class="hidden sm:flex relative"
+          data-user-menu-root="1"
+          @mouseenter="openUserMenu"
+          @mouseleave="closeUserMenuSoon"
+        >
+          <button
+            class="h-10 w-10 rounded-full border border-slate-200 dark:border-slate-700 bg-white/80 dark:bg-slate-900/40 hover:bg-slate-50 dark:hover:bg-slate-900/60 transition-colors overflow-hidden flex items-center justify-center"
+            @click="isUserMenuOpen = !isUserMenuOpen"
+            aria-label="User menu"
+          >
+            <img v-if="user" :src="user.avatarUrl" class="h-full w-full object-cover" />
+            <span v-else class="text-sm font-extrabold text-slate-600 dark:text-slate-200">{{ userInitial }}</span>
+          </button>
+
+          <div
+            v-if="isUserMenuOpen"
+            class="absolute right-0 top-12 w-72 rounded-2xl border border-slate-200/70 dark:border-slate-800/70 bg-white/90 dark:bg-[#0B1120]/90 backdrop-blur-xl shadow-2xl shadow-slate-900/10 dark:shadow-black/40 overflow-hidden"
+            @mouseenter="openUserMenu"
+            @mouseleave="closeUserMenuSoon"
+          >
+            <div class="p-4 flex items-center gap-3">
+              <div class="h-10 w-10 rounded-full bg-slate-200/70 dark:bg-slate-700/70 overflow-hidden shrink-0">
+                <img v-if="user" :src="user.avatarUrl" class="h-full w-full object-cover" />
+              </div>
+              <div class="min-w-0">
+                <div class="text-sm font-extrabold text-slate-800 dark:text-slate-100 truncate">
+                  {{ user?.name || '未登录' }}
+                </div>
+                <div class="text-xs text-slate-500 dark:text-slate-400 truncate">
+                  {{ isAuthenticated ? '已登录（演示）' : '登录后可提交项目' }}
+                </div>
+              </div>
+            </div>
+
+            <div class="px-4 pb-4 space-y-2">
+              <button
+                v-if="!isAuthenticated"
+                @click="closeUserMenuNow(); router.push('/me')"
+                class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold transition-colors"
+              >
+                <LogIn class="w-4 h-4" />
+                智教联盟登录
+              </button>
+
+              <div v-else class="space-y-2">
+                <button
+                  @click="closeUserMenuNow(); router.push('/me')"
+                  class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-extrabold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                >
+                  个人中心
+                </button>
+                <button
+                  v-if="user?.role === 'ops'"
+                  @click="closeUserMenuNow(); router.push('/admin')"
+                  class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-extrabold transition-colors"
+                >
+                  <Shield class="w-4 h-4" />
+                  运维后台
+                </button>
+                <button
+                  v-if="user?.role === 'dev'"
+                  @click="closeUserMenuNow(); router.push('/dev')"
+                  class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-extrabold transition-colors"
+                >
+                  <Wrench class="w-4 h-4" />
+                  开发者后台
+                </button>
+                <button
+                  @click="logout(); closeUserMenuNow(); router.push('/')"
+                  class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 font-extrabold hover:bg-rose-100 dark:hover:bg-rose-500/20 transition-colors"
+                >
+                  <LogOut class="w-4 h-4" />
+                  退出登录
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Mobile Menu Toggle -->
+        <button
+          @click="router.push('/me')"
+          class="sm:hidden p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+          aria-label="Me"
+        >
+          <div class="h-6 w-6 rounded-full bg-slate-200/70 dark:bg-slate-700/70 overflow-hidden flex items-center justify-center">
+            <img v-if="user" :src="user.avatarUrl" class="h-full w-full object-cover" />
+            <span v-else class="text-[10px] font-extrabold text-slate-600 dark:text-slate-200">{{ userInitial }}</span>
+          </div>
+        </button>
         <button @click="isMobileMenuOpen = !isMobileMenuOpen" class="md:hidden p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors">
           <Menu v-if="!isMobileMenuOpen" class="w-5 h-5" />
           <X v-else class="w-5 h-5" />
@@ -185,7 +316,8 @@ onMounted(() => {
     <div v-if="isMobileMenuOpen" class="md:hidden absolute top-16 left-0 w-full bg-white dark:bg-[#0B1120] border-b border-slate-200 dark:border-slate-800 shadow-xl py-4 px-6 flex flex-col gap-4">
       <router-link @click="isMobileMenuOpen = false" to="/" class="text-lg font-bold text-slate-800 dark:text-slate-200">应用商场</router-link>
       <router-link @click="isMobileMenuOpen = false" to="/today" class="text-lg font-bold text-slate-800 dark:text-slate-200">Today 精选</router-link>
-      <router-link @click="isMobileMenuOpen = false" to="/ecosystem" class="text-lg font-bold text-slate-800 dark:text-slate-200">开源生态</router-link>
+      <router-link @click="isMobileMenuOpen = false" to="/about" class="text-lg font-bold text-slate-800 dark:text-slate-200">关于我们</router-link>
+      <router-link @click="isMobileMenuOpen = false" to="/me" class="text-lg font-bold text-slate-800 dark:text-slate-200">个人中心</router-link>
       <div class="h-px w-full bg-slate-100 dark:bg-slate-800 my-2"></div>
       <button 
         @click="() => { isMobileMenuOpen = false; $router.push('/submit'); }"

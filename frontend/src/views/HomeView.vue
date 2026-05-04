@@ -1,23 +1,23 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
-import { Search, MessageCircle, Sparkles, LayoutGrid, Zap, Plus, Star, Tag, Code2, Award, Flame, Scale } from 'lucide-vue-next';
+import { Search, MessageCircle, Sparkles, Zap, Plus, Star, Tag, Code2, Award, Flame, Scale } from 'lucide-vue-next';
 import HeroCarousel from '../components/HeroCarousel.vue';
-import NavBar from '../components/NavBar.vue';
-import CommandPalette from '../components/CommandPalette.vue';
 import { useProjects } from '../composables/useProjects';
 import type { Project } from '../composables/useProjects';
 import { globalState } from '../store';
+import { includesNormalized } from '../utils/search';
 
 const router = useRouter();
 const { categories, loading, fetchProjects, allProjects } = useProjects();
+
+const getOrg = (project: any) => project?.organization || project?.extra?.feishu?.organization || '';
 
 const searchTerm = ref('');
 const activeCategory = ref('all');
 const activeSort = ref('default'); // default, stars, updated
 const activeLanguage = ref('all');
 const hasBadges = ref(false);
-const isSearchOpen = ref(false);
 const isScrolledPastSearch = ref(false);
 
 const comparisonList = ref<Project[]>([]);
@@ -57,7 +57,7 @@ const clearComparison = () => {
 const getFallbackImage = (name: string) => {
   const initial = name ? name.charAt(0).toUpperCase() : '?';
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect fill="#cbd5e1" width="100" height="100" rx="24"/><text fill="#475569" font-family="sans-serif" font-size="40" font-weight="bold" x="50%" y="50%" dominant-baseline="middle" text-anchor="middle">${initial}</text></svg>`;
-  return `data:image/svg+xml;base64,${btoa(svg)}`;
+  return `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svg)))}`;
 };
 
 const mainSearchInput = ref<HTMLElement | null>(null);
@@ -124,26 +124,6 @@ onMounted(async () => {
   });
 });
 
-// Footer 彩蛋：连点5次进入后台
-const logoClickCount = ref(0);
-let logoClickTimer: ReturnType<typeof setTimeout> | null = null;
-
-const handleLogoClick = () => {
-  logoClickCount.value++;
-  
-  if (logoClickTimer) clearTimeout(logoClickTimer);
-  
-  if (logoClickCount.value >= 5) {
-    logoClickCount.value = 0;
-    // 使用 Vue Router 前端单页路由跳转至新的后台组件页面
-    router.push('/admin');
-  } else {
-    logoClickTimer = setTimeout(() => {
-      logoClickCount.value = 0;
-    }, 1500); // 1.5秒内未连点则重置
-  }
-};
-
 const filteredCategories = computed(() => {
   const filtered = categories.value
     .map(category => ({
@@ -152,9 +132,9 @@ const filteredCategories = computed(() => {
         const matchesCategory = activeCategory.value === 'all' || category.id === activeCategory.value;
         const matchesLanguage = activeLanguage.value === 'all' || project.language === activeLanguage.value;
         const matchesBadge = !hasBadges.value || (project.stars && project.stars >= 100) || project.recommendation.includes('推荐');
-        const matchesSearch = project.name.toLowerCase().includes(searchTerm.value.toLowerCase()) || 
-           project.description.toLowerCase().includes(searchTerm.value.toLowerCase()) ||
-           project.keywords.some(kw => kw.toLowerCase().includes(searchTerm.value.toLowerCase()));
+        const matchesSearch = includesNormalized(project.name, searchTerm.value) ||
+           includesNormalized(project.description, searchTerm.value) ||
+           project.keywords.some(kw => includesNormalized(kw, searchTerm.value));
         
         return matchesCategory && matchesLanguage && matchesBadge && matchesSearch;
       })
@@ -252,7 +232,7 @@ const heroCards = computed(() => {
   const shuffledWithBanner = shuffle(withBanner);
   const shuffledWithoutBanner = shuffle(withoutBanner);
 
-  const selected = [];
+  const selected: Project[] = [];
   // 优先满足至少 3/4 有 banner
   selected.push(...shuffledWithBanner.slice(0, 3));
   
@@ -272,7 +252,7 @@ const heroCards = computed(() => {
 });
 
 watch(heroCards, (cards) => {
-  cards.forEach(c => extractColor(c.icon || c.avatar, c.name));
+  cards.forEach(c => extractColor(c.icon || c.avatar || '', c.name));
 }, { immediate: true });
 </script>
 
@@ -573,9 +553,14 @@ watch(heroCards, (cards) => {
                         <h3 class="font-bold text-slate-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors line-clamp-1" :class="isZoom(project) ? 'text-xl' : 'text-lg'">
                           {{ project.name }}
                         </h3>
-                        <div class="flex items-center gap-2 mt-1 text-sm">
-                          <img loading="lazy" :src="project.avatar" :alt="project.developer" class="w-5 h-5 rounded-full border border-slate-200 dark:border-slate-700 shrink-0 object-cover" @error="(e) => { (e.target as HTMLImageElement).src = getFallbackImage(project.developer) }" />
-                          <span class="text-slate-500 dark:text-slate-400 font-medium truncate">{{ project.developer }}</span>
+                        <div class="flex flex-wrap items-center gap-2 mt-1 text-sm">
+                          <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-50/90 dark:bg-slate-900/40 border border-slate-200/60 dark:border-slate-700/60 w-fit">
+                            <img loading="lazy" :src="project.avatar" :alt="project.developer" class="w-5 h-5 rounded-full border border-slate-200 dark:border-slate-700 shrink-0 object-cover" @error="(e) => { (e.target as HTMLImageElement).src = getFallbackImage(project.developer) }" />
+                            <span class="text-slate-600 dark:text-slate-300 font-semibold truncate max-w-[160px]">{{ project.developer }}</span>
+                          </div>
+                          <div v-if="getOrg(project)" class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-50/90 dark:bg-slate-900/40 border border-slate-200/60 dark:border-slate-700/60 w-fit">
+                            <span class="text-slate-600 dark:text-slate-300 font-semibold truncate max-w-[220px]">{{ getOrg(project) }}</span>
+                          </div>
                         </div>
                       </div>
                     </div>

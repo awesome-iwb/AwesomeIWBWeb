@@ -24,8 +24,9 @@ export interface Project {
   slug?: string;
   name: string;
   developer: string;
-  status?: string;
-  recommendation?: string | string[];
+  organization?: string;
+  status: string;
+  recommendation: string;
   github_url: string;
   avatar?: string;
   icon?: string;
@@ -45,6 +46,7 @@ export interface Project {
   github_source_url?: string;
   relations?: Relation[];
   releases?: Release[];
+  extra?: any;
 }
 
 export interface Category {
@@ -58,6 +60,20 @@ const categories = ref<Category[]>([]);
 const loading = ref(true);
 
 export function useProjects() {
+  const normalizeProject = (p: any): Project => {
+    const recommendation = Array.isArray(p?.recommendation) ? p.recommendation.join(' ') : String(p?.recommendation ?? '');
+    return {
+      ...p,
+      status: String(p?.status ?? ''),
+      recommendation,
+      keywords: Array.isArray(p?.keywords) ? p.keywords : [],
+      description: String(p?.description ?? ''),
+      developer: String(p?.developer ?? ''),
+      github_url: String(p?.github_url ?? ''),
+      organization: p?.organization || p?.extra?.feishu?.organization || ''
+    } as Project;
+  };
+
   /**
    * Fetch the full catalog used by the homepage.
    *
@@ -70,7 +86,10 @@ export function useProjects() {
       const res = await fetch('/api/projects');
       if (!res.ok) throw new Error('Failed to fetch projects');
       const json = await res.json();
-      categories.value = (json.categories ?? []) as Category[];
+      categories.value = (json.categories ?? []).map((c: any) => ({
+        ...c,
+        projects: (c.projects ?? []).map(normalizeProject)
+      })) as Category[];
     } catch (e) {
       console.error(e);
     } finally {
@@ -92,7 +111,7 @@ export function useProjects() {
     try {
       const res = await fetch(`/api/projects/${encodeURIComponent(name)}`);
       if (!res.ok) return null;
-      return (await res.json()) as Project;
+      return normalizeProject(await res.json());
     } catch {
       return allProjects.value.find(p => p.name.toLowerCase() === name.toLowerCase()) || null;
     }

@@ -29,6 +29,10 @@ const overlaySize = { width: 760, height: 420 };
 
 const viewport = ref({ width: window.innerWidth, height: window.innerHeight });
 
+const organizationName = computed(() => {
+  return props.project?.organization || props.project?.extra?.feishu?.organization || '';
+});
+
 const position = computed(() => {
   if (!props.visible || !props.cardRect) return null;
   return clampOverlayPosition({
@@ -98,7 +102,14 @@ onUnmounted(() => {
               </div>
               <div class="min-w-0">
                 <div class="text-white font-extrabold text-3xl leading-tight line-clamp-1">{{ project.name }}</div>
-                <div class="text-white/80 text-sm font-medium line-clamp-1">{{ project.developer }}</div>
+                <div class="flex flex-wrap items-center gap-2 mt-1">
+                  <div class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-white/15 text-white border border-white/15 max-w-[280px] truncate">
+                    {{ project.developer }}
+                  </div>
+                  <div v-if="organizationName" class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-white/15 text-white border border-white/15 max-w-[340px] truncate">
+                    {{ organizationName }}
+                  </div>
+                </div>
               </div>
               <div class="ml-auto flex items-center">
                 <span v-if="project.status" class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-white/15 text-white border border-white/15">
