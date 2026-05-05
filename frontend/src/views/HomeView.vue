@@ -272,7 +272,7 @@ watch(heroCards, (cards) => {
       <div class="max-w-7xl mx-auto px-6 flex flex-col lg:flex-row items-center justify-between gap-12 lg:gap-16 relative z-10">
 
         <!-- Left: Text & Search -->
-        <div class="flex-1 text-center lg:text-left flex flex-col items-center lg:items-start w-full">
+        <div class="relative z-20 flex-1 text-center lg:text-left flex flex-col items-center lg:items-start w-full">
           <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800/30 text-emerald-600 dark:text-emerald-400 text-sm font-bold mb-6 shadow-sm">
             <Sparkles class="w-4 h-4" />
             <span>精心挑选的 {{ stats.totalProjects }} 款优质教育软件</span>
@@ -313,7 +313,7 @@ watch(heroCards, (cards) => {
         </div>
 
         <!-- Right: Interface Craft Style Fan Cards -->
-        <div class="flex-1 relative w-full flex justify-center lg:justify-end lg:pr-32 h-[480px] sm:h-[520px] mt-12 lg:mt-0 perspective-1000 group/fan" v-if="heroCards.length >= 4">
+        <div class="relative z-10 flex-1 w-full flex justify-center lg:justify-end lg:pr-32 h-[480px] sm:h-[520px] mt-12 lg:mt-0 perspective-1000 group/fan" v-if="heroCards.length >= 4">
           
           <!-- Stack Container -->
           <div class="relative w-[280px] sm:w-[320px] h-[360px] sm:h-[400px] top-1/2 -translate-y-1/2 transition-transform duration-500">
