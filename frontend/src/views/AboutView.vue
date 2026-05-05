@@ -156,15 +156,8 @@ const displayContributors = contributorMembers.filter((c) => !excludedContributo
             :href="l.href"
             target="_blank"
             rel="noopener noreferrer"
-            class="group flex items-center gap-4 p-5 rounded-2xl border border-slate-200/70 dark:border-slate-800/70 bg-white/70 dark:bg-slate-950/30 hover:bg-white dark:hover:bg-slate-950/40 transition-colors"
+            class="group flex items-start gap-4 p-5 rounded-2xl border border-slate-200/70 dark:border-slate-800/70 bg-white/70 dark:bg-slate-950/30 hover:bg-white dark:hover:bg-slate-950/40 transition-colors"
           >
-            <img
-              v-if="l.logo"
-              :src="l.logo"
-              :alt="l.name"
-              class="h-12 w-12 rounded-full bg-slate-200/70 dark:bg-slate-700/70 shrink-0 object-cover"
-              @error="(e) => { (e.target as HTMLImageElement).src = placeholderAvatar }"
-            />
             <div class="min-w-0">
               <div class="text-base font-extrabold text-slate-800 dark:text-slate-100 line-clamp-1">{{ l.name }}</div>
               <div class="text-sm text-slate-500 dark:text-slate-400 line-clamp-2">{{ l.description }}</div>

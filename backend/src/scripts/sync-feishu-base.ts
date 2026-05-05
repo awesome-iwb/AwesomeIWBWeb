@@ -3,6 +3,11 @@ import path from "path";
 import { decodeAssSnapshot, extractTableSnapshot, makeFieldResolver } from "../feishu/baseSnapshot";
 import { syncFeishuSnapshotToFileMode, type SyncInputProject } from "../feishu/sync";
 
+// Data policy note:
+// - runtime output: backend/runtime/*.json
+// - optional seed update: backend/src/data.json via --write-seed
+// See docs/architecture/data-flow.md for source-of-truth details.
+
 const repoRoot = path.resolve(__dirname, "../../..");
 const runtimeDir = path.resolve(__dirname, "../../runtime");
 

@@ -15,10 +15,10 @@ defineProps<{
       class="object-contain"
       :class="variant === 'footer' ? 'h-9 w-auto' : 'w-8 h-8'"
     />
-    <picture :class="variant === 'navbar' ? 'hidden sm:block' : 'block'">
-      <source media="(prefers-color-scheme: dark)" srcset="/assets/brand/fontlogo/aiwb-font-white.webp">
-      <img alt="aiwb-logo" src="/assets/brand/fontlogo/aiwb-font-dark.webp" class="h-6">
-    </picture>
+    <div :class="variant === 'navbar' ? 'hidden sm:block' : 'block'">
+      <img alt="aiwb-logo" src="/assets/brand/fontlogo/aiwb-font-dark.webp" class="h-6 dark:hidden">
+      <img alt="aiwb-logo" src="/assets/brand/fontlogo/aiwb-font-white.webp" class="hidden h-6 dark:block">
+    </div>
     <span v-if="title && variant === 'navbar'" class="font-bold text-slate-800 dark:text-slate-200 sm:hidden">
       {{ title }}
     </span>

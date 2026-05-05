@@ -125,6 +125,7 @@ onMounted(async () => {
 });
 
 const filteredCategories = computed(() => {
+  const q = searchTerm.value.trim();
   const filtered = categories.value
     .map(category => ({
       ...category,
@@ -132,9 +133,13 @@ const filteredCategories = computed(() => {
         const matchesCategory = activeCategory.value === 'all' || category.id === activeCategory.value;
         const matchesLanguage = activeLanguage.value === 'all' || project.language === activeLanguage.value;
         const matchesBadge = !hasBadges.value || (project.stars && project.stars >= 100) || project.recommendation.includes('推荐');
-        const matchesSearch = includesNormalized(project.name, searchTerm.value) ||
-           includesNormalized(project.description, searchTerm.value) ||
-           project.keywords.some(kw => includesNormalized(kw, searchTerm.value));
+        const matchesSearch =
+          includesNormalized(project.name, q) ||
+          includesNormalized(project.description, q) ||
+          includesNormalized(project.developer, q) ||
+          includesNormalized(getOrg(project), q) ||
+          includesNormalized(category.name, q) ||
+          project.keywords.some(kw => includesNormalized(kw, q));
         
         return matchesCategory && matchesLanguage && matchesBadge && matchesSearch;
       })

@@ -52,12 +52,12 @@ const orgs: FooterOrg[] = [
               LOGO
             </div>
           </div>
-          <div v-else-if="org.key === 'smart-teach'" class="shrink-0 h-10 w-full max-w-64 flex items-center justify-center">
+          <div v-else-if="org.key === 'smart-teach'" class="shrink-0 h-8 w-full max-w-56 flex items-center justify-center">
             <img
               v-if="stcnLogoOk"
               src="/images/stcn.png"
               alt="智教联盟"
-              class="h-full w-full object-contain scale-100 sm:scale-[1.5]"
+              class="h-full w-full object-contain scale-100 sm:scale-100"
               @error="stcnLogoOk = false"
             />
             <div v-else class="h-full w-full flex items-center justify-center text-slate-500 dark:text-slate-300 font-extrabold text-xs">

@@ -5,6 +5,10 @@ import { VitePWA } from 'vite-plugin-pwa'
 import path from 'path'
 import fs from 'fs'
 
+// Source-of-truth rule:
+// - build/SSG routes are generated from backend/src/data.json
+// - runtime files under backend/runtime are NOT used by Vite build directly
+// See docs/architecture/data-flow.md for the full policy.
 // Read projects to generate dynamic routes
 const data = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../backend/src/data.json'), 'utf-8'));
 const projectRoutes = data.categories.flatMap((c: any) => 
