@@ -320,8 +320,20 @@
             </div>
 
             <div class="col-span-2 sm:col-span-1">
-              <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">推荐标签 (逗号分隔)</label>
-              <input type="text" v-model="projectDraft.recommendation" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-blue-500" placeholder="例如：编辑推荐, 特别好评" />
+              <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">稳定性标签</label>
+              <select v-model="projectDraft.recommendation" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-blue-500">
+                <option value="">无</option>
+                <option value="稳定">稳定</option>
+                <option value="不稳定">不稳定</option>
+                <option value="观望中">观望中</option>
+              </select>
+            </div>
+            <div class="col-span-2 sm:col-span-1">
+              <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">编辑推荐</label>
+              <select v-model="projectDraft.is_editors_choice" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-blue-500">
+                <option :value="false">否</option>
+                <option :value="true">是</option>
+              </select>
             </div>
             <div class="col-span-2 sm:col-span-1">
               <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">关键词 Tags (逗号分隔)</label>

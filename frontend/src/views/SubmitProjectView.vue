@@ -18,7 +18,7 @@ const form = ref({
   tags: '',
   category: '🛠️ 辅助类软件与实用工具',
   status: '活跃',
-  recommendation: '🥈 值得尝试'
+  recommendation: '稳定'
 });
 
 const isSubmitted = ref(false);

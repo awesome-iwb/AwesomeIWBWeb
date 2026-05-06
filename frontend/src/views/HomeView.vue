@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
-import { Search, MessageCircle, Sparkles, Zap, Plus, Star, Tag, Code2, Award, Flame, Scale } from 'lucide-vue-next';
+import { Search, MessageCircle, Sparkles, Zap, Plus, Star, Tag, Code2, Award, Flame, Scale, ShieldCheck } from 'lucide-vue-next';
 import HeroCarousel from '../components/HeroCarousel.vue';
 import { useProjects } from '../composables/useProjects';
 import type { Project } from '../composables/useProjects';
@@ -132,7 +132,7 @@ const filteredCategories = computed(() => {
       projects: category.projects.filter(project => {
         const matchesCategory = activeCategory.value === 'all' || category.id === activeCategory.value;
         const matchesLanguage = activeLanguage.value === 'all' || project.language === activeLanguage.value;
-        const matchesBadge = !hasBadges.value || (project.stars && project.stars >= 100) || project.recommendation.includes('推荐');
+        const matchesBadge = !hasBadges.value || (project.stars && project.stars >= 100) || project.is_editors_choice;
         const matchesSearch =
           includesNormalized(project.name, q) ||
           includesNormalized(project.description, q) ||
@@ -537,7 +537,7 @@ watch(heroCards, (cards) => {
                     <div v-if="project.stars && project.stars >= 100 && project.stars < 1000" class="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-slate-300 to-slate-500 text-white shadow-lg shadow-slate-500/30" title="百星精选 (100+ Stars)">
                       <Star class="w-4 h-4 fill-current" />
                     </div>
-                    <div v-if="project.recommendation.includes('推荐')" class="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-rose-400 to-red-600 text-white shadow-lg shadow-rose-500/30" title="编辑特别推荐">
+                    <div v-if="project.is_editors_choice" class="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-rose-400 to-red-600 text-white shadow-lg shadow-rose-500/30" title="编辑推荐">
                       <Flame class="w-4 h-4 fill-current" />
                     </div>
                   </div>
@@ -570,9 +570,6 @@ watch(heroCards, (cards) => {
                       </div>
                     </div>
                     <div class="flex flex-col items-end gap-1 shrink-0">
-                      <span class="inline-flex items-center justify-center bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 font-bold px-3 py-1.5 rounded-lg text-xs border border-slate-200/50 dark:border-slate-700 backdrop-blur-md">
-                        {{ project.recommendation.replace(/推荐|值得尝试|谨慎使用/, '').trim() || 'APP' }}
-                      </span>
                       <span v-if="project.stars" class="inline-flex items-center gap-1 text-xs font-bold text-amber-500 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-200/50 dark:border-amber-500/20">
                         <Star class="w-3 h-3 fill-current" /> {{ project.stars > 1000 ? (project.stars/1000).toFixed(1) + 'k' : project.stars }}
                       </span>
@@ -602,7 +599,18 @@ watch(heroCards, (cards) => {
                     >
                       <Zap class="w-3 h-3" /> {{ project.status }}
                     </span>
-                    <span v-if="project.version" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider bg-blue-50 text-blue-600 border border-blue-200/50 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20">
+                    <span 
+                      v-if="project.recommendation" 
+                      class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider border"
+                      :class="{
+                        'bg-blue-50 text-blue-600 border-blue-200/50 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20': project.recommendation === '稳定',
+                        'bg-orange-50 text-orange-600 border-orange-200/50 dark:bg-orange-500/10 dark:text-orange-400 dark:border-orange-500/20': project.recommendation === '不稳定',
+                        'bg-purple-50 text-purple-600 border-purple-200/50 dark:bg-purple-500/10 dark:text-purple-400 dark:border-purple-500/20': project.recommendation === '观望中'
+                      }"
+                    >
+                      <ShieldCheck class="w-3 h-3" /> {{ project.recommendation }}
+                    </span>
+                    <span v-if="project.version" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider bg-sky-50 text-sky-600 border border-sky-200/50 dark:bg-sky-500/10 dark:text-sky-400 dark:border-sky-500/20">
                       <Tag class="w-3 h-3" /> {{ project.version }}
                     </span>
                     <span 

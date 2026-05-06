@@ -408,7 +408,7 @@ if (allProjects.value.length === 0) {
             <div v-if="organizationName" class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100 dark:bg-slate-800/80 border border-slate-200/50 dark:border-slate-700 w-fit">
               <span class="text-sm font-semibold text-slate-700 dark:text-slate-300 max-w-[240px] truncate">{{ organizationName }}</span>
             </div>
-            <div v-if="project?.recommendation.includes('推荐')" class="flex items-center gap-1 text-xs font-bold text-amber-600 bg-amber-50 dark:bg-amber-500/10 px-2.5 py-1 rounded-md border border-amber-200/50 dark:border-amber-500/20">
+            <div v-if="project?.is_editors_choice" class="flex items-center gap-1 text-xs font-bold text-amber-600 bg-amber-50 dark:bg-amber-500/10 px-2.5 py-1 rounded-md border border-amber-200/50 dark:border-amber-500/20">
               <Star class="w-3.5 h-3.5 fill-current" /> Editors' Choice
             </div>
           </div>
@@ -418,7 +418,16 @@ if (allProjects.value.length === 0) {
               <ShieldCheck class="w-4 h-4" />
               {{ project?.status }}
             </span>
-            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-sm font-medium border border-slate-200/50 dark:border-slate-700">
+            <span 
+              v-if="project?.recommendation" 
+              class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border"
+              :class="{
+                'bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-200/50 dark:border-blue-500/20': project?.recommendation === '稳定',
+                'bg-orange-50 dark:bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-200/50 dark:border-orange-500/20': project?.recommendation === '不稳定',
+                'bg-purple-50 dark:bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-200/50 dark:border-purple-500/20': project?.recommendation === '观望中'
+              }"
+            >
+              <ShieldCheck class="w-4 h-4" />
               {{ project?.recommendation }}
             </span>
           </div>

@@ -27,6 +27,7 @@ export interface Project {
   organization?: string;
   status: string;
   recommendation: string;
+  is_editors_choice?: boolean;
   github_url: string;
   avatar?: string;
   icon?: string;
@@ -61,11 +62,19 @@ const loading = ref(true);
 
 export function useProjects() {
   const normalizeProject = (p: any): Project => {
-    const recommendation = Array.isArray(p?.recommendation) ? p.recommendation.join(' ') : String(p?.recommendation ?? '');
+    const recommendationRaw = p?.recommendation;
+    let recommendation = '';
+    if (Array.isArray(recommendationRaw) && recommendationRaw.length > 0) {
+      recommendation = String(recommendationRaw[0]).trim();
+    } else if (typeof recommendationRaw === 'string') {
+      recommendation = recommendationRaw.trim();
+    }
+    const isEditorsChoice = Boolean(p?.is_editors_choice ?? p?.extra?.is_editors_choice ?? false);
     return {
       ...p,
       status: String(p?.status ?? ''),
       recommendation,
+      is_editors_choice: isEditorsChoice,
       keywords: Array.isArray(p?.keywords) ? p.keywords : [],
       description: String(p?.description ?? ''),
       developer: String(p?.developer ?? ''),

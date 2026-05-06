@@ -154,13 +154,13 @@ const getOrg = (project: any) => project?.organization || project?.extra?.feishu
               </td>
             </tr>
 
-            <!-- Recommendation -->
+            <!-- Stability -->
             <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/20 transition-colors">
               <td class="p-6 border-r border-slate-200 dark:border-slate-800 font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                <MessageCircle class="w-5 h-5 text-rose-500" /> 推荐指数
+                <MessageCircle class="w-5 h-5 text-rose-500" /> 稳定性
               </td>
               <td v-for="project in projectsToCompare" :key="project.name" class="p-6 border-r last:border-r-0 border-slate-200 dark:border-slate-800 text-center text-sm font-medium text-slate-700 dark:text-slate-300">
-                {{ project.recommendation }}
+                {{ project.recommendation || '—' }}
               </td>
             </tr>
 

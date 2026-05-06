@@ -46,7 +46,7 @@ export function normalizeProjectInput(p: any) {
     ai_usage_state: readAiUsageStateField(p),
     description: typeof p.description === "string" ? p.description : "",
     keywords: normalizeList(p.keywords),
-    recommendation: normalizeList(p.recommendation),
+    recommendation: typeof p.recommendation === 'string' ? p.recommendation.trim() : normalizeList(p.recommendation),
     github_url: typeof p.github_url === "string" ? p.github_url : "",
     platform_developers: readDevelopersField(p),
     avatar: typeof p.avatar === "string" ? p.avatar : "",

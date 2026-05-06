@@ -48,11 +48,9 @@ const findProjectSlot = (data: any, name: string) => {
 };
 
 const recommendationFromTags = (tags: string[]) => {
-  if (tags.includes("值得推荐")) return "🥇 强烈推荐";
-  if (tags.includes("稳定")) return "🥈 值得尝试";
-  if (tags.includes("不稳定")) return "🥉 谨慎选择";
-  if (tags.includes("画饼")) return "🧪 观望中";
-  if (tags.includes("薛定谔的猫")) return "🤷‍♂️ 看情况";
+  if (tags.includes("不稳定")) return "不稳定";
+  if (tags.includes("稳定")) return "稳定";
+  if (tags.includes("画饼")) return "观望中";
   return "";
 };
 
