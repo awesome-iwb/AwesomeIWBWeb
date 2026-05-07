@@ -1,7 +1,10 @@
 import { Elysia } from "elysia";
-import { randomUUID } from "crypto";
+import { createHash, createHmac, randomBytes, randomUUID } from "crypto";
 import { signJwt } from "../utils/jwt";
-import { findUserByCasdoorId, createUser, updateUserLogin } from "../services/users";
+import { bumpUserTokenVersion, createUser, findUserByCasdoorId, updateUserLogin } from "../services/users";
+import { appConfig } from "../config";
+import { clearSessionCookie, parseCookieHeader, setSessionCookie } from "../utils/cookies";
+import { checkRateLimit } from "./rateLimit";
 
 const CASDOOR_ENDPOINT = process.env.CASDOOR_ENDPOINT ?? "";
 const CASDOOR_CLIENT_ID = process.env.CASDOOR_CLIENT_ID ?? "";
@@ -12,6 +15,7 @@ const CASDOOR_REDIRECT_URI = process.env.CASDOOR_REDIRECT_URI ?? "http://localho
 const FRONTEND_URL = process.env.FRONTEND_URL ?? "http://localhost:5173";
 
 const stateStore = new Map<string, { createdAt: number }>();
+const OAUTH_STATE_COOKIE = "awesomeiwb_oauth_state";
 
 function cleanOldStates() {
   const now = Date.now();
@@ -22,17 +26,73 @@ function cleanOldStates() {
   }
 }
 
-function buildAuthorizeUrl(state: string): string {
+function base64Url(input: Buffer | string) {
+  return Buffer.from(input).toString("base64url");
+}
+
+function signState(value: string): string {
+  return createHmac("sha256", appConfig.jwtSecret).update(value).digest("hex");
+}
+
+function encodeStateCookie(payload: { state: string; codeVerifier: string; returnTo: string }) {
+  const raw = JSON.stringify(payload);
+  const b64 = base64Url(raw);
+  return `${b64}.${signState(b64)}`;
+}
+
+function decodeStateCookie(cookieValue?: string) {
+  if (!cookieValue) return null;
+  const [b64, sig] = cookieValue.split(".");
+  if (!b64 || !sig) return null;
+  if (signState(b64) !== sig) return null;
+  try {
+    return JSON.parse(Buffer.from(b64, "base64url").toString("utf-8")) as { state: string; codeVerifier: string; returnTo: string };
+  } catch {
+    return null;
+  }
+}
+
+function setOauthStateCookie(set: any, payload: { state: string; codeVerifier: string; returnTo: string }) {
+  const value = encodeStateCookie(payload);
+  const parts = [`${OAUTH_STATE_COOKIE}=${value}`, "Path=/", "HttpOnly", "SameSite=Lax", "Max-Age=600"];
+  if (appConfig.isProduction) parts.push("Secure");
+  if (appConfig.cookieDomain) parts.push(`Domain=${appConfig.cookieDomain}`);
+  set.headers["set-cookie"] = parts.join("; ");
+}
+
+function clearOauthStateCookie(set: any) {
+  const parts = [`${OAUTH_STATE_COOKIE}=`, "Path=/", "HttpOnly", "SameSite=Lax", "Max-Age=0"];
+  if (appConfig.isProduction) parts.push("Secure");
+  if (appConfig.cookieDomain) parts.push(`Domain=${appConfig.cookieDomain}`);
+  set.headers["set-cookie"] = parts.join("; ");
+}
+
+function pickSafeReturnTo(input: string): string {
+  if (!input) return "/";
+  if (input.startsWith("/")) return input;
+  try {
+    const u = new URL(input);
+    const allowed = appConfig.allowedOrigins.includes(u.origin) || appConfig.casdoor.allowedRedirectOrigins.includes(u.origin);
+    if (!allowed) return "/";
+    return `${u.pathname}${u.search}${u.hash}`;
+  } catch {
+    return "/";
+  }
+}
+
+function buildAuthorizeUrl(state: string, codeChallenge: string): string {
   const url = new URL(`${CASDOOR_ENDPOINT}/login/oauth/authorize`);
   url.searchParams.set("client_id", CASDOOR_CLIENT_ID);
   url.searchParams.set("redirect_uri", CASDOOR_REDIRECT_URI);
   url.searchParams.set("response_type", "code");
   url.searchParams.set("scope", "profile");
   url.searchParams.set("state", state);
+  url.searchParams.set("code_challenge_method", "S256");
+  url.searchParams.set("code_challenge", codeChallenge);
   return url.toString();
 }
 
-async function exchangeCodeForToken(code: string): Promise<{ access_token: string } | null> {
+async function exchangeCodeForToken(code: string, codeVerifier: string): Promise<{ access_token: string } | null> {
   const res = await fetch(`${CASDOOR_ENDPOINT}/api/login/oauth/access_token`, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -42,6 +102,7 @@ async function exchangeCodeForToken(code: string): Promise<{ access_token: strin
       client_secret: CASDOOR_CLIENT_SECRET,
       code,
       redirect_uri: CASDOOR_REDIRECT_URI,
+      code_verifier: codeVerifier
     }),
   });
   if (!res.ok) return null;
@@ -59,10 +120,15 @@ async function fetchCasdoorUser(accessToken: string): Promise<any | null> {
 
 // Demo mode: when Casdoor is not configured, simulate a login redirect
 // that creates a demo user. Set DEMO_LOGIN=true to enable.
-const DEMO_LOGIN = process.env.DEMO_LOGIN === "true";
+const DEMO_LOGIN = process.env.DEMO_LOGIN === "true" && process.env.NODE_ENV !== "production";
 
 export const casdoorAuthPlugin = new Elysia({ prefix: "/api/auth" })
-  .get("/login", ({ set }) => {
+  .get("/login", ({ set, query, headers }) => {
+    if (checkRateLimit({ headers, path: "/api/auth/casdoor/login", set })) return { error: "Too Many Requests" };
+    if (!appConfig.oauthEnabled) {
+      set.status = 503;
+      return { error: "OAuth disabled by OAUTH_ENABLED=false" };
+    }
     if (!CASDOOR_ENDPOINT || !CASDOOR_CLIENT_ID) {
       if (DEMO_LOGIN) {
         // Simulate Casdoor login by redirecting directly to callback with a demo code
@@ -78,10 +144,20 @@ export const casdoorAuthPlugin = new Elysia({ prefix: "/api/auth" })
     }
     cleanOldStates();
     const state = randomUUID();
+    const codeVerifier = base64Url(randomBytes(32));
+    const codeChallenge = base64Url(createHash("sha256").update(codeVerifier).digest());
+    const returnToRaw = typeof (query as any)?.returnTo === "string" ? String((query as any).returnTo) : "/";
+    const returnTo = pickSafeReturnTo(returnToRaw);
     stateStore.set(state, { createdAt: Date.now() });
-    return { authorizeUrl: buildAuthorizeUrl(state) };
+    setOauthStateCookie(set, { state, codeVerifier, returnTo });
+    return { authorizeUrl: buildAuthorizeUrl(state, codeChallenge) };
   })
   .get("/callback", async ({ query, set, headers }) => {
+    if (checkRateLimit({ headers, path: "/api/auth/casdoor/callback", set })) return { error: "Too Many Requests" };
+    if (!appConfig.oauthEnabled) {
+      set.status = 503;
+      return { error: "OAuth disabled by OAUTH_ENABLED=false" };
+    }
     const code = String((query as any)?.code ?? "");
     const state = String((query as any)?.state ?? "");
 
@@ -89,11 +165,14 @@ export const casdoorAuthPlugin = new Elysia({ prefix: "/api/auth" })
       set.status = 400;
       return { error: "Missing code or state" };
     }
-    if (!stateStore.has(state)) {
+    const stateEntry = stateStore.get(state);
+    const oauthCookie = decodeStateCookie(parseCookieHeader(headers["cookie"])[OAUTH_STATE_COOKIE]);
+    if (!stateEntry || !oauthCookie || oauthCookie.state !== state) {
       set.status = 400;
       return { error: "Invalid or expired state" };
     }
     stateStore.delete(state);
+    clearOauthStateCookie(set);
 
     // Demo mode: bypass Casdoor and create a demo user directly
     if (code === "demo-auth-code" && DEMO_LOGIN) {
@@ -141,7 +220,7 @@ export const casdoorAuthPlugin = new Elysia({ prefix: "/api/auth" })
       return { token: jwt, user: { id: user.id, name: user.name, role: user.role, avatar_url: user.avatar_url } };
     }
 
-    const tokenRes = await exchangeCodeForToken(code);
+    const tokenRes = await exchangeCodeForToken(code, oauthCookie.codeVerifier);
     if (!tokenRes) {
       set.status = 400;
       return { error: "Failed to exchange code for token" };
@@ -190,6 +269,7 @@ export const casdoorAuthPlugin = new Elysia({ prefix: "/api/auth" })
       sub: user.id,
       name: user.name,
       role: user.role,
+      tv: user.token_version ?? 0
     });
 
     // Check if this is a browser redirect (has Accept: text/html) or an API call
@@ -197,13 +277,11 @@ export const casdoorAuthPlugin = new Elysia({ prefix: "/api/auth" })
     const isBrowserRedirect = acceptHeader.includes("text/html");
 
     if (isBrowserRedirect) {
-      // Redirect back to frontend with token in URL hash (safer than query param)
-      const redirectUrl = new URL(`${FRONTEND_URL}/me`);
-      redirectUrl.searchParams.set("token", jwt);
-      redirectUrl.searchParams.set("user_id", user.id);
-      redirectUrl.searchParams.set("user_name", user.name);
-      redirectUrl.searchParams.set("user_role", user.role);
+      const redirectUrl = new URL(FRONTEND_URL);
+      const requested = oauthCookie.returnTo || "/";
+      if (requested.startsWith("/")) redirectUrl.pathname = requested;
       set.status = 302;
+      setSessionCookie(set, jwt);
       set.redirect = redirectUrl.toString();
       return;
     }
@@ -211,16 +289,18 @@ export const casdoorAuthPlugin = new Elysia({ prefix: "/api/auth" })
     return { token: jwt, user: { id: user.id, name: user.name, role: user.role, avatar_url: user.avatar_url } };
   })
   .get("/me", async ({ headers, set }) => {
+    const cookies = parseCookieHeader(headers["cookie"]);
     const authHeader = headers["authorization"] ?? "";
     const bearerMatch = authHeader.match(/^Bearer\s+(.+)$/i);
-    if (!bearerMatch) {
+    const token = cookies[appConfig.sessionCookieName] || bearerMatch?.[1];
+    if (!token) {
       set.status = 401;
       return { error: "Unauthorized" };
     }
 
     const { verifyJwt } = await import("../utils/jwt");
     const { findUserById } = await import("../services/users");
-    const payload = verifyJwt(bearerMatch[1]);
+    const payload = verifyJwt(token);
     if (!payload) {
       set.status = 401;
       return { error: "Invalid token" };
@@ -245,6 +325,10 @@ export const casdoorAuthPlugin = new Elysia({ prefix: "/api/auth" })
       },
     };
   })
-  .post("/logout", () => {
+  .post("/logout", async ({ user, set }) => {
+    if (user?.id && !String(user.id).startsWith("local:") && !String(user.id).startsWith("token:")) {
+      await bumpUserTokenVersion(user.id).catch(() => {});
+    }
+    clearSessionCookie(set);
     return { success: true };
   });

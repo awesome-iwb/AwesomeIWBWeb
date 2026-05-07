@@ -6,7 +6,7 @@ import { useAuth } from '../composables/useAuth';
 
 const router = useRouter();
 const route = useRoute();
-const { user, isAuthenticated, loginDemo, logout, setRole, loginWithCasdoor, handleCallback } = useAuth();
+const { user, isAuthenticated, logout, loginWithCasdoor, handleCallback } = useAuth();
 
 const redirectTo = computed(() => {
   const q = route.query.redirect;
@@ -90,16 +90,6 @@ const startStcnLogin = async () => {
   }
 };
 
-const loginStcnDemoAsCjk = () => {
-  loginDemo({
-    name: 'CJK_MKP',
-    role: 'dev',
-    stcn_user_id: 'stcn:demo:cjk_mkp',
-    sectl_user_id: '',
-    lincube_user_id: ''
-  });
-  goNext();
-};
 </script>
 
 <template>
@@ -146,23 +136,7 @@ const loginStcnDemoAsCjk = () => {
             {{ isLoggingIn ? '正在跳转登录...' : '使用智教联盟登录' }}
           </button>
 
-          <div class="relative">
-            <div class="absolute inset-0 flex items-center">
-              <div class="w-full border-t border-slate-200 dark:border-slate-700"></div>
-            </div>
-            <div class="relative flex justify-center text-xs">
-              <span class="px-2 bg-white dark:bg-[#111827] text-slate-400">或</span>
-            </div>
-          </div>
-
           <div class="flex flex-col sm:flex-row gap-3">
-            <button
-              @click="loginStcnDemoAsCjk"
-              class="flex-1 inline-flex items-center justify-center gap-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 px-6 py-3.5 rounded-2xl font-extrabold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
-            >
-              <LogIn class="w-5 h-5" />
-              演示登录（开发测试）
-            </button>
             <a
               href="https://github.com/awesome-iwb/awesome-iwb"
               target="_blank"
@@ -185,30 +159,6 @@ const loginStcnDemoAsCjk = () => {
         </div>
 
         <div v-else class="mt-8 space-y-6">
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <button
-              @click="setRole('user')"
-              class="px-4 py-3 rounded-2xl border font-extrabold transition-colors"
-              :class="user?.role === 'user' ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10' : 'border-slate-200 dark:border-slate-700 bg-white/70 dark:bg-slate-900/30 hover:bg-slate-50 dark:hover:bg-slate-900/50'"
-            >
-              普通用户（演示）
-            </button>
-            <button
-              @click="setRole('dev')"
-              class="px-4 py-3 rounded-2xl border font-extrabold transition-colors"
-              :class="user?.role === 'dev' ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10' : 'border-slate-200 dark:border-slate-700 bg-white/70 dark:bg-slate-900/30 hover:bg-slate-50 dark:hover:bg-slate-900/50'"
-            >
-              开发者（演示）
-            </button>
-            <button
-              @click="setRole('ops')"
-              class="px-4 py-3 rounded-2xl border font-extrabold transition-colors"
-              :class="user?.role === 'ops' ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10' : 'border-slate-200 dark:border-slate-700 bg-white/70 dark:bg-slate-900/30 hover:bg-slate-50 dark:hover:bg-slate-900/50'"
-            >
-              运维（演示）
-            </button>
-          </div>
-
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <button
               v-if="user?.role === 'ops'"

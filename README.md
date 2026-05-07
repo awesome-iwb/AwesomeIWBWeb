@@ -1,5 +1,7 @@
 # AwesomeIWBWeb
 
+> 上线必读：`deploy/README.md`
+
 AwesomeIWBWeb 是一个面向班级大屏场景的**网页应用**，而不是纯文档仓库。  
 项目由前端站点、后端 API、内容数据与运营工具组成，支持公开展示、后台管理、开发者提交流程。
 
@@ -62,12 +64,14 @@ bun run dev -- --host 0.0.0.0 --port 5173
 
 详情见：`docs/architecture/data-flow.md`
 
-## 关于后台鉴权现状
+## 生产鉴权说明
 
-当前后台与开发者权限处于**临时方案**阶段（受外部 Casdoor 条件限制）。  
-该方案用于当前协作过渡，不应视为完整生产级鉴权体系。详见：
+当前生产方案为：**Casdoor/OAuth 主登录 + 超管应急密码登录（仅 `lincube`）**。  
+除 `lincube` 外，所有账号必须走第三方登录；`lincube` 首次登录后需立即改密。详见：
 
 - `docs/operations/security-note.md`
+- `docs/deploy/30-生产化改造记录.md`
+- `deploy/README.md`
 
 ## 从“README 文档”迁移而来
 

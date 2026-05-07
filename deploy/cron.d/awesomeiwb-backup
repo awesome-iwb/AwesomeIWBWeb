@@ -1,0 +1,1 @@
+0 3 * * * root POSTGRES_USER=awesome_iwb POSTGRES_DB=awesome_iwb /opt/awesomeiwb/deploy/backup-db.sh >> /var/log/awesomeiwb/backup.log 2>&1

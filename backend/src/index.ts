@@ -1,6 +1,7 @@
 import { Elysia, t } from "elysia";
 import { cors } from '@elysiajs/cors'
 import { randomUUID } from "crypto";
+import crypto from "crypto";
 import path from "path";
 import fs from "fs/promises";
 import seedData from "./data.json";
@@ -36,6 +37,9 @@ import { authPlugin, requireAuth, requireRole } from "./plugins/auth";
 import { casdoorAuthPlugin } from "./plugins/casdoorAuth";
 import { localAuthPlugin } from "./plugins/localAuth";
 import { listUsers, setUserRole, setUserActive } from "./services/users";
+import { ensureSuperadminInitialized } from "./services/localAccounts";
+import { appConfig } from "./config";
+import { checkRateLimit } from "./plugins/rateLimit";
 
 /**
  * Awesome-IWB backend API.
@@ -68,7 +72,11 @@ const FEEDBACK_PATH = path.join(RUNTIME_DIR, "feedback.json");
  * When disabled, the service reads/writes JSON files under `backend/runtime/`.
  */
 const dbEnabled = Boolean(process.env.DATABASE_URL);
+if (appConfig.isProduction && !dbEnabled) {
+  throw new Error("DATABASE_URL is required in production");
+}
 if (dbEnabled) await migrate();
+if (dbEnabled) await ensureSuperadminInitialized();
 
 /**
  * Load JSON from disk with a fallback.
@@ -156,15 +164,52 @@ function checkAuth(user: any, set: any) {
   return false;
 }
 
+const storyIdPattern = /^[a-zA-Z0-9_-]{1,64}$/;
+const storyFilePattern = /^[a-zA-Z0-9._-]{1,128}$/;
+const storyFileAllowlist = new Set(["meta.json", "content.md"]);
+
+function resolveStoryFile(id: string, filename: string) {
+  const safeId = path.basename(id);
+  const safeFilename = path.basename(filename);
+  if (!storyIdPattern.test(safeId) || !storyFilePattern.test(safeFilename) || !storyFileAllowlist.has(safeFilename)) {
+    return null;
+  }
+  const base = path.resolve(STORIES_DIR);
+  const resolved = path.resolve(STORIES_DIR, safeId, safeFilename);
+  if (!resolved.startsWith(base + path.sep)) return null;
+  return { safeId, safeFilename, resolved };
+}
+
+function extFromMime(mime: string) {
+  if (mime === "image/png") return "png";
+  if (mime === "image/jpeg") return "jpg";
+  if (mime === "image/webp") return "webp";
+  return null;
+}
+
+const allowedOrigins = appConfig.allowedOrigins;
 const app = new Elysia()
-  .use(cors())
+  .use(cors({
+    origin: ({ headers }) => {
+      const origin = headers.origin;
+      if (!origin) return true;
+      return allowedOrigins.includes(origin);
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"]
+  }))
   .use(authPlugin)
   .use(casdoorAuthPlugin)
   .use(localAuthPlugin)
-  .onError(({ error, set }) => {
+  .onError(({ error, set, request }) => {
+    const traceId = crypto.randomUUID();
     console.error(error);
     set.status = 500;
-    return { error: error.message };
+    if (appConfig.isProduction) {
+      return { error: { code: "INTERNAL", message: "Internal Server Error", traceId } };
+    }
+    return { error: { code: "INTERNAL", message: error.message, traceId, path: request.url } };
   })
   .get("/", () => "Welcome to Awesome-IWB API")
   .get("/api/categories", async () => {
@@ -186,15 +231,9 @@ const app = new Elysia()
     }
     return await getCatalog();
   })
-  .post("/api/projects", async ({ body, set }) => {
-    if (dbEnabled) {
-      set.status = 400;
-      return { error: "Use /api/admin/projects" };
-    }
-    const newData = body as any;
-    await saveJsonFile(DATA_PATH, newData);
-    Object.assign(data, newData);
-    return { success: true };
+  .post("/api/projects", async ({ set }) => {
+    set.status = 410;
+    return { error: "Gone" };
   })
   .get("/api/projects/:name", async ({ params: { name }, set }) => {
     const key = decodeURIComponent(name);
@@ -918,7 +957,8 @@ const app = new Elysia()
     await logAuditCompat({ action: "rollback", entity_type: "project", entity_id: id, diff: { before, after: updated, revisionId } });
     return updated;
   })
-  .post("/api/submissions", async ({ body, set }) => {
+  .post("/api/submissions", async ({ body, set, headers }) => {
+    if (checkRateLimit({ headers, path: "/api/submissions", set })) return { error: "Too Many Requests" };
     const payload: any = body as any;
     if (!payload?.name || !payload?.developer || !payload?.github_url) {
       set.status = 400;
@@ -935,17 +975,23 @@ const app = new Elysia()
     await logAuditCompat({ action: "submit", entity_type: "submission", entity_id: created.id });
     return { success: true, submissionId: created.id };
   })
-  .post("/api/dev/submissions", async ({ body, set, user }) => {
+  .post("/api/dev/submissions", async ({ body, set, user, headers }) => {
+    if (checkRateLimit({ headers, path: "/api/dev/submissions", set })) return { error: "Too Many Requests" };
     if (checkAuth(user, set)) return { error: "Unauthorized" };
+    if (!user || (user.role !== "dev" && user.role !== "ops")) {
+      set.status = 403;
+      return { error: "Forbidden" };
+    }
     const payload: any = body as any;
     if (payload?.kind !== "project_update") {
       set.status = 400;
       return { error: "kind must be project_update" };
     }
-    if (!payload?.project_name || !payload?.patch || !payload?.actor?.username) {
+    if (!payload?.project_name || !payload?.patch) {
       set.status = 400;
-      return { error: "project_name, patch, actor.username are required" };
+      return { error: "project_name, patch are required" };
     }
+    payload.actor = { username: user.name, role: user.role };
 
     if (!dbEnabled) {
       const created = { id: randomUUID(), status: "pending", payload, review_note: "", created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
@@ -959,7 +1005,8 @@ const app = new Elysia()
     await logAuditCompat({ action: "submit", entity_type: "submission", entity_id: created.id, diff: { kind: "project_update" } });
     return { success: true, submissionId: created.id };
   })
-  .post("/api/submit", async ({ body, set }) => {
+  .post("/api/submit", async ({ body, set, headers }) => {
+    if (checkRateLimit({ headers, path: "/api/submit", set })) return { error: "Too Many Requests" };
     const payload: any = body as any;
     if (!payload?.name || !payload?.developer || !payload?.github_url) {
       set.status = 400;
@@ -1239,16 +1286,30 @@ const app = new Elysia()
       return [];
     }
   })
-  .get("/api/stories/:id/:filename", ({ params: { id, filename } }) => {
-    const filePath = path.join(STORIES_DIR, id, filename);
-    return Bun.file(filePath);
+  .get("/api/stories/:id/:filename", ({ params: { id, filename }, set }) => {
+    const resolved = resolveStoryFile(id, filename);
+    if (!resolved) {
+      set.status = 404;
+      return { error: "Not found" };
+    }
+    return Bun.file(resolved.resolved);
   })
-  .post("/api/stories", async ({ body }) => {
+  .post("/api/stories", async ({ body, set, user }) => {
+    if (checkOps(user, set)) return { error: "Forbidden" };
     // In a real app, we'd save this to the DB/JSON file. For now, we update in-memory and write to file.
     const newStories = body as any;
     
     for (const story of newStories) {
-      const dirPath = path.join(STORIES_DIR, story.id);
+      const safeId = path.basename(String(story.id ?? ""));
+      if (!storyIdPattern.test(safeId)) {
+        set.status = 400;
+        return { error: "invalid story id" };
+      }
+      const dirPath = path.resolve(STORIES_DIR, safeId);
+      if (!dirPath.startsWith(path.resolve(STORIES_DIR) + path.sep)) {
+        set.status = 400;
+        return { error: "invalid path" };
+      }
       await fs.mkdir(dirPath, { recursive: true });
       
       const { content, ...meta } = story;
@@ -1271,13 +1332,35 @@ const app = new Elysia()
       return { error: "Not found" };
     }
   })
-  .post("/api/upload", async ({ body: { image }, set, user }) => {
+  .post("/api/upload", async ({ body: { image }, set, user, headers }) => {
+    if (checkRateLimit({ headers, path: "/api/upload", set })) return { error: "Too Many Requests" };
     if (checkAuth(user, set)) return { error: "Unauthorized" };
     if (!image) throw new Error("No image provided");
-    const ext = image.name.split('.').pop() || 'png';
-    const filename = `${randomUUID()}.${ext}`;
+    if (image.size > appConfig.uploadMaxBytes) {
+      set.status = 400;
+      return { error: "File too large" };
+    }
+    const mime = String(image.type || "");
+    if (!["image/png", "image/jpeg", "image/webp"].includes(mime)) {
+      set.status = 400;
+      return { error: "Unsupported image type" };
+    }
+    const ext = extFromMime(mime);
+    if (!ext) {
+      set.status = 400;
+      return { error: "Unsupported image type" };
+    }
+    const buffer = Buffer.from(await image.arrayBuffer());
+    const isPng = buffer.length > 8 && buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47;
+    const isJpeg = buffer.length > 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
+    const isWebp = buffer.length > 12 && buffer.toString("ascii", 0, 4) === "RIFF" && buffer.toString("ascii", 8, 12) === "WEBP";
+    if (!(isPng || isJpeg || isWebp)) {
+      set.status = 400;
+      return { error: "Invalid file signature" };
+    }
+    const filename = `${crypto.createHash("sha256").update(buffer).digest("hex")}.${ext}`;
     const uploadPath = path.join(UPLOADS_DIR, filename);
-    await Bun.write(uploadPath, image);
+    await Bun.write(uploadPath, buffer);
     return { url: `/api/uploads/${filename}` };
   }, {
     body: t.Object({

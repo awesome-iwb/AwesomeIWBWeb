@@ -1,22 +1,25 @@
-# 临时鉴权说明
+# 生产鉴权说明
 
 ## 现状
 
-当前后台与开发者权限控制为过渡方案，原因是外部 Casdoor 条件未满足，暂无法接入正式统一鉴权。
+当前默认为 Casdoor/OAuth 主登录路径，密码登录仅保留给超管 `lincube` 应急使用。
 
 ## 风险边界
 
-- 前端存在演示型登录状态存储
-- 管理能力适合受控协作环境，不等同生产级安全
+- 演示登录路径已移除
+- 非 `lincube` 用户名密码登录被拒绝（需使用 OAuth）
 
 ## 使用建议
 
 - 仅在可信维护环境中使用后台管理功能
 - 不将当前鉴权方案作为长期终态
-- 后续接入正式鉴权后，需替换现有前端演示逻辑
+- 仅在紧急故障时使用超管密码登录
+- 超管首次登录后必须改密
 
 ## 关联文件
 
 - `frontend/src/views/AdminView.vue`
 - `frontend/src/composables/useAuth.ts`
+- `frontend/src/views/MeView.vue`
+- `backend/src/plugins/localAuth.ts`
 

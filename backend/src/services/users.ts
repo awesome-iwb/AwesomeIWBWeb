@@ -17,6 +17,7 @@ export type User = {
   sectl_user_id: string | null;
   lincube_user_id: string | null;
   is_active: boolean;
+  token_version: number;
   last_login_at: string | null;
   created_at: string;
   updated_at: string;
@@ -44,6 +45,7 @@ function createMemoryUser(input: {
     sectl_user_id: input.sectl_user_id ?? null,
     lincube_user_id: input.lincube_user_id ?? null,
     is_active: true,
+    token_version: 0,
     last_login_at: now,
     created_at: now,
     updated_at: now,
@@ -57,7 +59,7 @@ export async function findUserById(id: string): Promise<User | null> {
     return memoryUsers.get(id) ?? null;
   }
   const rows = await sql()<User[]>`
-    select id, casdoor_id, name, avatar_url, email, role, stcn_user_id, sectl_user_id, lincube_user_id, is_active, last_login_at, created_at, updated_at
+    select id, casdoor_id, name, avatar_url, email, role, stcn_user_id, sectl_user_id, lincube_user_id, is_active, token_version, last_login_at, created_at, updated_at
     from users where id = ${id} limit 1
   `;
   return rows[0] ?? null;
@@ -71,7 +73,7 @@ export async function findUserByCasdoorId(casdoorId: string): Promise<User | nul
     return null;
   }
   const rows = await sql()<User[]>`
-    select id, casdoor_id, name, avatar_url, email, role, stcn_user_id, sectl_user_id, lincube_user_id, is_active, last_login_at, created_at, updated_at
+    select id, casdoor_id, name, avatar_url, email, role, stcn_user_id, sectl_user_id, lincube_user_id, is_active, token_version, last_login_at, created_at, updated_at
     from users where casdoor_id = ${casdoorId} limit 1
   `;
   return rows[0] ?? null;
@@ -93,7 +95,7 @@ export async function createUser(input: {
   const [row] = await sql()<User[]>`
     insert into users (casdoor_id, name, avatar_url, email, role, stcn_user_id, sectl_user_id, lincube_user_id)
     values (${input.casdoor_id ?? null}, ${input.name}, ${input.avatar_url ?? ""}, ${input.email ?? null}, ${input.role ?? "user"}, ${input.stcn_user_id ?? null}, ${input.sectl_user_id ?? null}, ${input.lincube_user_id ?? null})
-    returning id, casdoor_id, name, avatar_url, email, role, stcn_user_id, sectl_user_id, lincube_user_id, is_active, last_login_at, created_at, updated_at
+    returning id, casdoor_id, name, avatar_url, email, role, stcn_user_id, sectl_user_id, lincube_user_id, is_active, token_version, last_login_at, created_at, updated_at
   `;
   return row;
 }
@@ -150,7 +152,7 @@ export async function updateUserLogin(id: string, updates?: Partial<Pick<User, "
   const query = `
     update users set ${sets.join(", ")}
     where id = $${params.length}
-    returning id, casdoor_id, name, avatar_url, email, role, stcn_user_id, sectl_user_id, lincube_user_id, is_active, last_login_at, created_at, updated_at
+    returning id, casdoor_id, name, avatar_url, email, role, stcn_user_id, sectl_user_id, lincube_user_id, is_active, token_version, last_login_at, created_at, updated_at
   `;
   const rows = await sql().unsafe(query, params);
   return (rows as User[])[0] ?? null;
@@ -160,12 +162,19 @@ export async function setUserRole(id: string, role: "user" | "dev" | "ops"): Pro
   if (!dbEnabled) {
     const user = memoryUsers.get(id);
     if (!user) return null;
+    if (user.name === "lincube" && role !== "ops") {
+      throw new Error("SUPERADMIN_ROLE_IMMUTABLE");
+    }
     const updated = { ...user, role, updated_at: new Date().toISOString() };
     memoryUsers.set(id, updated);
     return updated;
   }
+  const existing = await findUserById(id);
+  if (existing?.name === "lincube" && role !== "ops") {
+    throw new Error("SUPERADMIN_ROLE_IMMUTABLE");
+  }
   const rows = await sql().unsafe(
-    `update users set role = $1 where id = $2 returning id, casdoor_id, name, avatar_url, email, role, stcn_user_id, sectl_user_id, lincube_user_id, is_active, last_login_at, created_at, updated_at`,
+    `update users set role = $1 where id = $2 returning id, casdoor_id, name, avatar_url, email, role, stcn_user_id, sectl_user_id, lincube_user_id, is_active, token_version, last_login_at, created_at, updated_at`,
     [role, id]
   );
   return (rows as User[])[0] ?? null;
@@ -180,7 +189,7 @@ export async function setUserActive(id: string, isActive: boolean): Promise<User
     return updated;
   }
   const rows = await sql().unsafe(
-    `update users set is_active = $1 where id = $2 returning id, casdoor_id, name, avatar_url, email, role, stcn_user_id, sectl_user_id, lincube_user_id, is_active, last_login_at, created_at, updated_at`,
+    `update users set is_active = $1 where id = $2 returning id, casdoor_id, name, avatar_url, email, role, stcn_user_id, sectl_user_id, lincube_user_id, is_active, token_version, last_login_at, created_at, updated_at`,
     [isActive, id]
   );
   return (rows as User[])[0] ?? null;
@@ -225,7 +234,7 @@ export async function listUsers(params: { q?: string; role?: string; page?: numb
 
   const countQuery = `select count(*)::text as count from users ${whereClause}`;
   const itemsQuery = `
-    select id, casdoor_id, name, avatar_url, email, role, stcn_user_id, sectl_user_id, lincube_user_id, is_active, last_login_at, created_at, updated_at
+    select id, casdoor_id, name, avatar_url, email, role, stcn_user_id, sectl_user_id, lincube_user_id, is_active, token_version, last_login_at, created_at, updated_at
     from users
     ${whereClause}
     order by created_at desc
@@ -236,4 +245,15 @@ export async function listUsers(params: { q?: string; role?: string; page?: numb
   const [{ count }] = await sql().unsafe(countQuery, queryParams) as Array<{ count: string }>;
 
   return { items, page, pageSize, total: Number(count) };
+}
+
+export async function bumpUserTokenVersion(id: string): Promise<void> {
+  if (!dbEnabled) {
+    const user = memoryUsers.get(id);
+    if (!user) return;
+    user.token_version += 1;
+    memoryUsers.set(id, user);
+    return;
+  }
+  await sql()`update users set token_version = token_version + 1 where id = ${id}`;
 }

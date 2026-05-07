@@ -9,7 +9,7 @@ import AboutView from '../views/AboutView.vue'
 import MeView from '../views/MeView.vue'
 import AdminLoginView from '../views/AdminLoginView.vue'
 import { useAuth } from '../composables/useAuth'
-import DevView from '../views/DevView.vue'
+const isDev = import.meta.env.DEV
 
 export const routes: RouteRecordRaw[] = [
   {
@@ -64,12 +64,14 @@ export const routes: RouteRecordRaw[] = [
     component: MeView,
     meta: { showNavBar: true, showBack: true, title: '个人中心' }
   },
-  {
-    path: '/dev',
-    name: 'dev',
-    component: DevView,
-    meta: { showNavBar: true, showBack: true, title: '开发者后台', requiresAuth: true, requiresRole: 'dev' }
-  },
+  ...(isDev
+    ? [{
+        path: '/dev',
+        name: 'dev',
+        component: () => import('../views/DevView.vue'),
+        meta: { showNavBar: true, showBack: true, title: '开发者后台', requiresAuth: true, requiresRole: 'dev' }
+      } as RouteRecordRaw]
+    : []),
   {
     path: '/project/:name',
     name: 'project-detail',

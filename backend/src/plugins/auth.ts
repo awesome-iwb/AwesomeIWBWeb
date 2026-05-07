@@ -3,6 +3,8 @@ import { verifyJwt, hashToken } from "../utils/jwt";
 import { findUserById } from "../services/users";
 import { findActiveTokenByHash, recordTokenUsage } from "../services/apiTokens";
 import { findLocalAccountByUsername } from "../services/localAccounts";
+import { appConfig } from "../config";
+import { parseCookieHeader } from "../utils/cookies";
 
 export type AuthUser = {
   id: string;
@@ -19,22 +21,20 @@ const dbEnabled = Boolean(process.env.DATABASE_URL);
 const devAllowDemoAdmin = process.env.DEV_ALLOW_DEMO_ADMIN === "true";
 
 export const authPlugin = new Elysia({ name: "auth" }).derive(
-  async ({ headers }): Promise<AuthContext> => {
+  async ({ headers, path }): Promise<AuthContext> => {
     // JSON mode: skip auth unless explicitly testing
     if (!dbEnabled) {
       return { user: null };
     }
 
+    const cookies = parseCookieHeader(headers["cookie"]);
     const authHeader = headers["authorization"] ?? "";
     const bearerMatch = authHeader.match(/^Bearer\s+(.+)$/i);
-    if (!bearerMatch) {
-      return { user: null };
-    }
-
-    const token = bearerMatch[1];
+    const token = cookies[appConfig.sessionCookieName] || bearerMatch?.[1];
+    if (!token) return { user: null };
 
     // Try JWT first
-    const jwtPayload = verifyJwt(token);
+    const jwtPayload = verifyJwt(token, { iss: appConfig.jwtIssuer, aud: appConfig.jwtAudience });
     if (jwtPayload) {
       // Local account JWT (sub format: "local:<id>")
       if (jwtPayload.sub.startsWith("local:")) {
@@ -55,7 +55,7 @@ export const authPlugin = new Elysia({ name: "auth" }).derive(
 
       // Regular OAuth user JWT
       const dbUser = await findUserById(jwtPayload.sub);
-      if (dbUser && dbUser.is_active) {
+      if (dbUser && dbUser.is_active && (jwtPayload.tv ?? 0) === (dbUser.token_version ?? 0)) {
         return {
           user: {
             id: dbUser.id,
@@ -70,17 +70,19 @@ export const authPlugin = new Elysia({ name: "auth" }).derive(
     }
 
     // Try API token
-    const tokenHash = hashToken(token);
-    const apiToken = await findActiveTokenByHash(tokenHash);
-    if (apiToken) {
-      void recordTokenUsage(tokenHash);
-      return {
-        user: {
-          id: `token:${apiToken.id}`,
-          name: apiToken.name,
-          role: apiToken.role,
-        },
-      };
+    if (bearerMatch?.[1]) {
+      const tokenHash = hashToken(bearerMatch[1]);
+      const apiToken = await findActiveTokenByHash(tokenHash);
+      if (apiToken) {
+        void recordTokenUsage(tokenHash);
+        return {
+          user: {
+            id: `token:${apiToken.id}`,
+            name: apiToken.name,
+            role: apiToken.role,
+          },
+        };
+      }
     }
 
     return { user: null };

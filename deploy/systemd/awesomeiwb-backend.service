@@ -1,0 +1,24 @@
+[Unit]
+Description=AwesomeIWBWeb Backend (Bun + Elysia)
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=awesomeiwb
+Group=awesomeiwb
+WorkingDirectory=/opt/awesomeiwb/backend
+EnvironmentFile=/etc/awesomeiwb/backend.env
+ExecStart=/usr/local/bin/bun run src/index.ts
+Restart=always
+RestartSec=3
+StandardOutput=append:/var/log/awesomeiwb/backend.log
+StandardError=append:/var/log/awesomeiwb/backend.err.log
+LimitNOFILE=65536
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

@@ -1,4 +1,5 @@
 import { ref, computed } from 'vue';
+import { useApi } from './useApi';
 
 export interface Release {
   tag_name: string;
@@ -61,6 +62,7 @@ const categories = ref<Category[]>([]);
 const loading = ref(true);
 
 export function useProjects() {
+  const { apiFetch } = useApi();
   const normalizeProject = (p: any): Project => {
     const recommendationRaw = p?.recommendation;
     let recommendation = '';
@@ -92,7 +94,7 @@ export function useProjects() {
   const fetchProjects = async () => {
     loading.value = true;
     try {
-      const res = await fetch('/api/projects');
+      const res = await apiFetch('/api/projects', { method: 'GET' });
       if (!res.ok) throw new Error('Failed to fetch projects');
       const text = await res.text();
       if (!text) throw new Error('Empty response from server');
@@ -120,7 +122,7 @@ export function useProjects() {
    */
   const fetchProjectByName = async (name: string): Promise<Project | null> => {
     try {
-      const res = await fetch(`/api/projects/${encodeURIComponent(name)}`);
+      const res = await apiFetch(`/api/projects/${encodeURIComponent(name)}`, { method: 'GET' });
       if (!res.ok) return null;
       const text = await res.text();
       if (!text) return null;
@@ -138,7 +140,7 @@ export function useProjects() {
    */
   const fetchStats = async () => {
     try {
-      const res = await fetch('/api/stats');
+      const res = await apiFetch('/api/stats', { method: 'GET' });
       if (!res.ok) throw new Error('Failed to fetch stats');
       const text = await res.text();
       if (!text) throw new Error('Empty response from server');

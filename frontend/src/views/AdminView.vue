@@ -761,38 +761,29 @@ const loginWithToken = () => {
     alert('请输入 API Token');
     return;
   }
-  localStorage.setItem('awesome_iwb_admin_token', apiTokenInput.value.trim());
   isAuthenticated.value = true;
   fetchData();
 };
 
 const logoutAdmin = () => {
-  localStorage.removeItem('awesome_iwb_admin_token');
   isAuthenticated.value = false;
   apiTokenInput.value = '';
 };
 
-const getAuthHeaders = () => {
-  const token = localStorage.getItem('awesome_iwb_admin_token');
-  return token ? { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json' };
-};
-
 const adminFetch = async (url: string, options: RequestInit = {}) => {
   const headers = new Headers(options.headers || {});
-  const authHeaders = getAuthHeaders();
-  Object.entries(authHeaders).forEach(([k, v]) => headers.set(k, v));
-  return fetch(url, { ...options, headers });
+  if (!headers.has('Content-Type') && !(options.body instanceof FormData)) {
+    headers.set('Content-Type', 'application/json');
+  }
+  if (apiTokenInput.value.trim()) {
+    headers.set('Authorization', `Bearer ${apiTokenInput.value.trim()}`);
+  }
+  return fetch(url, { ...options, headers, credentials: 'include' });
 };
 
 // Check for saved token on mount — fetchData is defined below, call it after script init
 const maybeRestoreSession = () => {
-  if (typeof window !== 'undefined') {
-    const saved = localStorage.getItem('awesome_iwb_admin_token');
-    if (saved) {
-      isAuthenticated.value = true;
-      fetchData();
-    }
-  }
+  return;
 };
 
 interface FeaturedStory {

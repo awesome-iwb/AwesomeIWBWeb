@@ -3,6 +3,12 @@ node_modules/
 dist/
 .vite-ssg-temp/
 backend/runtime/
+backend/src/data.json
+backend/src/audit.json
+backend/src/revisions.json
+backend/src/submissions.json
+backend/src/stories.json
+backend/src/comments.json
 .env
 .env.*
 *.log

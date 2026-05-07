@@ -7,7 +7,7 @@ import { useAuth } from '../composables/useAuth';
 const router = useRouter();
 const { setToken } = useAuth();
 
-const username = ref('');
+const username = ref('lincube');
 const password = ref('');
 const showPassword = ref(false);
 const isLoading = ref(false);
@@ -20,14 +20,14 @@ const handleLogin = async () => {
   error.value = '';
   remainingAttempts.value = undefined;
 
-  if (!username.value.trim() || !password.value) {
-    error.value = '请输入用户名和密码';
+  if (!password.value) {
+    error.value = '登录失败';
     return;
   }
 
   isLoading.value = true;
   try {
-    const res = await fetch('/api/auth/local/login', {
+    const res = await fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -40,10 +40,7 @@ const handleLogin = async () => {
     const json = text ? JSON.parse(text) : {};
 
     if (!res.ok) {
-      if (json.remainingAttempts !== undefined) {
-        remainingAttempts.value = json.remainingAttempts;
-      }
-      throw new Error(json.error || '登录失败');
+      throw new Error('登录失败');
     }
 
     if (json.token) {
@@ -55,10 +52,10 @@ const handleLogin = async () => {
       });
       router.push('/admin');
     } else {
-      throw new Error('登录响应异常');
+      throw new Error('登录失败');
     }
   } catch (e: any) {
-    error.value = e?.message || '登录过程中发生错误';
+    error.value = '登录失败';
   } finally {
     isLoading.value = false;
   }
@@ -113,7 +110,8 @@ const handleLogin = async () => {
               v-model="username"
               type="text"
               autocomplete="username"
-              placeholder="请输入用户名"
+              disabled
+              placeholder="lincube"
               class="w-full px-4 py-3 rounded-2xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-rose-500/50 focus:border-rose-500 transition-all"
             />
           </div>

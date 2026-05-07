@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { Star, X, Download } from 'lucide-vue-next';
+import DOMPurify from 'dompurify';
 
 interface FeaturedProject {
   name: string;
@@ -145,7 +146,7 @@ const closeStory = () => {
 
               <!-- Content Body -->
               <div class="p-8 sm:p-16 prose prose-lg prose-slate dark:prose-invert max-w-none">
-                <div v-html="selectedStory.content"></div>
+                <div v-html="DOMPurify.sanitize(selectedStory.content)"></div>
               </div>
 
               <!-- App Links at Bottom -->

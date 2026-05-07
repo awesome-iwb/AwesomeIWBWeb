@@ -14,9 +14,6 @@ export type AuthUser = {
   avatar_url?: string;
 };
 
-const STORAGE_KEY = 'awesome_iwb_auth';
-const TOKEN_KEY = 'awesome_iwb_token';
-
 const user = ref<AuthUser | null>(null);
 const token = ref<string | null>(null);
 const ready = ref(false);
@@ -25,48 +22,16 @@ const loadOnce = () => {
   if (ready.value) return;
   ready.value = true;
   if (typeof window === 'undefined') return;
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (raw) user.value = JSON.parse(raw) as AuthUser;
-    const t = window.localStorage.getItem(TOKEN_KEY);
-    if (t) token.value = t;
-  } catch {
-    user.value = null;
-    token.value = null;
-  }
 };
 
 const persist = () => {
-  if (typeof window === 'undefined') return;
-  try {
-    if (!user.value) {
-      window.localStorage.removeItem(STORAGE_KEY);
-      window.localStorage.removeItem(TOKEN_KEY);
-      return;
-    }
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(user.value));
-    if (token.value) window.localStorage.setItem(TOKEN_KEY, token.value);
-  } catch {}
+  // Cookie-based auth: no localStorage persistence.
 };
 
 export const useAuth = () => {
   loadOnce();
 
-  const isAuthenticated = computed(() => Boolean(user.value && token.value));
-
-  const loginDemo = (input?: Partial<AuthUser>) => {
-    const next: AuthUser = {
-      name: input?.name ?? '演示用户',
-      avatarUrl: input?.avatarUrl ?? '/assets/people/placeholder.svg',
-      role: input?.role ?? 'user',
-      stcn_user_id: input?.stcn_user_id ?? '',
-      sectl_user_id: input?.sectl_user_id ?? '',
-      lincube_user_id: input?.lincube_user_id ?? ''
-    };
-    user.value = next;
-    token.value = 'demo-token';
-    persist();
-  };
+  const isAuthenticated = computed(() => Boolean(user.value));
 
   const setToken = (newToken: string, newUser?: Partial<AuthUser>) => {
     token.value = newToken;
@@ -104,10 +69,9 @@ export const useAuth = () => {
   };
 
   const fetchUser = async (): Promise<boolean> => {
-    if (!token.value || token.value === 'demo-token') return false;
     try {
       const res = await fetch('/api/auth/me', {
-        headers: { Authorization: `Bearer ${token.value}` }
+        credentials: 'include'
       });
       if (!res.ok) {
         logout();
@@ -117,16 +81,18 @@ export const useAuth = () => {
       if (!text) return false;
       const json = JSON.parse(text);
       if (json.user) {
-        setToken(token.value!, {
+        user.value = {
           id: json.user.id,
           name: json.user.name,
           role: json.user.role,
+          avatarUrl: json.user.avatar_url || '/assets/people/placeholder.svg',
           avatar_url: json.user.avatar_url,
           email: json.user.email,
           stcn_user_id: json.user.stcn_user_id,
           sectl_user_id: json.user.sectl_user_id,
           lincube_user_id: json.user.lincube_user_id,
-        });
+        };
+        persist();
         return true;
       }
       return false;
@@ -151,22 +117,45 @@ export const useAuth = () => {
     window.location.href = json.authorizeUrl;
   };
 
+  const loginWithPassword = async (username: string, password: string): Promise<boolean> => {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ username, password })
+    });
+    if (!res.ok) return false;
+    const json = await res.json();
+    if (!json?.token) return false;
+    setToken(json.token, {
+      id: json.user?.id,
+      name: json.user?.name,
+      role: json.user?.role,
+      avatar_url: json.user?.avatar_url
+    });
+    return true;
+  };
+
   const handleCallback = async (code: string, state: string): Promise<boolean> => {
     try {
-      const res = await fetch(`/api/auth/callback?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}`);
+      const res = await fetch(`/api/auth/callback?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}`, {
+        credentials: 'include'
+      });
       const text = await res.text();
-      if (!text) return false;
-      const json = JSON.parse(text);
-      if (json.token) {
-        setToken(json.token, {
-          id: json.user?.id,
-          name: json.user?.name,
-          role: json.user?.role,
-          avatar_url: json.user?.avatar_url,
-        });
-        return true;
+      if (!res.ok) return false;
+      if (text) {
+        const json = JSON.parse(text);
+        if (json.token) {
+          setToken(json.token, {
+            id: json.user?.id,
+            name: json.user?.name,
+            role: json.user?.role,
+            avatar_url: json.user?.avatar_url,
+          });
+          return true;
+        }
       }
-      return false;
+      return await fetchUser();
     } catch {
       return false;
     }
@@ -176,7 +165,7 @@ export const useAuth = () => {
     user,
     token,
     isAuthenticated,
-    loginDemo,
+    loginWithPassword,
     loginWithCasdoor,
     handleCallback,
     fetchUser,
