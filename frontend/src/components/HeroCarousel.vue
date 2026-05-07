@@ -12,10 +12,10 @@ const router = useRouter();
 const currentIndex = ref(0);
 let autoPlayTimer: number | null = null;
 
-// Only feature projects that have a banner and are highly recommended
+// Only feature projects that have a banner and are editors' choice
 const featuredProjects = computed(() => {
   return props.projects
-    .filter(p => p.banner && p.recommendation.includes('非常推荐'))
+    .filter(p => p.banner && p.is_editors_choice)
     .slice(0, 5); // Limit to top 5
 });
 
@@ -101,7 +101,7 @@ const getFallbackImage = (name: string) => {
           <div class="max-w-2xl transform transition-all duration-700 translate-y-0" :class="{'opacity-0 translate-y-4': index !== currentIndex}">
             <div class="flex items-center gap-2 mb-4">
               <span class="inline-flex items-center gap-1 text-xs font-bold text-amber-400 bg-amber-500/20 backdrop-blur-md px-3 py-1.5 rounded-full border border-amber-500/30 uppercase tracking-wider">
-                <Star class="w-3.5 h-3.5 fill-current" /> Editors' Choice
+                <Star class="w-3.5 h-3.5 fill-current" /> 编辑推荐
               </span>
               <span class="inline-flex items-center gap-1 text-xs font-bold text-white bg-white/20 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/20">
                 {{ project.status }}

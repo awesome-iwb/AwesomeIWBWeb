@@ -112,7 +112,7 @@ const getFallbackImage = (name: string) => {
                   </div>
                   <div class="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400 truncate">
                     <span class="flex items-center gap-1"><Folder class="w-3 h-3" /> {{ project.developer }}</span>
-                    <span v-if="project.keywords.length > 0" class="flex items-center gap-1"><Hash class="w-3 h-3" /> {{ project.keywords[0] }}</span>
+                    <span v-if="project.keywords.length > 0" class="flex items-center gap-1" :title="`功能特性: ${project.keywords[0]}`"><Hash class="w-3 h-3" /> {{ project.keywords[0] }}</span>
                   </div>
                 </div>
                 <ArrowRight class="w-5 h-5 text-slate-300 dark:text-slate-600 group-hover:text-emerald-500 opacity-0 group-hover:opacity-100 transition-all -translate-x-2 group-hover:translate-x-0" />

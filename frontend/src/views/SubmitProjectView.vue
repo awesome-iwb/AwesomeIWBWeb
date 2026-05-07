@@ -137,7 +137,7 @@ const handleSubmit = async () => {
                 {{ tag }}
               </span>
               <span v-if="!form.tags" class="px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-400 text-xs font-medium border border-dashed border-slate-300 dark:border-slate-700">
-                标签预览
+                功能特性预览
               </span>
             </div>
           </div>
@@ -175,7 +175,7 @@ const handleSubmit = async () => {
             </div>
             
             <div class="space-y-2">
-              <label class="text-sm font-bold text-slate-700 dark:text-slate-300">标签 (逗号或空格分隔)</label>
+              <label class="text-sm font-bold text-slate-700 dark:text-slate-300">功能特性 (逗号或空格分隔)</label>
               <input v-model="form.tags" type="text" placeholder="例如: 课程表 提醒 桌面工具" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all" />
             </div>
           </div>

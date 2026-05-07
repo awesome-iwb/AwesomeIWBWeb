@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { Github, LogIn, LogOut, Shield, Wrench } from 'lucide-vue-next';
+import { Github, LogIn, LogOut, Shield, Wrench, AlertCircle } from 'lucide-vue-next';
 import { useAuth } from '../composables/useAuth';
 
 const router = useRouter();
 const route = useRoute();
-const { user, isAuthenticated, loginDemo, logout, setRole } = useAuth();
+const { user, isAuthenticated, loginDemo, logout, setRole, loginWithCasdoor, handleCallback } = useAuth();
 
 const redirectTo = computed(() => {
   const q = route.query.redirect;
@@ -21,6 +21,74 @@ const roleLabel = computed(() => {
 });
 
 const goNext = () => router.push(redirectTo.value);
+
+const isLoggingIn = ref(false);
+const loginError = ref('');
+
+// Handle Casdoor OAuth callback (two modes: backend redirect with token, or direct code+state)
+onMounted(async () => {
+  // Mode 1: Backend redirect with token in URL
+  const token = route.query.token as string | undefined;
+  const userId = route.query.user_id as string | undefined;
+  const userName = route.query.user_name as string | undefined;
+  const userRole = route.query.user_role as string | undefined;
+
+  if (token && userId) {
+    isLoggingIn.value = true;
+    loginError.value = '';
+    try {
+      const { setToken, fetchUser } = useAuth();
+      setToken(token, {
+        id: userId,
+        name: userName || '',
+        role: (userRole as any) || 'user',
+      });
+      // Fetch full user info from backend
+      await fetchUser();
+      // Clean URL
+      await router.replace({ path: '/me', query: {} });
+      goNext();
+      return;
+    } catch (e: any) {
+      loginError.value = e?.message || '登录过程中发生错误';
+    } finally {
+      isLoggingIn.value = false;
+    }
+  }
+
+  // Mode 2: Direct code+state (fallback for API mode)
+  const code = route.query.code as string | undefined;
+  const state = route.query.state as string | undefined;
+
+  if (code && state) {
+    isLoggingIn.value = true;
+    loginError.value = '';
+    try {
+      const success = await handleCallback(code, state);
+      if (success) {
+        await router.replace({ path: '/me', query: {} });
+        goNext();
+        return;
+      }
+      loginError.value = '登录回调处理失败，请重试';
+    } catch (e: any) {
+      loginError.value = e?.message || '登录过程中发生错误';
+    } finally {
+      isLoggingIn.value = false;
+    }
+  }
+});
+
+const startStcnLogin = async () => {
+  isLoggingIn.value = true;
+  loginError.value = '';
+  try {
+    await loginWithCasdoor();
+  } catch (e: any) {
+    loginError.value = e?.message || '无法启动登录流程，请检查网络连接';
+    isLoggingIn.value = false;
+  }
+};
 
 const loginStcnDemoAsCjk = () => {
   loginDemo({
@@ -58,26 +126,61 @@ const loginStcnDemoAsCjk = () => {
         </div>
 
         <div v-if="!isAuthenticated" class="mt-8 space-y-4">
+          <div v-if="loginError" class="p-4 rounded-2xl border border-rose-200 dark:border-rose-800 bg-rose-50 dark:bg-rose-500/10 flex items-start gap-3">
+            <AlertCircle class="w-5 h-5 text-rose-500 shrink-0 mt-0.5" />
+            <div class="text-sm text-rose-700 dark:text-rose-300">{{ loginError }}</div>
+          </div>
+
           <div class="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/40">
             <div class="text-sm font-extrabold text-slate-800 dark:text-slate-200">智教联盟登录系统</div>
-            <div class="text-sm text-slate-600 dark:text-slate-300 mt-1">当前为演示模式：点击按钮模拟完成 STCN 授权登录。</div>
+            <div class="text-sm text-slate-600 dark:text-slate-300 mt-1">使用智教联盟（STCN）统一身份认证登录，无需额外注册。</div>
           </div>
-          <div class="flex flex-col sm:flex-row gap-3">
+
           <button
-            @click="loginStcnDemoAsCjk"
-            class="flex-1 inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3.5 rounded-2xl font-extrabold transition-colors"
+            @click="startStcnLogin"
+            :disabled="isLoggingIn"
+            class="w-full inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed text-white px-6 py-3.5 rounded-2xl font-extrabold transition-colors"
           >
-            <LogIn class="w-5 h-5" />
-            使用智教联盟登录（演示）
+            <LogIn v-if="!isLoggingIn" class="w-5 h-5" />
+            <span v-if="isLoggingIn" class="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+            {{ isLoggingIn ? '正在跳转登录...' : '使用智教联盟登录' }}
           </button>
-          <a
-            href="https://github.com/awesome-iwb/awesome-iwb"
-            target="_blank"
-            class="flex-1 inline-flex items-center justify-center gap-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 px-6 py-3.5 rounded-2xl font-extrabold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
-          >
-            <Github class="w-5 h-5" />
-            GitHub
-          </a>
+
+          <div class="relative">
+            <div class="absolute inset-0 flex items-center">
+              <div class="w-full border-t border-slate-200 dark:border-slate-700"></div>
+            </div>
+            <div class="relative flex justify-center text-xs">
+              <span class="px-2 bg-white dark:bg-[#111827] text-slate-400">或</span>
+            </div>
+          </div>
+
+          <div class="flex flex-col sm:flex-row gap-3">
+            <button
+              @click="loginStcnDemoAsCjk"
+              class="flex-1 inline-flex items-center justify-center gap-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 px-6 py-3.5 rounded-2xl font-extrabold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+            >
+              <LogIn class="w-5 h-5" />
+              演示登录（开发测试）
+            </button>
+            <a
+              href="https://github.com/awesome-iwb/awesome-iwb"
+              target="_blank"
+              class="flex-1 inline-flex items-center justify-center gap-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 px-6 py-3.5 rounded-2xl font-extrabold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+            >
+              <Github class="w-5 h-5" />
+              GitHub
+            </a>
+          </div>
+
+          <!-- Emergency admin login -->
+          <div class="pt-2">
+            <button
+              @click="router.push('/admin-login')"
+              class="w-full text-xs text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 transition-colors py-2"
+            >
+              超级管理员登录（应急通道）
+            </button>
           </div>
         </div>
 

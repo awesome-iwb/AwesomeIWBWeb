@@ -409,7 +409,7 @@ if (allProjects.value.length === 0) {
               <span class="text-sm font-semibold text-slate-700 dark:text-slate-300 max-w-[240px] truncate">{{ organizationName }}</span>
             </div>
             <div v-if="project?.is_editors_choice" class="flex items-center gap-1 text-xs font-bold text-amber-600 bg-amber-50 dark:bg-amber-500/10 px-2.5 py-1 rounded-md border border-amber-200/50 dark:border-amber-500/20">
-              <Star class="w-3.5 h-3.5 fill-current" /> Editors' Choice
+              <Star class="w-3.5 h-3.5 fill-current" /> 编辑推荐
             </div>
           </div>
 
@@ -700,37 +700,35 @@ if (allProjects.value.length === 0) {
             </ul>
           </div>
 
-          <!-- Tags -->
-          <div class="bg-slate-50 dark:bg-[#111827] rounded-3xl p-6 border border-slate-200/50 dark:border-slate-800/80">
-            <div v-if="project.keywords && project.keywords.length > 0" class="mb-8">
-              <h3 class="font-bold text-lg text-slate-900 dark:text-white mb-4 flex items-center gap-2">
-                <Sparkles class="w-5 h-5 text-emerald-500" /> Tags
-              </h3>
-              <div class="flex flex-wrap gap-2">
-                <span 
-                  v-for="kw in project.keywords" 
-                  :key="kw" 
-                  class="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-sm font-medium hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-500/10 dark:hover:text-emerald-400 transition-colors cursor-default"
-                >
-                  {{ kw }}
-                </span>
-              </div>
+          <!-- Features -->
+          <div v-if="project.keywords && project.keywords.length > 0" class="bg-slate-50 dark:bg-[#111827] rounded-3xl p-6 border border-slate-200/50 dark:border-slate-800/80">
+            <h3 class="font-bold text-lg text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+              <Sparkles class="w-5 h-5 text-emerald-500" /> 功能特性
+            </h3>
+            <div class="flex flex-wrap gap-2">
+              <span 
+                v-for="kw in project.keywords" 
+                :key="kw" 
+                class="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-sm font-medium hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-500/10 dark:hover:text-emerald-400 transition-colors cursor-default"
+              >
+                {{ kw }}
+              </span>
             </div>
+          </div>
 
-            <!-- Tech Stack Section -->
-            <div v-if="techStack.length">
-              <h3 class="font-bold text-lg text-slate-900 dark:text-white mb-4 flex items-center gap-2">
-                <Code2 class="w-5 h-5 text-indigo-500" /> Tech Stack
-              </h3>
-              <div class="flex flex-wrap gap-2">
-                <span
-                  v-for="t in techStack"
-                  :key="t"
-                  class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/20 rounded-lg text-sm font-bold text-indigo-600 dark:text-indigo-400"
-                >
-                  <Code2 class="w-4 h-4" /> {{ t }}
-                </span>
-              </div>
+          <!-- Tech Stack -->
+          <div v-if="techStack.length" class="bg-slate-50 dark:bg-[#111827] rounded-3xl p-6 border border-slate-200/50 dark:border-slate-800/80">
+            <h3 class="font-bold text-lg text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+              <Code2 class="w-5 h-5 text-indigo-500" /> 技术栈
+            </h3>
+            <div class="flex flex-wrap gap-2">
+              <span
+                v-for="t in techStack"
+                :key="t"
+                class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/20 rounded-lg text-sm font-bold text-indigo-600 dark:text-indigo-400"
+              >
+                <Code2 class="w-4 h-4" /> {{ t }}
+              </span>
             </div>
           </div>
 

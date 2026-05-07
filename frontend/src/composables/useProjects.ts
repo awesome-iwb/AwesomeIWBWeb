@@ -94,7 +94,9 @@ export function useProjects() {
     try {
       const res = await fetch('/api/projects');
       if (!res.ok) throw new Error('Failed to fetch projects');
-      const json = await res.json();
+      const text = await res.text();
+      if (!text) throw new Error('Empty response from server');
+      const json = JSON.parse(text);
       categories.value = (json.categories ?? []).map((c: any) => ({
         ...c,
         projects: (c.projects ?? []).map(normalizeProject)
@@ -120,7 +122,9 @@ export function useProjects() {
     try {
       const res = await fetch(`/api/projects/${encodeURIComponent(name)}`);
       if (!res.ok) return null;
-      return normalizeProject(await res.json());
+      const text = await res.text();
+      if (!text) return null;
+      return normalizeProject(JSON.parse(text));
     } catch {
       return allProjects.value.find(p => p.name.toLowerCase() === name.toLowerCase()) || null;
     }
@@ -133,15 +137,19 @@ export function useProjects() {
    * Fallback: compute from the current catalog when the endpoint is unavailable.
    */
   const fetchStats = async () => {
-    const res = await fetch('/api/stats');
-    if (!res.ok) {
+    try {
+      const res = await fetch('/api/stats');
+      if (!res.ok) throw new Error('Failed to fetch stats');
+      const text = await res.text();
+      if (!text) throw new Error('Empty response from server');
+      return JSON.parse(text);
+    } catch {
       const totalProjects = categories.value.reduce((acc, cat) => acc + cat.projects.length, 0);
       const totalStars = categories.value.reduce((acc, cat) => {
         return acc + cat.projects.reduce((sum, p) => sum + (p.stars || 0), 0);
       }, 0);
       return { totalProjects, totalStars };
     }
-    return await res.json();
   };
 
   return {

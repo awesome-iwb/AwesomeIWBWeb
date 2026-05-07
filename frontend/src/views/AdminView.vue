@@ -5,20 +5,21 @@
     <div v-if="!isAuthenticated" class="min-h-screen flex items-center justify-center">
       <div class="bg-white dark:bg-slate-800 p-10 rounded-3xl shadow-2xl max-w-md w-full">
         <h1 class="text-3xl font-bold mb-6 text-center text-emerald-500">管理后台</h1>
-        <p class="text-slate-500 mb-8 text-center">请输入管理员密码进入创作中心</p>
+        <p class="text-slate-500 mb-8 text-center">请输入管理员 API Token 进入运维后台</p>
         <input 
           type="password" 
-          v-model="password"
-          @keyup.enter="login"
-          placeholder="Password (try: admin)" 
+          v-model="apiTokenInput"
+          @keyup.enter="loginWithToken"
+          placeholder="输入 API Token" 
           class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 mb-6 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
         />
         <button 
-          @click="login" 
+          @click="loginWithToken" 
           class="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl transition-colors shadow-lg shadow-emerald-500/30"
         >
           进入
         </button>
+        <p class="text-xs text-slate-400 mt-4 text-center">Token 由后端环境变量配置，请联系管理员获取</p>
       </div>
     </div>
 
@@ -30,7 +31,7 @@
             <span class="text-transparent bg-clip-text bg-gradient-to-r from-emerald-500 to-teal-500">Awesome</span>
             后台管理
           </h1>
-          <div class="flex gap-4 mt-4">
+          <div class="flex gap-4 mt-4 flex-wrap">
             <button 
               @click="activeTab = 'stories'" 
               class="px-4 py-2 rounded-full font-bold transition-colors"
@@ -59,11 +60,21 @@
             >
               评论与反馈
             </button>
+            <button 
+              @click="activeTab = 'users'" 
+              class="px-4 py-2 rounded-full font-bold transition-colors"
+              :class="activeTab === 'users' ? 'bg-emerald-500 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-300 dark:hover:bg-slate-700'"
+            >
+              用户权限
+            </button>
           </div>
         </div>
         <div class="flex gap-4">
           <button @click="router.push('/')" class="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
             返回首页
+          </button>
+          <button @click="logoutAdmin" class="px-4 py-2 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-bold transition-colors">
+            退出
           </button>
           <button v-if="activeTab === 'stories'" @click="saveStories" class="px-6 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold shadow-lg shadow-emerald-500/20 transition-all flex items-center gap-2">
             <Save class="w-4 h-4" />
@@ -118,7 +129,7 @@
             </div>
             <div class="col-span-2 sm:col-span-1">
               <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">分类标签</label>
-              <input type="text" v-model="currentStory.category" class="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-emerald-500" placeholder="例如：Editors' Choice" />
+              <input type="text" v-model="currentStory.category" class="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-emerald-500" placeholder="例如：编辑推荐" />
             </div>
             <div class="col-span-2 sm:col-span-1">
               <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">发布日期</label>
@@ -182,6 +193,7 @@
         </div>
       </div>
 
+      <!-- Projects Tab -->
       <div v-else-if="activeTab === 'projects'" class="grid grid-cols-1 lg:grid-cols-4 gap-8">
         <div class="lg:col-span-1 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col h-[700px]">
           <div class="p-4 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 flex justify-between items-center gap-2">
@@ -336,7 +348,7 @@
               </select>
             </div>
             <div class="col-span-2 sm:col-span-1">
-              <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">关键词 Tags (逗号分隔)</label>
+              <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">功能特性 (逗号分隔)</label>
               <input type="text" v-model="projectDraft.keywords" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-blue-500" placeholder="例如：白板, 批注, C#" />
             </div>
             <div class="col-span-2">
@@ -389,6 +401,7 @@
         </div>
       </div>
 
+      <!-- Submissions Tab -->
       <div v-else-if="activeTab === 'submissions'" class="grid grid-cols-1 lg:grid-cols-4 gap-8">
         <div class="lg:col-span-1 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col h-[700px]">
           <div class="p-4 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
@@ -490,7 +503,7 @@
                 </select>
                 <input v-model="submissionNewCategoryName" type="text" placeholder="或新建分类名称" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-emerald-500" />
               </div>
-              <div class="text-xs text-slate-500 dark:text-slate-400 mt-2">优先使用“选择现有分类”，若填写新分类名称则会自动创建。</div>
+              <div class="text-xs text-slate-500 dark:text-slate-400 mt-2">优先使用"选择现有分类"，若填写新分类名称则会自动创建。</div>
             </div>
             <div class="col-span-2">
               <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">驳回原因（可选）</label>
@@ -507,10 +520,153 @@
         </div>
       </div>
 
+      <!-- Feedback Tab -->
       <div v-else-if="activeTab === 'feedback'" class="max-w-5xl mx-auto">
         <CommentPanel project-name="__admin__" variant="ops" />
       </div>
 
+      <!-- Users Tab -->
+      <div v-else-if="activeTab === 'users'" class="grid grid-cols-1 lg:grid-cols-4 gap-8">
+        <div class="lg:col-span-1 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col h-[700px]">
+          <div class="p-4 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
+            <h2 class="font-bold text-lg">用户列表</h2>
+          </div>
+          <div class="p-4 border-b border-slate-100 dark:border-slate-700 space-y-3">
+            <input v-model="userQuery.q" @keyup.enter="fetchUsers" type="text" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-emerald-500 text-sm" placeholder="搜索（用户名/邮箱/STCN ID）" />
+            <select v-model="userQuery.role" @change="userQuery.page = 1; fetchUsers()" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-emerald-500 text-sm">
+              <option value="">全部角色</option>
+              <option value="user">普通用户</option>
+              <option value="dev">开发者</option>
+              <option value="ops">运维</option>
+            </select>
+            <button @click="userQuery.page = 1; fetchUsers()" class="w-full px-3 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold transition-colors">刷新</button>
+          </div>
+          <div class="flex-1 overflow-y-auto p-4 space-y-2">
+            <div
+              v-for="u in usersPage.items"
+              :key="u.id"
+              @click="selectUser(u)"
+              class="p-3 rounded-xl border cursor-pointer transition-all duration-200 flex items-center gap-3"
+              :class="selectedUserId === u.id ? 'bg-emerald-500 text-white border-emerald-500 shadow-md shadow-emerald-500/20' : 'bg-slate-50 dark:bg-slate-900/50 border-transparent hover:border-emerald-300'"
+            >
+              <div class="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-xs font-bold overflow-hidden">
+                <img v-if="u.avatar_url" :src="u.avatar_url" class="w-full h-full object-cover" />
+                <span v-else :class="selectedUserId === u.id ? 'text-white' : 'text-slate-500'">{{ (u.name || '?').charAt(0) }}</span>
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="font-medium truncate text-sm">{{ u.name }}</div>
+                <div class="text-xs opacity-80 truncate">{{ u.role }} {{ u.is_active ? '' : '(已禁用)' }}</div>
+              </div>
+            </div>
+            <div v-if="usersPage.items.length === 0" class="text-sm text-slate-400 text-center py-10">暂无用户</div>
+          </div>
+          <div class="p-4 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between text-sm">
+            <button @click="prevUserPage" :disabled="usersPage.page <= 1" class="px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed">上一页</button>
+            <div class="text-slate-500 dark:text-slate-300">{{ usersPage.page }} / {{ Math.max(1, Math.ceil(usersPage.total / usersPage.pageSize)) }}</div>
+            <button @click="nextUserPage" :disabled="usersPage.page >= Math.ceil(usersPage.total / usersPage.pageSize)" class="px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed">下一页</button>
+          </div>
+        </div>
+
+        <div class="lg:col-span-3 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col h-[700px] overflow-y-auto" v-if="userDraft">
+          <div class="p-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50">
+            <h2 class="text-xl font-bold text-slate-800 dark:text-white">用户详情</h2>
+          </div>
+          <div class="p-8 space-y-6">
+            <div class="flex items-center gap-4">
+              <div class="w-16 h-16 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
+                <img v-if="userDraft.avatar_url" :src="userDraft.avatar_url" class="w-full h-full object-cover" />
+                <div v-else class="w-full h-full flex items-center justify-center text-xl font-bold text-slate-500">{{ (userDraft.name || '?').charAt(0) }}</div>
+              </div>
+              <div>
+                <div class="text-lg font-extrabold text-slate-900 dark:text-white">{{ userDraft.name }}</div>
+                <div class="text-sm text-slate-500 dark:text-slate-400">{{ userDraft.email || '无邮箱' }}</div>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <div class="p-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
+                <div class="text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">用户 ID</div>
+                <div class="text-sm text-slate-900 dark:text-white font-mono">{{ userDraft.id }}</div>
+              </div>
+              <div class="p-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
+                <div class="text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Casdoor ID</div>
+                <div class="text-sm text-slate-900 dark:text-white font-mono">{{ userDraft.casdoor_id || '-' }}</div>
+              </div>
+              <div class="p-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
+                <div class="text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">STCN 用户 ID</div>
+                <div class="text-sm text-slate-900 dark:text-white font-mono">{{ userDraft.stcn_user_id || '-' }}</div>
+              </div>
+              <div class="p-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
+                <div class="text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">SECTL 用户 ID</div>
+                <div class="text-sm text-slate-900 dark:text-white font-mono">{{ userDraft.sectl_user_id || '-' }}</div>
+              </div>
+              <div class="p-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
+                <div class="text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">注册时间</div>
+                <div class="text-sm text-slate-900 dark:text-white">{{ new Date(userDraft.created_at).toLocaleString() }}</div>
+              </div>
+              <div class="p-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
+                <div class="text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">最后登录</div>
+                <div class="text-sm text-slate-900 dark:text-white">{{ userDraft.last_login_at ? new Date(userDraft.last_login_at).toLocaleString() : '从未登录' }}</div>
+              </div>
+            </div>
+
+            <div class="p-6 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 space-y-4">
+              <div class="text-sm font-extrabold text-slate-800 dark:text-slate-200">权限管理</div>
+              
+              <div class="flex items-center justify-between">
+                <div>
+                  <div class="text-sm font-bold text-slate-700 dark:text-slate-300">当前角色</div>
+                  <div class="text-xs text-slate-500 dark:text-slate-400">决定用户可以访问的功能</div>
+                </div>
+                <div class="flex gap-2">
+                  <button 
+                    @click="updateUserRole('user')"
+                    class="px-4 py-2 rounded-xl font-bold transition-colors"
+                    :class="userDraft.role === 'user' ? 'bg-emerald-500 text-white' : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'"
+                  >
+                    普通用户
+                  </button>
+                  <button 
+                    @click="updateUserRole('dev')"
+                    class="px-4 py-2 rounded-xl font-bold transition-colors"
+                    :class="userDraft.role === 'dev' ? 'bg-blue-500 text-white' : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'"
+                  >
+                    开发者
+                  </button>
+                  <button 
+                    @click="updateUserRole('ops')"
+                    class="px-4 py-2 rounded-xl font-bold transition-colors"
+                    :class="userDraft.role === 'ops' ? 'bg-purple-500 text-white' : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'"
+                  >
+                    运维
+                  </button>
+                </div>
+              </div>
+
+              <div class="h-px bg-slate-200 dark:bg-slate-700"></div>
+
+              <div class="flex items-center justify-between">
+                <div>
+                  <div class="text-sm font-bold text-slate-700 dark:text-slate-300">账号状态</div>
+                  <div class="text-xs text-slate-500 dark:text-slate-400">禁用后用户将无法登录</div>
+                </div>
+                <button 
+                  @click="updateUserActive(!userDraft.is_active)"
+                  class="px-4 py-2 rounded-xl font-bold transition-colors"
+                  :class="userDraft.is_active ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300' : 'bg-rose-100 dark:bg-rose-500/20 text-rose-700 dark:text-rose-300'"
+                >
+                  {{ userDraft.is_active ? '已启用' : '已禁用' }}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div v-else class="col-span-3 flex items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-3xl h-[700px]">
+          <p class="text-slate-400">请在左侧选择一个用户进行管理</p>
+        </div>
+      </div>
+
+      <!-- Category Manager Modal -->
       <div v-if="showCategoryManager" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
         <div class="w-full max-w-3xl bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-2xl overflow-hidden">
           <div class="p-6 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
@@ -541,6 +697,7 @@
         </div>
       </div>
 
+      <!-- Revisions Modal -->
       <div v-if="showRevisionsModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
         <div class="w-full max-w-3xl bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-2xl overflow-hidden">
           <div class="p-6 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
@@ -560,6 +717,7 @@
         </div>
       </div>
 
+      <!-- Audit Modal -->
       <div v-if="showAuditModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
         <div class="w-full max-w-4xl bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-2xl overflow-hidden">
           <div class="p-6 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
@@ -596,14 +754,44 @@ const router = useRouter();
 const md = new MarkdownIt({ html: true, breaks: true });
 
 const isAuthenticated = ref(false);
-const password = ref('');
+const apiTokenInput = ref('');
 
-const login = () => {
-  if (password.value === 'admin') {
-    isAuthenticated.value = true;
-    fetchData();
-  } else {
-    alert('密码错误');
+const loginWithToken = () => {
+  if (!apiTokenInput.value.trim()) {
+    alert('请输入 API Token');
+    return;
+  }
+  localStorage.setItem('awesome_iwb_admin_token', apiTokenInput.value.trim());
+  isAuthenticated.value = true;
+  fetchData();
+};
+
+const logoutAdmin = () => {
+  localStorage.removeItem('awesome_iwb_admin_token');
+  isAuthenticated.value = false;
+  apiTokenInput.value = '';
+};
+
+const getAuthHeaders = () => {
+  const token = localStorage.getItem('awesome_iwb_admin_token');
+  return token ? { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json' };
+};
+
+const adminFetch = async (url: string, options: RequestInit = {}) => {
+  const headers = new Headers(options.headers || {});
+  const authHeaders = getAuthHeaders();
+  Object.entries(authHeaders).forEach(([k, v]) => headers.set(k, v));
+  return fetch(url, { ...options, headers });
+};
+
+// Check for saved token on mount — fetchData is defined below, call it after script init
+const maybeRestoreSession = () => {
+  if (typeof window !== 'undefined') {
+    const saved = localStorage.getItem('awesome_iwb_admin_token');
+    if (saved) {
+      isAuthenticated.value = true;
+      fetchData();
+    }
   }
 };
 
@@ -624,7 +812,7 @@ const selectedIndex = ref<number | null>(null);
 const viewMode = ref<'edit' | 'split' | 'preview'>('split');
 const isSaving = ref(false);
 
-const activeTab = ref<'stories' | 'projects' | 'submissions' | 'feedback'>('stories');
+const activeTab = ref<'stories' | 'projects' | 'submissions' | 'feedback' | 'users'>('stories');
 
 const adminCategories = ref<any[]>([]);
 const projectsPage = ref<{ items: any[]; page: number; pageSize: number; total: number }>({
@@ -669,6 +857,17 @@ const submissionReviewNote = ref('');
 const submissionCategoryId = ref('');
 const submissionNewCategoryName = ref('');
 
+// Users tab
+const usersPage = ref<{ items: any[]; page: number; pageSize: number; total: number }>({
+  items: [],
+  page: 1,
+  pageSize: 20,
+  total: 0
+});
+const userQuery = ref<{ q: string; role: string; page: number; pageSize: number }>({ q: '', role: '', page: 1, pageSize: 20 });
+const selectedUserId = ref<string | null>(null);
+const userDraft = ref<any | null>(null);
+
 const currentStory = computed(() => {
   if (selectedIndex.value === null) return null;
   return stories.value[selectedIndex.value];
@@ -690,6 +889,7 @@ const fetchData = async () => {
     await fetchAdminCategories();
     await fetchAdminProjects();
     await fetchSubmissions();
+    await fetchUsers();
   } catch (e) {
     console.error('获取数据失败', e);
   }
@@ -713,18 +913,16 @@ const saveProjects = async () => {
 
     const id = p.id;
     if (id) {
-      const res = await fetch(`/api/admin/projects/${id}`, {
+      const res = await adminFetch(`/api/admin/projects/${id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(p)
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json?.error ?? 'save failed');
       projectDraft.value = normalizeProjectDraft(json);
     } else {
-      const res = await fetch('/api/admin/projects', {
+      const res = await adminFetch('/api/admin/projects', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(p)
       });
       const json = await res.json();
@@ -743,9 +941,8 @@ const saveProjects = async () => {
 const saveStories = async () => {
   isSaving.value = true;
   try {
-    await fetch('/api/stories', {
+    await adminFetch('/api/stories', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(stories.value)
     });
     alert('保存成功！');
@@ -817,13 +1014,10 @@ const uploadFile = async (file: File): Promise<string | null> => {
   const formData = new FormData();
   formData.append('image', file);
   try {
-    const res = await fetch('/api/upload', {
-      method: 'POST',
-      body: formData
-    });
+    const res = await adminFetch('/api/upload', { method: 'POST', body: formData });
     if (res.ok) {
       const data = await res.json();
-      return data.url; // e.g. /uploads/xxxx.png
+      return data.url;
     }
   } catch (e) {
     console.error('上传失败', e);
@@ -864,12 +1058,6 @@ const uploadProjectBanner = async (e: Event) => {
   }
 };
 
-/**
- * Normalize a project payload into the admin form draft shape.
- *
- * The admin UI edits list-like fields as comma-separated strings, but the backend may return arrays.
- * This function also validates `ai_usage_state` into the supported tri-state.
- */
 const normalizeProjectDraft = (p: any) => {
   const clone = { ...p };
   if (Array.isArray(clone.keywords)) clone.keywords = clone.keywords.join(', ');
@@ -905,7 +1093,7 @@ const removePlatformDeveloper = (idx: number) => {
 
 const fetchAdminCategories = async () => {
   try {
-    const res = await fetch('/api/admin/categories');
+    const res = await adminFetch('/api/admin/categories');
     if (res.ok) {
       adminCategories.value = await res.json();
       return;
@@ -925,7 +1113,7 @@ const fetchAdminProjects = async () => {
     if (projectQuery.value.category) qs.set('category', projectQuery.value.category);
     qs.set('page', String(projectQuery.value.page));
     qs.set('pageSize', String(projectQuery.value.pageSize));
-    const res = await fetch(`/api/admin/projects?${qs.toString()}`);
+    const res = await adminFetch(`/api/admin/projects?${qs.toString()}`);
     if (res.ok) {
       const json = await res.json();
       projectsPage.value = { ...json, items: (json.items ?? []).map(normalizeProjectDraft) };
@@ -983,9 +1171,8 @@ const importProjectsJson = async (e: Event) => {
   if (!file) return;
   try {
     const payload = await file.text();
-    const res = await fetch('/api/admin/projects/import.json', {
+    const res = await adminFetch('/api/admin/projects/import.json', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: payload
     });
     const json = await res.json();
@@ -1006,7 +1193,7 @@ const importProjectsCsv = async (e: Event) => {
   try {
     const fd = new FormData();
     fd.append('file', file);
-    const res = await fetch('/api/admin/projects/import.csv', { method: 'POST', body: fd });
+    const res = await adminFetch('/api/admin/projects/import.csv', { method: 'POST', body: fd });
     const json = await res.json();
     if (!res.ok) throw new Error(json?.error ?? 'import failed');
     alert(`导入完成：created=${json.created} updated=${json.updated} skipped=${json.skipped}`);
@@ -1025,7 +1212,7 @@ const deleteCurrentProject = async () => {
   if (!ok) return;
   isSaving.value = true;
   try {
-    const res = await fetch(`/api/admin/projects/${projectDraft.value.id}`, { method: 'DELETE' });
+    const res = await adminFetch(`/api/admin/projects/${projectDraft.value.id}`, { method: 'DELETE' });
     if (!res.ok) throw new Error('delete failed');
     projectDraft.value = null;
     selectedProjectId.value = null;
@@ -1051,9 +1238,8 @@ const closeCategoryManager = () => {
 
 const createCategory = async () => {
   if (!newCategoryName.value.trim()) return;
-  const res = await fetch('/api/admin/categories', {
+  const res = await adminFetch('/api/admin/categories', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name: newCategoryName.value.trim(), description: newCategoryDescription.value })
   });
   const json = await res.json();
@@ -1066,9 +1252,8 @@ const createCategory = async () => {
 };
 
 const saveCategory = async (c: any) => {
-  const res = await fetch(`/api/admin/categories/${c.id}`, {
+  const res = await adminFetch(`/api/admin/categories/${c.id}`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name: c.name, description: c.description, sort_index: c.sort_index })
   });
   const json = await res.json();
@@ -1083,7 +1268,7 @@ const saveCategory = async (c: any) => {
 const deleteCategory = async (c: any) => {
   const ok = confirm(`确认删除分类：${c.name}？（分类下项目将变为未分类）`);
   if (!ok) return;
-  const res = await fetch(`/api/admin/categories/${c.id}`, { method: 'DELETE' });
+  const res = await adminFetch(`/api/admin/categories/${c.id}`, { method: 'DELETE' });
   const json = await res.json();
   if (!res.ok) {
     alert(json?.error ?? '删除失败');
@@ -1095,7 +1280,7 @@ const deleteCategory = async (c: any) => {
 
 const openRevisions = async () => {
   if (!projectDraft.value?.id) return;
-  const res = await fetch(`/api/admin/projects/${projectDraft.value.id}/revisions`);
+  const res = await adminFetch(`/api/admin/projects/${projectDraft.value.id}/revisions`);
   if (!res.ok) {
     alert('获取历史版本失败');
     return;
@@ -1105,7 +1290,7 @@ const openRevisions = async () => {
 };
 
 const openAuditLogs = async () => {
-  const res = await fetch('/api/admin/audit-logs?page=1&pageSize=50');
+  const res = await adminFetch('/api/admin/audit-logs?page=1&pageSize=50');
   if (!res.ok) {
     alert('获取审计日志失败');
     return;
@@ -1118,9 +1303,8 @@ const rollbackToRevision = async (revisionId: string) => {
   if (!projectDraft.value?.id) return;
   const ok = confirm('确认回滚到该版本？');
   if (!ok) return;
-  const res = await fetch(`/api/admin/projects/${projectDraft.value.id}/rollback`, {
+  const res = await adminFetch(`/api/admin/projects/${projectDraft.value.id}/rollback`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ revisionId })
   });
   const json = await res.json();
@@ -1140,7 +1324,7 @@ const fetchSubmissions = async () => {
     qs.set('status', 'pending');
     qs.set('page', String(submissionQuery.value.page));
     qs.set('pageSize', String(submissionQuery.value.pageSize));
-    const res = await fetch(`/api/admin/submissions?${qs.toString()}`);
+    const res = await adminFetch(`/api/admin/submissions?${qs.toString()}`);
     if (!res.ok) return;
     const json = await res.json();
     submissionsPage.value = json;
@@ -1185,9 +1369,8 @@ const selectSubmission = (s: any) => {
 const approveSubmission = async () => {
   if (!selectedSubmissionId.value || !submissionDraft.value) return;
   if (submissionKind.value === 'project_update') {
-    const res = await fetch(`/api/admin/submissions/${selectedSubmissionId.value}/approve`, {
+    const res = await adminFetch(`/api/admin/submissions/${selectedSubmissionId.value}/approve`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({})
     });
     const json = await res.json();
@@ -1216,9 +1399,8 @@ const approveSubmission = async () => {
   if (submissionNewCategoryName.value.trim()) body.category_name = submissionNewCategoryName.value.trim();
   else if (submissionCategoryId.value) body.category_id = submissionCategoryId.value;
 
-  const res = await fetch(`/api/admin/submissions/${selectedSubmissionId.value}/approve`, {
+  const res = await adminFetch(`/api/admin/submissions/${selectedSubmissionId.value}/approve`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body)
   });
   const json = await res.json();
@@ -1237,9 +1419,8 @@ const approveSubmission = async () => {
 
 const rejectSubmission = async () => {
   if (!selectedSubmissionId.value) return;
-  const res = await fetch(`/api/admin/submissions/${selectedSubmissionId.value}/reject`, {
+  const res = await adminFetch(`/api/admin/submissions/${selectedSubmissionId.value}/reject`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ review_note: submissionReviewNote.value })
   });
   const json = await res.json();
@@ -1289,7 +1470,6 @@ const insertText = (text: string) => {
     text + 
     currentContent.substring(end);
     
-  // 保持焦点并调整光标
   setTimeout(() => {
     if (markdownTextarea.value) {
       markdownTextarea.value.focus();
@@ -1298,10 +1478,77 @@ const insertText = (text: string) => {
     }
   }, 10);
 };
+
+// Users management
+const fetchUsers = async () => {
+  try {
+    const qs = new URLSearchParams();
+    if (userQuery.value.q) qs.set('q', userQuery.value.q);
+    if (userQuery.value.role) qs.set('role', userQuery.value.role);
+    qs.set('page', String(userQuery.value.page));
+    qs.set('pageSize', String(userQuery.value.pageSize));
+    const res = await adminFetch(`/api/admin/users?${qs.toString()}`);
+    if (!res.ok) return;
+    const json = await res.json();
+    usersPage.value = json;
+  } catch {}
+};
+
+const selectUser = (u: any) => {
+  selectedUserId.value = u.id;
+  userDraft.value = { ...u };
+};
+
+const prevUserPage = async () => {
+  if (usersPage.value.page <= 1) return;
+  userQuery.value.page -= 1;
+  await fetchUsers();
+};
+
+const nextUserPage = async () => {
+  const maxPage = Math.max(1, Math.ceil(usersPage.value.total / usersPage.value.pageSize));
+  if (usersPage.value.page >= maxPage) return;
+  userQuery.value.page += 1;
+  await fetchUsers();
+};
+
+const updateUserRole = async (role: string) => {
+  if (!userDraft.value?.id) return;
+  const res = await adminFetch(`/api/admin/users/${userDraft.value.id}/role`, {
+    method: 'PATCH',
+    body: JSON.stringify({ role })
+  });
+  const json = await res.json();
+  if (!res.ok) {
+    alert(json?.error ?? '更新失败');
+    return;
+  }
+  userDraft.value = { ...userDraft.value, role };
+  await fetchUsers();
+  alert('角色更新成功');
+};
+
+const updateUserActive = async (isActive: boolean) => {
+  if (!userDraft.value?.id) return;
+  const res = await adminFetch(`/api/admin/users/${userDraft.value.id}/active`, {
+    method: 'PATCH',
+    body: JSON.stringify({ is_active: isActive })
+  });
+  const json = await res.json();
+  if (!res.ok) {
+    alert(json?.error ?? '更新失败');
+    return;
+  }
+  userDraft.value = { ...userDraft.value, is_active: isActive };
+  await fetchUsers();
+  alert(isActive ? '账号已启用' : '账号已禁用');
+};
+
+// Restore session on mount
+maybeRestoreSession();
 </script>
 
 <style scoped>
-/* Custom prose styles for editor preview */
 .prose img {
   border-radius: 1rem;
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);

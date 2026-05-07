@@ -1,5 +1,4 @@
-import { createRouter, createWebHistory, createMemoryHistory } from 'vue-router'
-import type { RouteRecordRaw } from 'vue-router'
+import type { RouteRecordRaw, Router } from 'vue-router'
 import HomeView from '../views/HomeView.vue'
 import ProjectDetailView from '../views/ProjectDetailView.vue'
 import SubmitProjectView from '../views/SubmitProjectView.vue'
@@ -8,6 +7,7 @@ import FeaturedView from '../views/FeaturedView.vue'
 import AdminView from '../views/AdminView.vue'
 import AboutView from '../views/AboutView.vue'
 import MeView from '../views/MeView.vue'
+import AdminLoginView from '../views/AdminLoginView.vue'
 import { useAuth } from '../composables/useAuth'
 import DevView from '../views/DevView.vue'
 
@@ -22,6 +22,12 @@ export const routes: RouteRecordRaw[] = [
     path: '/admin',
     name: 'admin',
     component: AdminView,
+    meta: { showNavBar: false, requiresAuth: true, requiresRole: 'ops' }
+  },
+  {
+    path: '/admin-login',
+    name: 'admin-login',
+    component: AdminLoginView,
     meta: { showNavBar: false }
   },
   {
@@ -72,28 +78,18 @@ export const routes: RouteRecordRaw[] = [
   }
 ]
 
-const router = createRouter({
-  history: typeof window === 'undefined'
-    ? createMemoryHistory((import.meta as any).env?.BASE_URL ?? '/')
-    : createWebHistory((import.meta as any).env?.BASE_URL ?? '/'),
-  routes,
-  scrollBehavior() {
-    return { top: 0 }
-  }
-})
-
-router.beforeEach((to) => {
-  if (typeof window === 'undefined') return true;
-  const { isAuthenticated } = useAuth();
-  if ((to.meta as any)?.requiresAuth && !isAuthenticated.value) {
-    return { path: '/me', query: { redirect: to.fullPath } };
-  }
-  const role = (to.meta as any)?.requiresRole;
-  if (role) {
-    const { user } = useAuth();
-    if (user.value?.role !== role) return { path: '/me', query: { redirect: to.fullPath } };
-  }
-  return true;
-});
-
-export default router
+export function setupRouterGuard(router: Router) {
+  router.beforeEach((to) => {
+    if (typeof window === 'undefined') return true;
+    const { isAuthenticated } = useAuth();
+    if ((to.meta as any)?.requiresAuth && !isAuthenticated.value) {
+      return { path: '/me', query: { redirect: to.fullPath } };
+    }
+    const role = (to.meta as any)?.requiresRole;
+    if (role) {
+      const { user } = useAuth();
+      if (user.value?.role !== role) return { path: '/me', query: { redirect: to.fullPath } };
+    }
+    return true;
+  });
+}

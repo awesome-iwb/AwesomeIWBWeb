@@ -32,6 +32,10 @@ import { normalizeProjectInput } from "./domain/normalizeProjectInput";
 import { createFeedback, listFeedback, updateFeedback } from "./services/feedback";
 import { sanitizeIssueLabels } from "./domain/feedbackLabels";
 import { normalizeProjectTags } from "./domain/projectTags";
+import { authPlugin, requireAuth, requireRole } from "./plugins/auth";
+import { casdoorAuthPlugin } from "./plugins/casdoorAuth";
+import { localAuthPlugin } from "./plugins/localAuth";
+import { listUsers, setUserRole, setUserActive } from "./services/users";
 
 /**
  * Awesome-IWB backend API.
@@ -112,15 +116,17 @@ function withAiUsageState(p: any) {
  *
  * In DB mode, persists to the audit table. In JSON mode, appends to runtime `audit.json`.
  */
-async function logAuditCompat(input: { actor?: string; action: string; entity_type: string; entity_id?: string; diff?: any }) {
+async function logAuditCompat(input: { actor?: string; action: string; entity_type: string; entity_id?: string; diff?: any }, defaultActor?: string) {
   try {
+    const actor = input.actor ?? defaultActor ?? "system";
+    const payload = { ...input, actor };
     if (dbEnabled) {
-      await logAudit(input);
+      await logAudit(payload);
       return;
     }
     auditFile.unshift({
       id: randomUUID(),
-      actor: input.actor ?? "system",
+      actor,
       action: input.action,
       entity_type: input.entity_type,
       entity_id: input.entity_id ?? "",
@@ -132,8 +138,29 @@ async function logAuditCompat(input: { actor?: string; action: string; entity_ty
   } catch {}
 }
 
+function checkOps(user: any, set: any) {
+  if (!dbEnabled) return false;
+  if (!user || user.role !== 'ops') {
+    set.status = 403;
+    return true;
+  }
+  return false;
+}
+
+function checkAuth(user: any, set: any) {
+  if (!dbEnabled) return false;
+  if (!user) {
+    set.status = 401;
+    return true;
+  }
+  return false;
+}
+
 const app = new Elysia()
   .use(cors())
+  .use(authPlugin)
+  .use(casdoorAuthPlugin)
+  .use(localAuthPlugin)
   .onError(({ error, set }) => {
     console.error(error);
     set.status = 500;
@@ -226,7 +253,8 @@ const app = new Elysia()
       .sort((a: any, b: any) => String(b.created_at ?? "").localeCompare(String(a.created_at ?? "")));
     return items.slice(0, Math.min(Math.max(limit ?? 100, 1), 200));
   })
-  .post("/api/feedback", async ({ body, set }) => {
+  .post("/api/feedback", async ({ body, set, user }) => {
+    if (checkAuth(user, set)) return { error: "Unauthorized" };
     const payload: any = body as any;
     const kind = payload?.kind === "bug" ? "bug" : "comment";
     const project_name = String(payload?.project_name ?? "").trim();
@@ -281,7 +309,12 @@ const app = new Elysia()
     await saveJsonFile(FEEDBACK_PATH, feedbackFile);
     return created;
   })
-  .patch("/api/feedback/:id", async ({ params: { id }, body, set }) => {
+  .patch("/api/feedback/:id", async ({ params: { id }, body, set, user }) => {
+    if (checkAuth(user, set)) return { error: "Unauthorized" };
+    if (user.role !== 'dev' && user.role !== 'ops') {
+      set.status = 403;
+      return { error: "Forbidden" };
+    }
     const payload: any = body as any;
     const status = typeof payload?.status === "string" ? payload.status : undefined;
     const labels = payload?.labels ? sanitizeIssueLabels(payload.labels) : undefined;
@@ -315,7 +348,8 @@ const app = new Elysia()
     await saveJsonFile(FEEDBACK_PATH, feedbackFile);
     return next;
   })
-  .post("/api/admin/categories", async ({ body, set }) => {
+  .post("/api/admin/categories", async ({ body, set, user }) => {
+    if (checkOps(user, set)) return { error: "Forbidden" };
     const input = body as any;
     if (!input?.name) {
       set.status = 400;
@@ -325,14 +359,15 @@ const app = new Elysia()
       const id = randomUUID().replaceAll("-", "").slice(0, 8);
       (data as any).categories.push({ id, name: input.name, description: input.description ?? "", projects: [] });
       await saveJsonFile(DATA_PATH, data);
-      await logAuditCompat({ action: "create", entity_type: "category", entity_id: id });
+      await logAuditCompat({ action: "create", entity_type: "category", entity_id: id }, user?.name);
       return { id, name: input.name, description: input.description ?? "", sort_index: 0 };
     }
     const created = await createCategory({ name: input.name, description: input.description, sort_index: input.sort_index });
-    await logAuditCompat({ action: "create", entity_type: "category", entity_id: created.id });
+    await logAuditCompat({ action: "create", entity_type: "category", entity_id: created.id }, user?.name);
     return created;
   })
-  .put("/api/admin/categories/:id", async ({ params: { id }, body, set }) => {
+  .put("/api/admin/categories/:id", async ({ params: { id }, body, set, user }) => {
+    if (checkOps(user, set)) return { error: "Forbidden" };
     if (!dbEnabled) {
       const cat = (data as any).categories.find((c: any) => String(c.id) === String(id));
       if (!cat) {
@@ -345,7 +380,7 @@ const app = new Elysia()
         description: (body as any)?.description ?? cat.description
       });
       await saveJsonFile(DATA_PATH, data);
-      await logAuditCompat({ action: "update", entity_type: "category", entity_id: id, diff: { before, after: cat } });
+      await logAuditCompat({ action: "update", entity_type: "category", entity_id: id, diff: { before, after: cat } }, user?.name);
       return { id: cat.id, name: cat.name, description: cat.description, sort_index: 0 };
     }
     const before = await listCategories().then((cs) => cs.find((c) => c.id === id) ?? null);
@@ -354,10 +389,11 @@ const app = new Elysia()
       set.status = 404;
       return { error: "Category not found" };
     }
-    await logAuditCompat({ action: "update", entity_type: "category", entity_id: id, diff: { before, after: updated } });
+    await logAuditCompat({ action: "update", entity_type: "category", entity_id: id, diff: { before, after: updated } }, user?.name);
     return updated;
   })
-  .delete("/api/admin/categories/:id", async ({ params: { id }, set }) => {
+  .delete("/api/admin/categories/:id", async ({ params: { id }, set, user }) => {
+    if (checkOps(user, set)) return { error: "Forbidden" };
     if (!dbEnabled) {
       const idx = (data as any).categories.findIndex((c: any) => String(c.id) === String(id));
       if (idx === -1) {
@@ -374,14 +410,15 @@ const app = new Elysia()
         uncat.projects.push(...removed.projects);
       }
       await saveJsonFile(DATA_PATH, data);
-      await logAuditCompat({ action: "delete", entity_type: "category", entity_id: id, diff: { before: removed } });
+      await logAuditCompat({ action: "delete", entity_type: "category", entity_id: id, diff: { before: removed } }, user?.name);
       return { success: true };
     }
     const res = await deleteCategory(id);
-    await logAuditCompat({ action: "delete", entity_type: "category", entity_id: id });
+    await logAuditCompat({ action: "delete", entity_type: "category", entity_id: id }, user?.name);
     return res;
   })
-  .post("/api/admin/projects", async ({ body, set }) => {
+  .post("/api/admin/projects", async ({ body, set, user }) => {
+    if (checkOps(user, set)) return { error: "Forbidden" };
     const input = body as any;
     if (!input?.name) {
       set.status = 400;
@@ -419,14 +456,15 @@ const app = new Elysia()
       cat.projects.unshift(project);
       await saveJsonFile(DATA_PATH, data);
       const id = encodeURIComponent(project.name);
-      await logAuditCompat({ action: "create", entity_type: "project", entity_id: id });
+      await logAuditCompat({ action: "create", entity_type: "project", entity_id: id }, user?.name);
       return { ...project, id, category_id: cat.id };
     }
     const created = await createProject(normalizeProjectInput(input));
-    await logAuditCompat({ action: "create", entity_type: "project", entity_id: created.id });
+    await logAuditCompat({ action: "create", entity_type: "project", entity_id: created.id }, user?.name);
     return created;
   })
-  .put("/api/admin/projects/:id", async ({ params: { id }, body, set }) => {
+  .put("/api/admin/projects/:id", async ({ params: { id }, body, set, user }) => {
+    if (checkOps(user, set)) return { error: "Forbidden" };
     if (!dbEnabled) {
       const key = decodeURIComponent(id);
       let foundCat: any = null;
@@ -490,7 +528,7 @@ const app = new Elysia()
 
       await saveJsonFile(DATA_PATH, data);
       const newId = encodeURIComponent(next.name);
-      await logAuditCompat({ action: "update", entity_type: "project", entity_id: newId, diff: { before, after: next } });
+      await logAuditCompat({ action: "update", entity_type: "project", entity_id: newId, diff: { before, after: next } }, user?.name);
       return { ...next, id: newId, category_id: foundCat.id };
     }
     const before = await getProjectById(id);
@@ -500,10 +538,11 @@ const app = new Elysia()
       set.status = 404;
       return { error: "Project not found" };
     }
-    await logAuditCompat({ action: "update", entity_type: "project", entity_id: id, diff: { before, after: updated } });
+    await logAuditCompat({ action: "update", entity_type: "project", entity_id: id, diff: { before, after: updated } }, user?.name);
     return updated;
   })
-  .delete("/api/admin/projects/:id", async ({ params: { id }, set }) => {
+  .delete("/api/admin/projects/:id", async ({ params: { id }, set, user }) => {
+    if (checkOps(user, set)) return { error: "Forbidden" };
     if (!dbEnabled) {
       const key = decodeURIComponent(id);
       for (const c of (data as any).categories) {
@@ -511,7 +550,7 @@ const app = new Elysia()
         if (idx !== -1) {
           const before = c.projects.splice(idx, 1)[0];
           await saveJsonFile(DATA_PATH, data);
-          await logAuditCompat({ action: "delete", entity_type: "project", entity_id: id, diff: { before } });
+          await logAuditCompat({ action: "delete", entity_type: "project", entity_id: id, diff: { before } }, user?.name);
           return { success: true };
         }
       }
@@ -520,16 +559,18 @@ const app = new Elysia()
     }
     const before = await getProjectById(id);
     const res = await deleteProject(id);
-    await logAuditCompat({ action: "delete", entity_type: "project", entity_id: id, diff: { before } });
+    await logAuditCompat({ action: "delete", entity_type: "project", entity_id: id, diff: { before } }, user?.name);
     return res;
   })
-  .get("/api/admin/categories", async ({ set }) => {
+  .get("/api/admin/categories", async ({ set, user }) => {
+    if (checkOps(user, set)) return { error: "Forbidden" };
     if (!dbEnabled) {
       return (data as any).categories.map((c: any) => ({ id: c.id ?? c.name, name: c.name, description: c.description ?? "", sort_index: 0 }));
     }
     return await listCategories();
   })
-  .get("/api/admin/projects", async ({ query, set }) => {
+  .get("/api/admin/projects", async ({ query, set, user }) => {
+    if (checkOps(user, set)) return { error: "Forbidden" };
     const q = typeof query.q === "string" ? query.q : undefined;
     const category = typeof query.category === "string" ? query.category : undefined;
     const sort =
@@ -557,17 +598,19 @@ const app = new Elysia()
     }
     return await listProjects({ q, category, sort, page, pageSize });
   })
-  .get("/api/admin/projects/export.json", async ({ set }) => {
+  .get("/api/admin/projects/export.json", async ({ set, user }) => {
+    if (checkOps(user, set)) return { error: "Forbidden" };
     if (!dbEnabled) {
-      await logAuditCompat({ action: "export_json", entity_type: "project", entity_id: "" });
+      await logAuditCompat({ action: "export_json", entity_type: "project", entity_id: "" }, user?.name);
       return data;
     }
-    await logAuditCompat({ action: "export_json", entity_type: "project", entity_id: "" });
+    await logAuditCompat({ action: "export_json", entity_type: "project", entity_id: "" }, user?.name);
     return await getCatalog();
   })
-  .get("/api/admin/projects/export.csv", async ({ set }) => {
+  .get("/api/admin/projects/export.csv", async ({ set, user }) => {
+    if (checkOps(user, set)) return { error: "Forbidden" };
     if (!dbEnabled) {
-      await logAuditCompat({ action: "export_csv", entity_type: "project", entity_id: "" });
+      await logAuditCompat({ action: "export_csv", entity_type: "project", entity_id: "" }, user?.name);
       const rows: Record<string, any>[] = [];
       for (const c of (data as any).categories) {
         for (const p of c.projects ?? []) {
@@ -653,7 +696,8 @@ const app = new Elysia()
       }
     });
   })
-  .post("/api/admin/projects/import.json", async ({ body, set }) => {
+  .post("/api/admin/projects/import.json", async ({ body, set, user }) => {
+    if (checkOps(user, set)) return { error: "Forbidden" };
       const payload: any = body as any;
       const incomingProjects: any[] = [];
       const incomingCategories: any[] = Array.isArray(payload?.categories) ? payload.categories : [];
@@ -736,7 +780,8 @@ const app = new Elysia()
   })
   .post(
     "/api/admin/projects/import.csv",
-    async ({ body, set }) => {
+    async ({ body, set, user }) => {
+      if (checkOps(user, set)) return { error: "Forbidden" };
       const file = (body as any).file as File | undefined;
       if (!file) {
         set.status = 400;
@@ -819,7 +864,8 @@ const app = new Elysia()
       })
     }
   )
-  .get("/api/admin/audit-logs", async ({ query, set }) => {
+  .get("/api/admin/audit-logs", async ({ query, set, user }) => {
+    if (checkOps(user, set)) return { error: "Forbidden" };
     const page = typeof query.page === "string" ? Number(query.page) : undefined;
     const pageSize = typeof query.pageSize === "string" ? Number(query.pageSize) : undefined;
     if (!dbEnabled) {
@@ -830,11 +876,13 @@ const app = new Elysia()
     }
     return await listAuditLogs({ page, pageSize });
   })
-  .get("/api/admin/projects/:id/revisions", async ({ params: { id }, set }) => {
+  .get("/api/admin/projects/:id/revisions", async ({ params: { id }, set, user }) => {
+    if (checkOps(user, set)) return { error: "Forbidden" };
     if (!dbEnabled) return revisionsFile[id] ?? [];
     return await listProjectRevisions(id);
   })
-  .post("/api/admin/projects/:id/rollback", async ({ params: { id }, body, set }) => {
+  .post("/api/admin/projects/:id/rollback", async ({ params: { id }, body, set, user }) => {
+    if (checkOps(user, set)) return { error: "Forbidden" };
     const revisionId = (body as any)?.revisionId;
     if (!revisionId) {
       set.status = 400;
@@ -887,7 +935,8 @@ const app = new Elysia()
     await logAuditCompat({ action: "submit", entity_type: "submission", entity_id: created.id });
     return { success: true, submissionId: created.id };
   })
-  .post("/api/dev/submissions", async ({ body, set }) => {
+  .post("/api/dev/submissions", async ({ body, set, user }) => {
+    if (checkAuth(user, set)) return { error: "Unauthorized" };
     const payload: any = body as any;
     if (payload?.kind !== "project_update") {
       set.status = 400;
@@ -927,7 +976,8 @@ const app = new Elysia()
     await logAuditCompat({ action: "submit", entity_type: "submission", entity_id: created.id });
     return { success: true, submissionId: created.id };
   })
-  .get("/api/admin/submissions", async ({ query, set }) => {
+  .get("/api/admin/submissions", async ({ query, set, user }) => {
+    if (checkOps(user, set)) return { error: "Forbidden" };
     const status = typeof query.status === "string" ? query.status : undefined;
     const q = typeof query.q === "string" ? query.q : undefined;
     const page = typeof query.page === "string" ? Number(query.page) : undefined;
@@ -947,7 +997,8 @@ const app = new Elysia()
     }
     return await listSubmissions({ status, q, page, pageSize });
   })
-  .get("/api/admin/submissions/:id", async ({ params: { id }, set }) => {
+  .get("/api/admin/submissions/:id", async ({ params: { id }, set, user }) => {
+    if (checkOps(user, set)) return { error: "Forbidden" };
     const item = !dbEnabled ? submissionsFile.find((s: any) => s.id === id) : await getSubmission(id);
     if (!item) {
       set.status = 404;
@@ -955,7 +1006,8 @@ const app = new Elysia()
     }
     return item;
   })
-  .post("/api/admin/submissions/:id/reject", async ({ params: { id }, body, set }) => {
+  .post("/api/admin/submissions/:id/reject", async ({ params: { id }, body, set, user }) => {
+    if (checkOps(user, set)) return { error: "Forbidden" };
     const note = String((body as any)?.review_note ?? "");
     if (!dbEnabled) {
       const s = submissionsFile.find((x: any) => x.id === id);
@@ -978,7 +1030,8 @@ const app = new Elysia()
     await logAuditCompat({ action: "reject", entity_type: "submission", entity_id: id, diff: { review_note: note } });
     return { success: true };
   })
-  .post("/api/admin/submissions/:id/approve", async ({ params: { id }, body, set }) => {
+  .post("/api/admin/submissions/:id/approve", async ({ params: { id }, body, set, user }) => {
+    if (checkOps(user, set)) return { error: "Forbidden" };
     try {
       const submission = !dbEnabled ? submissionsFile.find((s: any) => s.id === id) : await getSubmission(id);
       if (!submission) {
@@ -1218,7 +1271,8 @@ const app = new Elysia()
       return { error: "Not found" };
     }
   })
-  .post("/api/upload", async ({ body: { image } }) => {
+  .post("/api/upload", async ({ body: { image }, set, user }) => {
+    if (checkAuth(user, set)) return { error: "Unauthorized" };
     if (!image) throw new Error("No image provided");
     const ext = image.name.split('.').pop() || 'png';
     const filename = `${randomUUID()}.${ext}`;
@@ -1229,6 +1283,44 @@ const app = new Elysia()
     body: t.Object({
       image: t.File()
     })
+  })
+  .get("/api/admin/users", async ({ query, set, user }) => {
+    if (checkOps(user, set)) return { error: "Forbidden" };
+    const q = typeof query.q === "string" ? query.q : undefined;
+    const role = typeof query.role === "string" ? query.role : undefined;
+    const page = typeof query.page === "string" ? Number(query.page) : undefined;
+    const pageSize = typeof query.pageSize === "string" ? Number(query.pageSize) : undefined;
+    return await listUsers({ q, role, page, pageSize });
+  })
+  .patch("/api/admin/users/:id/role", async ({ params: { id }, body, set, user }) => {
+    if (checkOps(user, set)) return { error: "Forbidden" };
+    const role = (body as any)?.role;
+    if (!role || !["user", "dev", "ops"].includes(role)) {
+      set.status = 400;
+      return { error: "Invalid role" };
+    }
+    const updated = await setUserRole(id, role);
+    if (!updated) {
+      set.status = 404;
+      return { error: "User not found" };
+    }
+    await logAuditCompat({ action: "update_role", entity_type: "user", entity_id: id, diff: { role } });
+    return updated;
+  })
+  .patch("/api/admin/users/:id/active", async ({ params: { id }, body, set, user }) => {
+    if (checkOps(user, set)) return { error: "Forbidden" };
+    const isActive = (body as any)?.is_active;
+    if (typeof isActive !== "boolean") {
+      set.status = 400;
+      return { error: "is_active must be boolean" };
+    }
+    const updated = await setUserActive(id, isActive);
+    if (!updated) {
+      set.status = 404;
+      return { error: "User not found" };
+    }
+    await logAuditCompat({ action: isActive ? "activate" : "deactivate", entity_type: "user", entity_id: id });
+    return updated;
   })
   .listen(8080);
 

@@ -13,6 +13,7 @@
     "@elysiajs/cors": "^1.4.2",
     "@octokit/rest": "^22.0.1",
     "@sinclair/typebox": "^0.34.49",
+    "argon2": "^0.44.0",
     "elysia": "latest",
     "postgres": "^3.4.7"
   },

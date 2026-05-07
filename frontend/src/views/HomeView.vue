@@ -617,6 +617,7 @@ watch(heroCards, (cards) => {
                       v-for="kw in project.keywords.slice(0, project.version ? 1 : 2)" 
                       :key="kw"
                       class="px-2 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-xs font-medium border border-slate-200/50 dark:border-slate-700 truncate max-w-[100px]"
+                      :title="`功能特性: ${kw}`"
                     >
                       {{ kw }}
                     </span>
