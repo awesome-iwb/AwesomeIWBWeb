@@ -1,9 +1,26 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { useHead } from '@unhead/vue';
 import { useProjects } from '../composables/useProjects';
 import type { Project } from '../composables/useProjects';
 import { Scale, Star, ShieldCheck, Code2, MessageCircle, Github, Tag } from 'lucide-vue-next';
+
+useHead({
+  title: '横向对比 - Awesome IWB',
+  meta: [
+    { name: 'description', content: '对比 Awesome IWB 中收录的交互式白板软件，从星级、下载量、语言等维度进行横向比较。' },
+    { property: 'og:title', content: '横向对比 - Awesome IWB' },
+    { property: 'og:description', content: '对比交互式白板软件，从星级、下载量等维度横向比较。' },
+    { property: 'og:type', content: 'website' },
+    { property: 'og:url', content: 'https://aiwb.stcn.moe/compare' },
+    { property: 'og:image', content: 'https://aiwb.stcn.moe/assets/brand/aiwb-icon.webp' },
+    { name: 'twitter:card', content: 'summary' },
+  ],
+  link: [
+    { rel: 'canonical', href: 'https://aiwb.stcn.moe/compare' }
+  ]
+})
 
 const route = useRoute();
 const router = useRouter();

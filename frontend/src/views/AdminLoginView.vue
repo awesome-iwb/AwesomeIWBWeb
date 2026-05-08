@@ -7,7 +7,7 @@ import { useAuth } from '../composables/useAuth';
 const router = useRouter();
 const { setToken } = useAuth();
 
-const username = ref('lincube');
+const username = ref('');
 const password = ref('');
 const showPassword = ref(false);
 const isLoading = ref(false);
@@ -20,8 +20,13 @@ const handleLogin = async () => {
   error.value = '';
   remainingAttempts.value = undefined;
 
+  if (!username.value.trim()) {
+    error.value = '请输入超级管理员账号';
+    return;
+  }
+
   if (!password.value) {
-    error.value = '登录失败';
+    error.value = '请输入密码';
     return;
   }
 
@@ -110,8 +115,7 @@ const handleLogin = async () => {
               v-model="username"
               type="text"
               autocomplete="username"
-              disabled
-              placeholder="lincube"
+              placeholder="管理员账号"
               class="w-full px-4 py-3 rounded-2xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-rose-500/50 focus:border-rose-500 transition-all"
             />
           </div>

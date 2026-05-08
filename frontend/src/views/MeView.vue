@@ -1,12 +1,20 @@
 <script setup lang="ts">
 import { computed, ref, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { Github, LogIn, LogOut, Shield, Wrench, AlertCircle } from 'lucide-vue-next';
+import { useHead } from '@unhead/vue';
+import { Github, LogIn, LogOut, Shield, Wrench, AlertCircle, Camera } from 'lucide-vue-next';
 import { useAuth } from '../composables/useAuth';
+
+useHead({
+  title: '个人中心 - Awesome IWB',
+  meta: [
+    { name: 'description', content: '管理你的 Awesome IWB 账户、查看收藏项目和提交历史。' }
+  ]
+});
 
 const router = useRouter();
 const route = useRoute();
-const { user, isAuthenticated, logout, loginWithCasdoor, handleCallback } = useAuth();
+const { user, isAuthenticated, logout, loginWithCasdoor, handleCallback, uploadAvatar } = useAuth();
 
 const redirectTo = computed(() => {
   const q = route.query.redirect;
@@ -24,6 +32,11 @@ const goNext = () => router.push(redirectTo.value);
 
 const isLoggingIn = ref(false);
 const loginError = ref('');
+
+// Avatar upload state
+const isUploadingAvatar = ref(false);
+const avatarUploadError = ref('');
+const fileInputRef = ref<HTMLInputElement | null>(null);
 
 // Handle Casdoor OAuth callback (two modes: backend redirect with token, or direct code+state)
 onMounted(async () => {
@@ -90,6 +103,33 @@ const startStcnLogin = async () => {
   }
 };
 
+// Avatar upload handlers
+const triggerFileInput = () => {
+  fileInputRef.value?.click();
+};
+
+const handleAvatarChange = async (event: Event) => {
+  const target = event.target as HTMLInputElement;
+  const file = target.files?.[0];
+  if (!file) return;
+
+  avatarUploadError.value = '';
+  isUploadingAvatar.value = true;
+
+  try {
+    const url = await uploadAvatar(file);
+    if (!url) {
+      avatarUploadError.value = '头像上传失败，请重试';
+    }
+  } catch (e: any) {
+    avatarUploadError.value = e?.message || '头像上传失败';
+  } finally {
+    isUploadingAvatar.value = false;
+    // Reset input so the same file can be selected again
+    if (fileInputRef.value) fileInputRef.value.value = '';
+  }
+};
+
 </script>
 
 <template>
@@ -97,17 +137,44 @@ const startStcnLogin = async () => {
     <main class="pt-24 px-6 max-w-3xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out-expo">
       <div class="mb-10">
         <h1 class="text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white mb-3">个人中心</h1>
-        <p class="text-slate-600 dark:text-slate-300">本页面先做 UI 占位，后续接入智教联盟（STCN，基于 Casdoor）等第三方授权后替换登录逻辑。</p>
+        <p class="text-slate-600 dark:text-slate-300">管理你的 Awesome IWB 账户信息。</p>
       </div>
 
       <div class="bg-white dark:bg-[#111827] rounded-3xl p-6 sm:p-10 border border-slate-200/80 dark:border-slate-800/80 shadow-xl shadow-slate-200/50 dark:shadow-none">
+        <!-- User Profile Header -->
         <div class="flex items-center gap-4">
-          <div class="h-14 w-14 rounded-full bg-slate-200/70 dark:bg-slate-700/70 overflow-hidden shrink-0">
-            <img v-if="user" :src="user.avatarUrl" class="h-full w-full object-cover" />
+          <!-- Avatar with upload overlay -->
+          <div class="relative group shrink-0">
+            <div class="h-20 w-20 rounded-full bg-slate-200/70 dark:bg-slate-700/70 overflow-hidden">
+              <img v-if="user" :src="user.avatarUrl" class="h-full w-full object-cover" />
+              <div v-else class="h-full w-full flex items-center justify-center">
+                <span class="text-2xl font-extrabold text-slate-400">?</span>
+              </div>
+            </div>
+            <!-- Upload overlay (only when logged in) -->
+            <button
+              v-if="isAuthenticated"
+              @click="triggerFileInput"
+              :disabled="isUploadingAvatar"
+              class="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer disabled:cursor-not-allowed"
+            >
+              <Camera v-if="!isUploadingAvatar" class="w-6 h-6 text-white" />
+              <span v-else class="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+            </button>
+            <input
+              ref="fileInputRef"
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              class="hidden"
+              @change="handleAvatarChange"
+            />
           </div>
           <div class="min-w-0">
             <div class="text-xl font-extrabold text-slate-900 dark:text-white truncate">
               {{ user?.name || '未登录' }}
+            </div>
+            <div v-if="user?.stcn_username" class="text-sm text-emerald-600 dark:text-emerald-400 truncate">
+              @{{ user.stcn_username }}
             </div>
             <div class="text-sm text-slate-500 dark:text-slate-400 truncate">
               {{ isAuthenticated ? `身份：${roleLabel}` : '登录后可提交项目并进入对应后台入口' }}
@@ -115,6 +182,13 @@ const startStcnLogin = async () => {
           </div>
         </div>
 
+        <!-- Avatar upload error -->
+        <div v-if="avatarUploadError" class="mt-4 p-4 rounded-2xl border border-rose-200 dark:border-rose-800 bg-rose-50 dark:bg-rose-500/10 flex items-start gap-3">
+          <AlertCircle class="w-5 h-5 text-rose-500 shrink-0 mt-0.5" />
+          <div class="text-sm text-rose-700 dark:text-rose-300">{{ avatarUploadError }}</div>
+        </div>
+
+        <!-- Not logged in -->
         <div v-if="!isAuthenticated" class="mt-8 space-y-4">
           <div v-if="loginError" class="p-4 rounded-2xl border border-rose-200 dark:border-rose-800 bg-rose-50 dark:bg-rose-500/10 flex items-start gap-3">
             <AlertCircle class="w-5 h-5 text-rose-500 shrink-0 mt-0.5" />
@@ -158,7 +232,26 @@ const startStcnLogin = async () => {
           </div>
         </div>
 
+        <!-- Logged in -->
         <div v-else class="mt-8 space-y-6">
+          <!-- Profile info card -->
+          <div class="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/40 p-4 space-y-3">
+            <div class="flex items-center justify-between">
+              <span class="text-sm text-slate-500 dark:text-slate-400">头像来源</span>
+              <span class="text-sm font-medium text-slate-700 dark:text-slate-200">
+                {{ user?.avatar_source === 'upload' ? '自定义上传' : user?.avatar_source === 'casdoor' ? '智教联盟同步' : '默认' }}
+              </span>
+            </div>
+            <div v-if="user?.email" class="flex items-center justify-between">
+              <span class="text-sm text-slate-500 dark:text-slate-400">邮箱</span>
+              <span class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ user.email }}</span>
+            </div>
+            <div v-if="user?.stcn_username" class="flex items-center justify-between">
+              <span class="text-sm text-slate-500 dark:text-slate-400">STCN 账号</span>
+              <span class="text-sm font-medium text-emerald-600 dark:text-emerald-400">@{{ user.stcn_username }}</span>
+            </div>
+          </div>
+
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <button
               v-if="user?.role === 'ops'"

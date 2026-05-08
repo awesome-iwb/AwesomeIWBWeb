@@ -6,8 +6,10 @@ export type AuthUser = {
   id?: string;
   name: string;
   avatarUrl: string;
+  avatar_source?: 'casdoor' | 'upload' | 'default';
   role: AuthRole;
   stcn_user_id: string;
+  stcn_username?: string;
   sectl_user_id: string;
   lincube_user_id: string;
   email?: string;
@@ -39,8 +41,10 @@ export const useAuth = () => {
       user.value = {
         name: newUser.name ?? user.value?.name ?? '',
         avatarUrl: newUser.avatarUrl ?? newUser.avatar_url ?? user.value?.avatarUrl ?? '/assets/people/placeholder.svg',
+        avatar_source: newUser.avatar_source ?? user.value?.avatar_source ?? 'default',
         role: newUser.role ?? user.value?.role ?? 'user',
         stcn_user_id: newUser.stcn_user_id ?? user.value?.stcn_user_id ?? '',
+        stcn_username: newUser.stcn_username ?? user.value?.stcn_username ?? '',
         sectl_user_id: newUser.sectl_user_id ?? user.value?.sectl_user_id ?? '',
         lincube_user_id: newUser.lincube_user_id ?? user.value?.lincube_user_id ?? '',
         id: newUser.id ?? user.value?.id,
@@ -87,8 +91,10 @@ export const useAuth = () => {
           role: json.user.role,
           avatarUrl: json.user.avatar_url || '/assets/people/placeholder.svg',
           avatar_url: json.user.avatar_url,
+          avatar_source: json.user.avatar_source || 'default',
           email: json.user.email,
           stcn_user_id: json.user.stcn_user_id,
+          stcn_username: json.user.stcn_username,
           sectl_user_id: json.user.sectl_user_id,
           lincube_user_id: json.user.lincube_user_id,
         };
@@ -161,6 +167,31 @@ export const useAuth = () => {
     }
   };
 
+  const uploadAvatar = async (file: File): Promise<string | null> => {
+    try {
+      const formData = new FormData();
+      formData.append('image', file);
+      const res = await fetch('/api/user/avatar', {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      });
+      if (!res.ok) return null;
+      const json = await res.json();
+      if (json.url) {
+        updateUser({
+          avatarUrl: json.url,
+          avatar_url: json.url,
+          avatar_source: 'upload',
+        });
+        return json.url;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  };
+
   return {
     user,
     token,
@@ -173,5 +204,6 @@ export const useAuth = () => {
     logout,
     setRole,
     updateUser,
+    uploadAvatar,
   };
 };

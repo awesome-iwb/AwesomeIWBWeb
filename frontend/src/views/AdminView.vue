@@ -24,8 +24,9 @@
     </div>
 
     <!-- Admin Dashboard -->
-    <div v-else class="max-w-7xl mx-auto p-6">
-      <header class="flex justify-between items-center mb-8">
+    <div v-else class="max-w-7xl mx-auto p-4 lg:p-6 pb-20 lg:pb-6">
+      <!-- Desktop Header -->
+      <header class="hidden lg:flex justify-between items-center mb-8">
         <div>
           <h1 class="text-3xl font-extrabold flex items-center gap-3">
             <span class="text-transparent bg-clip-text bg-gradient-to-r from-emerald-500 to-teal-500">Awesome</span>
@@ -97,22 +98,49 @@
         </div>
       </header>
 
+      <!-- Mobile Header -->
+      <header class="lg:hidden flex items-center justify-between mb-4">
+        <div class="flex items-center gap-2">
+          <button v-if="mobileView === 'detail'" @click="backToList" class="p-2 -ml-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+            <ArrowLeft class="w-5 h-5" />
+          </button>
+          <h1 class="text-xl font-extrabold">
+            <span class="text-transparent bg-clip-text bg-gradient-to-r from-emerald-500 to-teal-500">Awesome</span>
+            <span v-if="mobileView === 'list'">后台</span>
+            <span v-else>{{ bottomTabs.find(t => t.key === activeTab)?.label }}</span>
+          </h1>
+        </div>
+        <div class="flex items-center gap-2">
+          <button v-if="mobileView === 'detail' && activeTab === 'stories'" @click="saveStories" class="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold shadow-lg shadow-emerald-500/20 transition-all flex items-center gap-2">
+            <Save class="w-4 h-4" />
+            {{ isSaving ? '保存中...' : '保存' }}
+          </button>
+          <button v-if="mobileView === 'detail' && activeTab === 'projects'" @click="saveProjects" class="px-4 py-2 rounded-xl bg-blue-500 hover:bg-blue-600 text-white text-sm font-bold shadow-lg shadow-blue-500/20 transition-all flex items-center gap-2">
+            <Save class="w-4 h-4" />
+            {{ isSaving ? '保存中...' : '保存' }}
+          </button>
+          <button @click="logoutAdmin" class="p-2 rounded-xl bg-rose-500 hover:bg-rose-600 text-white transition-colors">
+            <span class="text-sm font-bold">退出</span>
+          </button>
+        </div>
+      </header>
+
       <!-- Stories Tab -->
-      <div v-if="activeTab === 'stories'" class="grid grid-cols-1 lg:grid-cols-4 gap-8">
+      <div v-if="activeTab === 'stories'" class="grid grid-cols-1 lg:grid-cols-4 gap-4 lg:gap-8">
         
         <!-- Sidebar: List of stories -->
-        <div class="lg:col-span-1 space-y-4">
+        <div class="lg:col-span-1 space-y-3" :class="{ 'hidden lg:block': isMobile && mobileView === 'detail' }">
           <div class="flex justify-between items-center mb-4">
             <h2 class="font-bold text-lg">文章列表</h2>
-            <button @click="createNewStory" class="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 flex items-center justify-center hover:bg-emerald-200 transition-colors">
-              <Plus class="w-4 h-4" />
+            <button @click="createNewStory" class="w-10 h-10 lg:w-8 lg:h-8 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 flex items-center justify-center hover:bg-emerald-200 transition-colors">
+              <Plus class="w-5 h-5 lg:w-4 lg:h-4" />
             </button>
           </div>
           
           <div 
             v-for="(story, index) in stories" 
             :key="story.id"
-            @click="selectStory(index)"
+            @click="selectStory(index); if (isMobile) openDetail()"
             class="p-4 rounded-2xl border cursor-pointer transition-all duration-200 group"
             :class="selectedIndex === index ? 'bg-emerald-500 text-white border-emerald-500 shadow-lg shadow-emerald-500/20' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-emerald-400'"
           >
@@ -122,27 +150,27 @@
         </div>
 
         <!-- Editor Area -->
-        <div class="lg:col-span-3 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col" v-if="currentStory">
+        <div class="lg:col-span-3 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col" :class="{ 'hidden': isMobile && mobileView === 'list' }" v-if="currentStory">
           
           <!-- Metadata Form -->
-          <div class="p-6 border-b border-slate-100 dark:border-slate-700 grid grid-cols-2 gap-6 bg-slate-50/50 dark:bg-slate-900/50">
-            <div class="col-span-2 sm:col-span-1">
+          <div class="p-4 lg:p-6 border-b border-slate-100 dark:border-slate-700 grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6 bg-slate-50/50 dark:bg-slate-900/50">
+            <div class="lg:col-span-1">
               <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">文章大标题</label>
-              <input type="text" v-model="currentStory.title" class="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-emerald-500" placeholder="例如：重新定义班级大屏" />
+              <input type="text" v-model="currentStory.title" class="w-full px-4 py-3 lg:py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-emerald-500 text-base" placeholder="例如：重新定义班级大屏" />
             </div>
-            <div class="col-span-2 sm:col-span-1">
+            <div class="lg:col-span-1">
               <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">副标题</label>
-              <input type="text" v-model="currentStory.subtitle" class="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-emerald-500" placeholder="例如：探索 ClassIsland 带来的智能灵动体验" />
+              <input type="text" v-model="currentStory.subtitle" class="w-full px-4 py-3 lg:py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-emerald-500 text-base" placeholder="例如：探索 ClassIsland 带来的智能灵动体验" />
             </div>
-            <div class="col-span-2 sm:col-span-1">
+            <div class="lg:col-span-1">
               <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">分类标签</label>
-              <input type="text" v-model="currentStory.category" class="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-emerald-500" placeholder="例如：编辑推荐" />
+              <input type="text" v-model="currentStory.category" class="w-full px-4 py-3 lg:py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-emerald-500 text-base" placeholder="例如：编辑推荐" />
             </div>
-            <div class="col-span-2 sm:col-span-1">
+            <div class="lg:col-span-1">
               <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">发布日期</label>
-              <input type="text" v-model="currentStory.date" class="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-emerald-500" placeholder="例如：SATURDAY, APRIL 25" />
+              <input type="text" v-model="currentStory.date" class="w-full px-4 py-3 lg:py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-emerald-500 text-base" placeholder="例如：SATURDAY, APRIL 25" />
             </div>
-            <div class="col-span-2">
+            <div class="lg:col-span-2">
               <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2 flex justify-between">
                 <span>封面大图 (Banner)</span>
                 <span class="text-emerald-500 text-xs cursor-pointer hover:underline" @click="triggerBannerUpload">上传新封面...</span>
@@ -150,59 +178,60 @@
               </label>
               <div class="flex gap-4 items-center">
                 <img v-if="currentStory.coverImage" :src="currentStory.coverImage" class="h-16 w-32 object-cover rounded-lg border border-slate-200 dark:border-slate-700" />
-                <input type="text" v-model="currentStory.coverImage" class="flex-1 px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-emerald-500" placeholder="图片 URL 或上传" />
+                <input type="text" v-model="currentStory.coverImage" class="flex-1 px-4 py-3 lg:py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-emerald-500 text-base" placeholder="图片 URL 或上传" />
               </div>
             </div>
           </div>
 
           <!-- Markdown Editor Toolbar -->
-          <div class="flex items-center gap-2 p-3 border-b border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800">
-            <button @click="insertText('**加粗**')" class="p-2 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300" title="加粗"><Bold class="w-4 h-4" /></button>
-            <button @click="insertText('*斜体*')" class="p-2 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300" title="斜体"><Italic class="w-4 h-4" /></button>
-            <div class="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-2"></div>
-            <button @click="insertText('### 标题')" class="p-2 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300" title="标题"><Heading class="w-4 h-4" /></button>
-            <button @click="insertText('> 引用段落')" class="p-2 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300" title="引用"><Quote class="w-4 h-4" /></button>
-            <button @click="insertText('- 列表项')" class="p-2 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300" title="列表"><List class="w-4 h-4" /></button>
-            <div class="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-2"></div>
-            <button @click="triggerImageUpload" class="p-2 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-emerald-600 dark:text-emerald-400 flex items-center gap-2 text-sm font-bold" title="插入图片">
-              <ImageIcon class="w-4 h-4" /> 上传插图
+          <div class="flex items-center gap-1 lg:gap-2 p-2 lg:p-3 border-b border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 overflow-x-auto">
+            <button @click="insertText('**加粗**')" class="p-3 lg:p-2 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 flex-shrink-0" title="加粗"><Bold class="w-5 h-5 lg:w-4 lg:h-4" /></button>
+            <button @click="insertText('*斜体*')" class="p-3 lg:p-2 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 flex-shrink-0" title="斜体"><Italic class="w-5 h-5 lg:w-4 lg:h-4" /></button>
+            <div class="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1 lg:mx-2 flex-shrink-0"></div>
+            <button @click="insertText('### 标题')" class="p-3 lg:p-2 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 flex-shrink-0" title="标题"><Heading class="w-5 h-5 lg:w-4 lg:h-4" /></button>
+            <button @click="insertText('> 引用段落')" class="p-3 lg:p-2 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 flex-shrink-0" title="引用"><Quote class="w-5 h-5 lg:w-4 lg:h-4" /></button>
+            <button @click="insertText('- 列表项')" class="p-3 lg:p-2 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 flex-shrink-0" title="列表"><List class="w-5 h-5 lg:w-4 lg:h-4" /></button>
+            <div class="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1 lg:mx-2 flex-shrink-0"></div>
+            <button @click="triggerImageUpload" class="p-3 lg:p-2 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-emerald-600 dark:text-emerald-400 flex items-center gap-2 text-sm font-bold flex-shrink-0" title="插入图片">
+              <ImageIcon class="w-5 h-5 lg:w-4 lg:h-4" /> <span class="hidden sm:inline">上传插图</span>
             </button>
             <input type="file" ref="imageInput" @change="uploadImageToMarkdown" class="hidden" accept="image/*" />
             
-            <div class="ml-auto flex items-center gap-2 bg-slate-100 dark:bg-slate-900 p-1 rounded-lg">
+            <div class="ml-auto flex items-center gap-2 bg-slate-100 dark:bg-slate-900 p-1 rounded-lg flex-shrink-0">
               <button @click="viewMode = 'edit'" class="px-3 py-1 text-sm rounded-md transition-colors" :class="viewMode === 'edit' ? 'bg-white dark:bg-slate-700 shadow-sm' : 'text-slate-500'">编辑</button>
-              <button @click="viewMode = 'split'" class="px-3 py-1 text-sm rounded-md transition-colors" :class="viewMode === 'split' ? 'bg-white dark:bg-slate-700 shadow-sm' : 'text-slate-500'">双栏</button>
+              <button @click="viewMode = 'split'" class="px-3 py-1 text-sm rounded-md transition-colors hidden sm:block" :class="viewMode === 'split' ? 'bg-white dark:bg-slate-700 shadow-sm' : 'text-slate-500'">双栏</button>
               <button @click="viewMode = 'preview'" class="px-3 py-1 text-sm rounded-md transition-colors" :class="viewMode === 'preview' ? 'bg-white dark:bg-slate-700 shadow-sm' : 'text-slate-500'">预览</button>
             </div>
           </div>
 
           <!-- Editor Split Pane -->
-          <div class="flex-1 flex min-h-[500px]">
+          <div class="flex-1 flex min-h-[300px] lg:min-h-[500px]">
             <!-- Textarea -->
             <div v-show="viewMode !== 'preview'" class="flex-1 border-r border-slate-100 dark:border-slate-700">
               <textarea 
                 ref="markdownTextarea"
                 v-model="currentStory.content" 
-                class="w-full h-full p-6 bg-transparent resize-none outline-none font-mono text-sm leading-relaxed"
+                class="w-full h-full p-4 lg:p-6 bg-transparent resize-none outline-none font-mono text-base lg:text-sm leading-relaxed"
                 placeholder="在这里使用 Markdown 语法撰写您的文章正文..."
               ></textarea>
             </div>
             
             <!-- Preview -->
-            <div v-show="viewMode !== 'edit'" class="flex-1 bg-slate-50/50 dark:bg-slate-900/30 p-8 overflow-y-auto max-h-[600px] prose prose-slate dark:prose-invert max-w-none">
+            <div v-show="viewMode !== 'edit'" class="flex-1 bg-slate-50/50 dark:bg-slate-900/30 p-4 lg:p-8 overflow-y-auto max-h-[400px] lg:max-h-[600px] prose prose-slate dark:prose-invert max-w-none">
               <div v-html="renderedMarkdown"></div>
             </div>
           </div>
           
         </div>
-        <div v-else class="col-span-3 flex items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-3xl">
+        <div v-else class="lg:col-span-3 flex items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-3xl min-h-[300px] lg:min-h-0" :class="{ 'hidden': isMobile && mobileView === 'list' }">
           <p class="text-slate-400">请在左侧选择一篇文章，或创建新文章</p>
         </div>
       </div>
 
       <!-- Projects Tab -->
-      <div v-else-if="activeTab === 'projects'" class="grid grid-cols-1 lg:grid-cols-4 gap-8">
-        <div class="lg:col-span-1 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col h-[700px]">
+      <div v-else-if="activeTab === 'projects'" class="grid grid-cols-1 lg:grid-cols-4 gap-4 lg:gap-8">
+        <!-- Projects List Sidebar -->
+        <div class="lg:col-span-1 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col" :class="{ 'hidden lg:flex': isMobile && mobileView === 'detail' }" style="height: auto; min-height: 400px; max-height: 700px;">
           <div class="p-4 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 flex justify-between items-center gap-2">
             <h2 class="font-bold text-lg">软件库</h2>
             <div class="flex items-center gap-2">
@@ -212,21 +241,21 @@
               <button @click="openAuditLogs" class="px-3 py-1.5 rounded-lg bg-slate-200/70 dark:bg-slate-700/60 text-slate-700 dark:text-slate-200 text-sm font-bold hover:bg-slate-300 dark:hover:bg-slate-700 transition-colors">
                 日志
               </button>
-              <button @click="createNewProject" class="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center hover:bg-blue-200 transition-colors" title="添加新软件">
-                <Plus class="w-4 h-4" />
+              <button @click="createNewProject" class="w-10 h-10 lg:w-8 lg:h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center hover:bg-blue-200 transition-colors" title="添加新软件">
+                <Plus class="w-5 h-5 lg:w-4 lg:h-4" />
               </button>
             </div>
           </div>
 
           <div class="p-4 border-b border-slate-100 dark:border-slate-700 space-y-3">
-            <input v-model="projectQuery.q" @keyup.enter="fetchAdminProjects" type="text" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-blue-500 text-sm" placeholder="搜索项目（名称/开发者/关键词）" />
-            <select v-model="projectQuery.category" @change="projectQuery.page = 1; fetchAdminProjects()" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-blue-500 text-sm">
+            <input v-model="projectQuery.q" @keyup.enter="fetchAdminProjects" type="text" class="w-full px-3 py-3 lg:py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-blue-500 text-base lg:text-sm" placeholder="搜索项目（名称/开发者/关键词）" />
+            <select v-model="projectQuery.category" @change="projectQuery.page = 1; fetchAdminProjects()" class="w-full px-3 py-3 lg:py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-blue-500 text-base lg:text-sm">
               <option value="">全部分类</option>
               <option v-for="c in adminCategories" :key="c.id" :value="c.id">{{ c.name }}</option>
             </select>
             <div class="flex gap-2">
-              <button @click="projectQuery.page = 1; fetchAdminProjects()" class="flex-1 px-3 py-2 rounded-xl bg-blue-500 hover:bg-blue-600 text-white text-sm font-bold transition-colors">搜索</button>
-              <button @click="resetProjectQuery" class="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-sm font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">重置</button>
+              <button @click="projectQuery.page = 1; fetchAdminProjects()" class="flex-1 px-3 py-3 lg:py-2 rounded-xl bg-blue-500 hover:bg-blue-600 text-white text-base lg:text-sm font-bold transition-colors">搜索</button>
+              <button @click="resetProjectQuery" class="px-3 py-3 lg:py-2 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-base lg:text-sm font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">重置</button>
             </div>
           </div>
 
@@ -234,12 +263,12 @@
             <div
               v-for="p in projectsPage.items"
               :key="p.id || p.slug || p.name"
-              @click="selectProject(p)"
+              @click="selectProject(p); if (isMobile) openDetail()"
               class="p-3 rounded-xl border cursor-pointer transition-all duration-200 flex items-center gap-3"
               :class="selectedProjectId === p.id ? 'bg-blue-500 text-white border-blue-500 shadow-md shadow-blue-500/20' : 'bg-slate-50 dark:bg-slate-900/50 border-transparent hover:border-blue-300'"
             >
-              <img v-if="p.icon || p.avatar" :src="p.icon || p.avatar" class="w-8 h-8 rounded bg-white object-contain p-0.5" />
-              <div v-else class="w-8 h-8 rounded bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-xs font-bold text-slate-500">{{ (p.name || '?').charAt(0) }}</div>
+              <img v-if="p.icon || p.avatar" :src="p.icon || p.avatar" class="w-10 h-10 lg:w-8 lg:h-8 rounded bg-white object-contain p-0.5" />
+              <div v-else class="w-10 h-10 lg:w-8 lg:h-8 rounded bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-xs font-bold text-slate-500">{{ (p.name || '?').charAt(0) }}</div>
               <div class="flex-1 min-w-0">
                 <div class="font-medium truncate text-sm">{{ p.name }}</div>
                 <div class="text-xs opacity-80 truncate">{{ p.developer }}</div>
@@ -255,19 +284,20 @@
           </div>
 
           <div class="p-4 border-t border-slate-100 dark:border-slate-700 grid grid-cols-2 gap-2">
-            <button @click="exportJson" class="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-sm font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">导出 JSON</button>
-            <button @click="exportCsv" class="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-sm font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">导出 CSV</button>
-            <button @click="triggerImportJson" class="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-sm font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">导入 JSON</button>
-            <button @click="triggerImportCsv" class="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-sm font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">导入 CSV</button>
+            <button @click="exportJson" class="px-3 py-3 lg:py-2 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-sm font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">导出 JSON</button>
+            <button @click="exportCsv" class="px-3 py-3 lg:py-2 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-sm font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">导出 CSV</button>
+            <button @click="triggerImportJson" class="px-3 py-3 lg:py-2 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-sm font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">导入 JSON</button>
+            <button @click="triggerImportCsv" class="px-3 py-3 lg:py-2 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-sm font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">导入 CSV</button>
             <input ref="importJsonInput" type="file" class="hidden" accept="application/json" @change="importProjectsJson" />
             <input ref="importCsvInput" type="file" class="hidden" accept=".csv,text/csv" @change="importProjectsCsv" />
           </div>
         </div>
 
-        <div class="lg:col-span-3 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col h-[700px] overflow-y-auto" v-if="projectDraft">
-          <div class="p-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50 flex items-start justify-between gap-4">
+        <!-- Project Editor -->
+        <div class="lg:col-span-3 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col" :class="{ 'hidden': isMobile && mobileView === 'list' }" v-if="projectDraft">
+          <div class="p-4 lg:p-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50 flex items-start justify-between gap-4">
             <div>
-              <h2 class="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-3">
+              <h2 class="text-lg lg:text-xl font-bold text-slate-800 dark:text-white flex items-center gap-3">
                 正在编辑: <span class="text-blue-500">{{ projectDraft.name }}</span>
               </h2>
               <div v-if="projectDraft.slug" class="text-xs text-slate-500 dark:text-slate-400 mt-1">slug: {{ projectDraft.slug }}</div>
@@ -277,152 +307,210 @@
             </button>
           </div>
 
-          <div class="p-8 grid grid-cols-2 gap-8">
-            <div class="col-span-2 sm:col-span-1">
-              <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">软件名称</label>
-              <input type="text" v-model="projectDraft.name" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-blue-500" />
+          <!-- Mobile Step Wizard -->
+          <div v-if="isMobile" class="p-4 border-b border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800">
+            <div class="flex items-center justify-between">
+              <button 
+                v-for="step in 4" 
+                :key="step"
+                @click="projectMobileStep = step"
+                class="flex flex-col items-center gap-1"
+              >
+                <div class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-colors"
+                  :class="projectMobileStep === step ? 'bg-blue-500 text-white' : projectMobileStep > step ? 'bg-blue-200 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300' : 'bg-slate-200 dark:bg-slate-700 text-slate-500'"
+                >
+                  {{ step }}
+                </div>
+                <span class="text-[10px]" :class="projectMobileStep === step ? 'text-blue-500 font-bold' : 'text-slate-400'">
+                  {{ ['基本信息', '分类标签', '媒体资源', '高级设置'][step - 1] }}
+                </span>
+              </button>
             </div>
-            <div class="col-span-2 sm:col-span-1">
-              <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">作者 / 开发者</label>
-              <input type="text" v-model="projectDraft.developer" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-blue-500" />
-            </div>
-            
-            <div class="col-span-2">
-              <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">一句话简介</label>
-              <textarea v-model="projectDraft.description" rows="2" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-blue-500 resize-none"></textarea>
+          </div>
+
+          <div class="p-4 lg:p-8 space-y-4 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-8 overflow-y-auto" style="max-height: 600px;">
+            <!-- Step 1: Basic Info (Mobile) / All (Desktop) -->
+            <div v-if="!isMobile || projectMobileStep === 1" class="lg:col-span-1 space-y-4">
+              <div class="lg:col-span-1">
+                <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">软件名称</label>
+                <input type="text" v-model="projectDraft.name" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-blue-500 text-base" />
+              </div>
+              <div class="lg:col-span-1">
+                <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">作者 / 开发者</label>
+                <input type="text" v-model="projectDraft.developer" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-blue-500 text-base" />
+              </div>
+              <div class="lg:col-span-1">
+                <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">一句话简介</label>
+                <textarea v-model="projectDraft.description" rows="2" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-blue-500 resize-none text-base"></textarea>
+              </div>
+              <div class="lg:col-span-1">
+                <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">状态</label>
+                <input type="text" v-model="projectDraft.status" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-blue-500 text-base" placeholder="例如：活跃 / 停更 / 维护中" />
+              </div>
+              <div class="lg:col-span-1">
+                <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">开源仓库 (Repository)</label>
+                <input type="text" v-model="projectDraft.github_url" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-blue-500 text-base" />
+              </div>
             </div>
 
-            <div class="col-span-2 sm:col-span-1">
-              <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">状态</label>
-              <input type="text" v-model="projectDraft.status" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-blue-500" placeholder="例如：活跃 / 停更 / 维护中" />
-            </div>
-            <div class="col-span-2 sm:col-span-1">
-              <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">AI 使用率标签</label>
-              <select v-model="projectDraft.ai_usage_state" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-blue-500">
-                <option value="unknown">未知（用户点击后转圈）</option>
-                <option value="under50">未超过 50%</option>
-                <option value="over50">超过 50%</option>
-              </select>
-            </div>
-            <div class="col-span-2 sm:col-span-1">
-              <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">开源仓库 (Repository)</label>
-              <input type="text" v-model="projectDraft.github_url" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-blue-500" />
+            <!-- Step 2: Category & Tags -->
+            <div v-if="!isMobile || projectMobileStep === 2" class="lg:col-span-1 space-y-4">
+              <div class="lg:col-span-1">
+                <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">AI 使用率标签</label>
+                <select v-model="projectDraft.ai_usage_state" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-blue-500 text-base">
+                  <option value="unknown">未知（用户点击后转圈）</option>
+                  <option value="under50">未超过 50%</option>
+                  <option value="over50">超过 50%</option>
+                </select>
+              </div>
+              <div class="lg:col-span-1">
+                <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">稳定性标签</label>
+                <select v-model="projectDraft.recommendation" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-blue-500 text-base">
+                  <option value="">无</option>
+                  <option value="稳定">稳定</option>
+                  <option value="不稳定">不稳定</option>
+                  <option value="观望中">观望中</option>
+                </select>
+              </div>
+              <div class="lg:col-span-1">
+                <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">编辑推荐</label>
+                <select v-model="projectDraft.is_editors_choice" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-blue-500 text-base">
+                  <option :value="false">否</option>
+                  <option :value="true">是</option>
+                </select>
+              </div>
+              <div class="lg:col-span-1">
+                <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">功能特性 (逗号分隔)</label>
+                <input type="text" v-model="projectDraft.keywords" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-blue-500 text-base" placeholder="例如：白板, 批注, C#" />
+              </div>
+              <div class="lg:col-span-1">
+                <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">所属分类</label>
+                <select v-model="projectDraft.category_id" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-blue-500 text-base">
+                  <option :value="null">未分类</option>
+                  <option v-for="c in adminCategories" :key="c.id" :value="c.id">{{ c.name }}</option>
+                </select>
+              </div>
             </div>
 
-            <div class="col-span-2">
-              <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2 flex items-center justify-between">
-                <span>关联开发者账号（平台）</span>
-                <button @click="addPlatformDeveloper" type="button" class="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-extrabold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
-                  添加
-                </button>
-              </label>
-              <div class="space-y-2">
-                <div v-for="(d, idx) in (projectDraft.platform_developers || [])" :key="idx" class="grid grid-cols-1 sm:grid-cols-5 gap-2 p-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white/70 dark:bg-slate-900/30">
-                  <input v-model="d.username" type="text" placeholder="username（如 cjk_mkp）" class="sm:col-span-4 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 outline-none focus:border-blue-500 text-sm" />
-                  <button @click="removePlatformDeveloper(Number(idx))" type="button" class="sm:col-span-1 px-3 py-2 rounded-xl bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 font-extrabold hover:bg-rose-100 dark:hover:bg-rose-500/20 transition-colors">
-                    删除
+            <!-- Step 3: Media -->
+            <div v-if="!isMobile || projectMobileStep === 3" class="lg:col-span-2 space-y-4">
+              <div class="p-4 lg:p-6 rounded-2xl bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-700">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
+                  <div>
+                    <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-4 flex justify-between items-center">
+                      <span>应用图标 (Icon)</span>
+                      <span class="text-blue-500 text-xs cursor-pointer hover:underline" @click="triggerProjectIconUpload">上传新图标...</span>
+                      <input type="file" ref="projectIconInput" @change="uploadProjectIcon" class="hidden" accept="image/*" />
+                    </label>
+                    <div class="flex gap-4 items-center">
+                      <div class="w-16 h-16 shrink-0 bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-center p-2">
+                        <img v-if="projectDraft.icon || projectDraft.avatar" :src="projectDraft.icon || projectDraft.avatar" class="w-full h-full object-contain" />
+                        <span v-else class="text-slate-400 text-xs">无图</span>
+                      </div>
+                      <input type="text" v-model="projectDraft.icon" class="flex-1 px-4 py-3 lg:py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-blue-500 text-base" placeholder="图标 URL" />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-4 flex justify-between items-center">
+                      <span>应用横幅 (Banner)</span>
+                      <span class="text-blue-500 text-xs cursor-pointer hover:underline" @click="triggerProjectBannerUpload">上传新横幅...</span>
+                      <input type="file" ref="projectBannerInput" @change="uploadProjectBanner" class="hidden" accept="image/*" />
+                    </label>
+                    <div class="flex flex-col gap-3">
+                      <div class="w-full h-24 bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-center p-1 overflow-hidden">
+                        <img v-if="projectDraft.banner" :src="projectDraft.banner" class="w-full h-full object-cover rounded-lg" />
+                        <span v-else class="text-slate-400 text-xs">无横幅</span>
+                      </div>
+                      <input type="text" v-model="projectDraft.banner" class="w-full px-4 py-3 lg:py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-blue-500 text-base" placeholder="横幅 URL" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Step 4: Advanced Settings -->
+            <div v-if="!isMobile || projectMobileStep === 4" class="lg:col-span-2 space-y-4">
+              <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">编程语言 (Language)</label>
+                  <input type="text" v-model="projectDraft.language" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-blue-500 text-base" />
+                </div>
+                <div>
+                  <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Star 数量 (Stars)</label>
+                  <input type="number" v-model.number="projectDraft.stars" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-blue-500 text-base" />
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2 flex items-center justify-between">
+                  <span>关联开发者账号（平台）</span>
+                  <button @click="addPlatformDeveloper" type="button" class="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-extrabold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+                    添加
                   </button>
-                </div>
-                <div v-if="!(projectDraft.platform_developers || []).length" class="text-sm text-slate-400">
-                  暂无关联账号
-                </div>
-              </div>
-            </div>
-
-            <div class="col-span-2 sm:col-span-1">
-              <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">编程语言 (Language)</label>
-              <input type="text" v-model="projectDraft.language" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-blue-500" />
-            </div>
-            <div class="col-span-2 sm:col-span-1">
-              <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Star 数量 (Stars)</label>
-              <input type="number" v-model.number="projectDraft.stars" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-blue-500" />
-            </div>
-
-            <div class="col-span-2 sm:col-span-1">
-              <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">稳定性标签</label>
-              <select v-model="projectDraft.recommendation" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-blue-500">
-                <option value="">无</option>
-                <option value="稳定">稳定</option>
-                <option value="不稳定">不稳定</option>
-                <option value="观望中">观望中</option>
-              </select>
-            </div>
-            <div class="col-span-2 sm:col-span-1">
-              <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">编辑推荐</label>
-              <select v-model="projectDraft.is_editors_choice" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-blue-500">
-                <option :value="false">否</option>
-                <option :value="true">是</option>
-              </select>
-            </div>
-            <div class="col-span-2 sm:col-span-1">
-              <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">功能特性 (逗号分隔)</label>
-              <input type="text" v-model="projectDraft.keywords" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-blue-500" placeholder="例如：白板, 批注, C#" />
-            </div>
-            <div class="col-span-2">
-              <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">所属分类</label>
-              <select v-model="projectDraft.category_id" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-blue-500">
-                <option :value="null">未分类</option>
-                <option v-for="c in adminCategories" :key="c.id" :value="c.id">{{ c.name }}</option>
-              </select>
-            </div>
-
-            <!-- Image Uploads for Project -->
-            <div class="col-span-2 p-6 rounded-2xl bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-700">
-              <div class="grid grid-cols-2 gap-8">
-                <div>
-                  <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-4 flex justify-between items-center">
-                    <span>应用图标 (Icon)</span>
-                    <span class="text-blue-500 text-xs cursor-pointer hover:underline" @click="triggerProjectIconUpload">上传新图标...</span>
-                    <input type="file" ref="projectIconInput" @change="uploadProjectIcon" class="hidden" accept="image/*" />
-                  </label>
-                  <div class="flex gap-4 items-center">
-                    <div class="w-16 h-16 shrink-0 bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-center p-2">
-                      <img v-if="projectDraft.icon || projectDraft.avatar" :src="projectDraft.icon || projectDraft.avatar" class="w-full h-full object-contain" />
-                      <span v-else class="text-slate-400 text-xs">无图</span>
-                    </div>
-                    <input type="text" v-model="projectDraft.icon" class="flex-1 px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-blue-500 text-sm" placeholder="图标 URL" />
+                </label>
+                <div class="space-y-2">
+                  <div v-for="(d, idx) in (projectDraft.platform_developers || [])" :key="idx" class="grid grid-cols-1 lg:grid-cols-5 gap-2 p-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white/70 dark:bg-slate-900/30">
+                    <input v-model="d.username" type="text" placeholder="username（如 cjk_mkp）" class="lg:col-span-4 px-3 py-3 lg:py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 outline-none focus:border-blue-500 text-base" />
+                    <button @click="removePlatformDeveloper(Number(idx))" type="button" class="lg:col-span-1 px-3 py-3 lg:py-2 rounded-xl bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 font-extrabold hover:bg-rose-100 dark:hover:bg-rose-500/20 transition-colors">
+                      删除
+                    </button>
                   </div>
-                </div>
-
-                <div>
-                  <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-4 flex justify-between items-center">
-                    <span>应用横幅 (Banner)</span>
-                    <span class="text-blue-500 text-xs cursor-pointer hover:underline" @click="triggerProjectBannerUpload">上传新横幅...</span>
-                    <input type="file" ref="projectBannerInput" @change="uploadProjectBanner" class="hidden" accept="image/*" />
-                  </label>
-                  <div class="flex flex-col gap-3">
-                    <div class="w-full h-24 bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-center p-1 overflow-hidden">
-                      <img v-if="projectDraft.banner" :src="projectDraft.banner" class="w-full h-full object-cover rounded-lg" />
-                      <span v-else class="text-slate-400 text-xs">无横幅</span>
-                    </div>
-                    <input type="text" v-model="projectDraft.banner" class="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-blue-500 text-sm" placeholder="横幅 URL" />
+                  <div v-if="!(projectDraft.platform_developers || []).length" class="text-sm text-slate-400">
+                    暂无关联账号
                   </div>
                 </div>
               </div>
             </div>
 
+            <!-- Mobile Step Navigation -->
+            <div v-if="isMobile" class="lg:col-span-2 flex items-center justify-between pt-4 border-t border-slate-200 dark:border-slate-700">
+              <button 
+                @click="projectMobileStep = Math.max(1, projectMobileStep - 1)"
+                :disabled="projectMobileStep === 1"
+                class="px-4 py-3 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold disabled:opacity-50"
+              >
+                上一步
+              </button>
+              <span class="text-sm text-slate-500">步骤 {{ projectMobileStep }} / 4</span>
+              <button 
+                v-if="projectMobileStep < 4"
+                @click="projectMobileStep = Math.min(4, projectMobileStep + 1)"
+                class="px-4 py-3 rounded-xl bg-blue-500 hover:bg-blue-600 text-white font-bold"
+              >
+                下一步
+              </button>
+              <button 
+                v-else
+                @click="saveProjects"
+                class="px-4 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold flex items-center gap-2"
+              >
+                <Save class="w-4 h-4" />
+                {{ isSaving ? '保存中...' : '保存' }}
+              </button>
+            </div>
           </div>
         </div>
-        <div v-else class="col-span-3 flex items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-3xl h-[700px]">
+        <div v-else class="lg:col-span-3 flex items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-3xl min-h-[300px] lg:min-h-[700px]" :class="{ 'hidden': isMobile && mobileView === 'list' }">
           <p class="text-slate-400">请在左侧选择一个软件项目进行编辑</p>
         </div>
       </div>
 
       <!-- Submissions Tab -->
-      <div v-else-if="activeTab === 'submissions'" class="grid grid-cols-1 lg:grid-cols-4 gap-8">
-        <div class="lg:col-span-1 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col h-[700px]">
+      <div v-else-if="activeTab === 'submissions'" class="grid grid-cols-1 lg:grid-cols-4 gap-4 lg:gap-8">
+        <div class="lg:col-span-1 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col" :class="{ 'hidden lg:flex': isMobile && mobileView === 'detail' }" style="height: auto; min-height: 400px; max-height: 700px;">
           <div class="p-4 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
             <h2 class="font-bold text-lg">待审核</h2>
           </div>
           <div class="p-4 border-b border-slate-100 dark:border-slate-700 space-y-3">
-            <input v-model="submissionQuery.q" @keyup.enter="fetchSubmissions" type="text" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-emerald-500 text-sm" placeholder="搜索（名称/GitHub）" />
-            <button @click="submissionQuery.page = 1; fetchSubmissions()" class="w-full px-3 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold transition-colors">刷新</button>
+            <input v-model="submissionQuery.q" @keyup.enter="fetchSubmissions" type="text" class="w-full px-3 py-3 lg:py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-emerald-500 text-base lg:text-sm" placeholder="搜索（名称/GitHub）" />
+            <button @click="submissionQuery.page = 1; fetchSubmissions()" class="w-full px-3 py-3 lg:py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-base lg:text-sm font-bold transition-colors">刷新</button>
           </div>
           <div class="flex-1 overflow-y-auto p-4 space-y-2">
             <div
               v-for="s in submissionsPage.items"
               :key="s.id"
-              @click="selectSubmission(s)"
+              @click="selectSubmission(s); if (isMobile) openDetail()"
               class="p-3 rounded-xl border cursor-pointer transition-all duration-200"
               :class="selectedSubmissionId === s.id ? 'bg-emerald-500 text-white border-emerald-500 shadow-md shadow-emerald-500/20' : 'bg-slate-50 dark:bg-slate-900/50 border-transparent hover:border-emerald-300'"
             >
@@ -444,92 +532,90 @@
           </div>
         </div>
 
-        <div class="lg:col-span-3 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col h-[700px] overflow-y-auto" v-if="submissionDraft">
-          <div class="p-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50">
-            <h2 class="text-xl font-bold text-slate-800 dark:text-white">审核项目提交</h2>
+        <div class="lg:col-span-3 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col" :class="{ 'hidden': isMobile && mobileView === 'list' }" v-if="submissionDraft">
+          <div class="p-4 lg:p-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50">
+            <h2 class="text-lg lg:text-xl font-bold text-slate-800 dark:text-white">审核项目提交</h2>
           </div>
-          <div v-if="submissionKind === 'project_update'" class="p-8 space-y-6">
-            <div class="p-5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
-              <div class="text-sm font-extrabold text-slate-800 dark:text-slate-200 mb-2">目标项目</div>
-              <div class="text-lg font-extrabold text-slate-900 dark:text-white">{{ submissionDraft.project_name }}</div>
-              <div class="text-sm text-slate-500 dark:text-slate-400 mt-1">开发者：{{ submissionDraft.actor?.username || '-' }}</div>
-            </div>
-
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              <div class="space-y-2">
-                <div class="text-sm font-extrabold text-slate-700 dark:text-slate-300">新简介</div>
-                <div class="p-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 whitespace-pre-wrap text-sm">{{ submissionDraft.patch?.description || '' }}</div>
+          <div class="flex-1 overflow-y-auto p-4 lg:p-8 space-y-4 lg:space-y-6" style="max-height: 500px;">
+            <div v-if="submissionKind === 'project_update'" class="space-y-4 lg:space-y-6">
+              <div class="p-4 lg:p-5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
+                <div class="text-sm font-extrabold text-slate-800 dark:text-slate-200 mb-2">目标项目</div>
+                <div class="text-lg font-extrabold text-slate-900 dark:text-white">{{ submissionDraft.project_name }}</div>
+                <div class="text-sm text-slate-500 dark:text-slate-400 mt-1">开发者：{{ submissionDraft.actor?.username || '-' }}</div>
               </div>
+
+              <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
+                <div class="space-y-2">
+                  <div class="text-sm font-extrabold text-slate-700 dark:text-slate-300">新简介</div>
+                  <div class="p-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 whitespace-pre-wrap text-sm">{{ submissionDraft.patch?.description || '' }}</div>
+                </div>
+                <div class="space-y-2">
+                  <div class="text-sm font-extrabold text-slate-700 dark:text-slate-300">新关键词</div>
+                  <div class="p-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 whitespace-pre-wrap text-sm">{{ submissionDraft.patch?.keywords || '' }}</div>
+                </div>
+              </div>
+
               <div class="space-y-2">
-                <div class="text-sm font-extrabold text-slate-700 dark:text-slate-300">新关键词</div>
-                <div class="p-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 whitespace-pre-wrap text-sm">{{ submissionDraft.patch?.keywords || '' }}</div>
+                <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">驳回原因（可选）</label>
+                <textarea v-model="submissionReviewNote" rows="2" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-emerald-500 resize-none text-base"></textarea>
               </div>
             </div>
-
-            <div class="space-y-2">
-              <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">驳回原因（可选）</label>
-              <textarea v-model="submissionReviewNote" rows="2" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-emerald-500 resize-none"></textarea>
-            </div>
-
-            <div class="flex flex-col sm:flex-row gap-3">
-              <button @click="approveSubmission" class="flex-1 px-4 py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold transition-colors">通过并应用</button>
-              <button @click="rejectSubmission" class="flex-1 px-4 py-3 rounded-2xl bg-rose-500 hover:bg-rose-600 text-white font-bold transition-colors">驳回</button>
+            <div v-else class="space-y-4 lg:grid lg:grid-cols-2 lg:gap-8">
+              <div class="lg:col-span-1">
+                <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">项目名称</label>
+                <input type="text" v-model="submissionDraft.name" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-emerald-500 text-base" />
+              </div>
+              <div class="lg:col-span-1">
+                <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">开发者</label>
+                <input type="text" v-model="submissionDraft.developer" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-emerald-500 text-base" />
+              </div>
+              <div class="lg:col-span-2">
+                <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">GitHub 仓库</label>
+                <input type="text" v-model="submissionDraft.github_url" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-emerald-500 text-base" />
+              </div>
+              <div class="lg:col-span-2">
+                <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">简介</label>
+                <textarea v-model="submissionDraft.description" rows="3" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-emerald-500 resize-none text-base"></textarea>
+              </div>
+              <div class="lg:col-span-1">
+                <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">标签（逗号分隔）</label>
+                <input type="text" v-model="submissionDraft.keywords" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-emerald-500 text-base" />
+              </div>
+              <div class="lg:col-span-1">
+                <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">推荐标签（逗号分隔）</label>
+                <input type="text" v-model="submissionDraft.recommendation" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-emerald-500 text-base" />
+              </div>
+              <div class="lg:col-span-2">
+                <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">分类</label>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                  <select v-model="submissionCategoryId" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-emerald-500 text-base">
+                    <option value="">选择现有分类</option>
+                    <option v-for="c in adminCategories" :key="c.id" :value="c.id">{{ c.name }}</option>
+                  </select>
+                  <input v-model="submissionNewCategoryName" type="text" placeholder="或新建分类名称" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-emerald-500 text-base" />
+                </div>
+                <div class="text-xs text-slate-500 dark:text-slate-400 mt-2">优先使用"选择现有分类"，若填写新分类名称则会自动创建。</div>
+              </div>
+              <div class="lg:col-span-2">
+                <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">驳回原因（可选）</label>
+                <textarea v-model="submissionReviewNote" rows="2" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-emerald-500 resize-none text-base"></textarea>
+              </div>
             </div>
           </div>
-          <div v-else class="p-8 grid grid-cols-2 gap-8">
-            <div class="col-span-2 sm:col-span-1">
-              <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">项目名称</label>
-              <input type="text" v-model="submissionDraft.name" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-emerald-500" />
-            </div>
-            <div class="col-span-2 sm:col-span-1">
-              <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">开发者</label>
-              <input type="text" v-model="submissionDraft.developer" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-emerald-500" />
-            </div>
-            <div class="col-span-2">
-              <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">GitHub 仓库</label>
-              <input type="text" v-model="submissionDraft.github_url" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-emerald-500" />
-            </div>
-            <div class="col-span-2">
-              <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">简介</label>
-              <textarea v-model="submissionDraft.description" rows="3" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-emerald-500 resize-none"></textarea>
-            </div>
-            <div class="col-span-2 sm:col-span-1">
-              <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">标签（逗号分隔）</label>
-              <input type="text" v-model="submissionDraft.keywords" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-emerald-500" />
-            </div>
-            <div class="col-span-2 sm:col-span-1">
-              <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">推荐标签（逗号分隔）</label>
-              <input type="text" v-model="submissionDraft.recommendation" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-emerald-500" />
-            </div>
-            <div class="col-span-2">
-              <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">分类</label>
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <select v-model="submissionCategoryId" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-emerald-500">
-                  <option value="">选择现有分类</option>
-                  <option v-for="c in adminCategories" :key="c.id" :value="c.id">{{ c.name }}</option>
-                </select>
-                <input v-model="submissionNewCategoryName" type="text" placeholder="或新建分类名称" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-emerald-500" />
-              </div>
-              <div class="text-xs text-slate-500 dark:text-slate-400 mt-2">优先使用"选择现有分类"，若填写新分类名称则会自动创建。</div>
-            </div>
-            <div class="col-span-2">
-              <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">驳回原因（可选）</label>
-              <textarea v-model="submissionReviewNote" rows="2" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-emerald-500 resize-none"></textarea>
-            </div>
-            <div class="col-span-2 flex flex-col sm:flex-row gap-3">
-              <button @click="approveSubmission" class="flex-1 px-4 py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold transition-colors">通过并入库</button>
-              <button @click="rejectSubmission" class="flex-1 px-4 py-3 rounded-2xl bg-rose-500 hover:bg-rose-600 text-white font-bold transition-colors">驳回</button>
-            </div>
+          <!-- Mobile Fixed Action Bar -->
+          <div class="p-4 border-t border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 flex flex-col sm:flex-row gap-3">
+            <button @click="approveSubmission" class="flex-1 px-4 py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold transition-colors">通过并入库</button>
+            <button @click="rejectSubmission" class="flex-1 px-4 py-3 rounded-2xl bg-rose-500 hover:bg-rose-600 text-white font-bold transition-colors">驳回</button>
           </div>
         </div>
-        <div v-else class="col-span-3 flex items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-3xl h-[700px]">
+        <div v-else class="lg:col-span-3 flex items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-3xl min-h-[300px] lg:min-h-[700px]" :class="{ 'hidden': isMobile && mobileView === 'list' }">
           <p class="text-slate-400">请在左侧选择一个待审核项目</p>
         </div>
       </div>
 
       <!-- Moderation Tab -->
-      <div v-else-if="activeTab === 'moderation'" class="grid grid-cols-1 lg:grid-cols-4 gap-8">
-        <div class="lg:col-span-1 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col h-[700px]">
+      <div v-else-if="activeTab === 'moderation'" class="grid grid-cols-1 lg:grid-cols-4 gap-4 lg:gap-8">
+        <div class="lg:col-span-1 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col" :class="{ 'hidden lg:flex': isMobile && mobileView === 'detail' }" style="height: auto; min-height: 400px; max-height: 700px;">
           <div class="p-4 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
             <h2 class="font-bold text-lg">内容审核队列</h2>
           </div>
@@ -537,31 +623,31 @@
             <div class="flex gap-2">
               <button
                 @click="moderationKind = 'comment'"
-                class="flex-1 px-3 py-2 rounded-xl text-sm font-bold transition-colors"
+                class="flex-1 px-3 py-3 lg:py-2 rounded-xl text-base lg:text-sm font-bold transition-colors"
                 :class="moderationKind === 'comment' ? 'bg-amber-500 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200'"
               >
                 评论
               </button>
               <button
                 @click="moderationKind = 'bug'"
-                class="flex-1 px-3 py-2 rounded-xl text-sm font-bold transition-colors"
+                class="flex-1 px-3 py-3 lg:py-2 rounded-xl text-base lg:text-sm font-bold transition-colors"
                 :class="moderationKind === 'bug' ? 'bg-amber-500 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200'"
               >
                 Bug反馈
               </button>
             </div>
-            <select v-model="moderationStatus" @change="moderationQuery.page = 1; fetchModeration()" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-amber-500 text-sm">
+            <select v-model="moderationStatus" @change="moderationQuery.page = 1; fetchModeration()" class="w-full px-3 py-3 lg:py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-amber-500 text-base lg:text-sm">
               <option value="pending">待审核</option>
               <option value="approved">已通过</option>
               <option value="rejected">已驳回</option>
             </select>
-            <button @click="moderationQuery.page = 1; fetchModeration()" class="w-full px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-sm font-bold transition-colors">刷新</button>
+            <button @click="moderationQuery.page = 1; fetchModeration()" class="w-full px-3 py-3 lg:py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-base lg:text-sm font-bold transition-colors">刷新</button>
           </div>
           <div class="flex-1 overflow-y-auto p-4 space-y-2">
             <div
               v-for="m in moderationPage.items"
               :key="m.id"
-              @click="selectModeration(m)"
+              @click="selectModeration(m); if (isMobile) openDetail()"
               class="p-3 rounded-xl border cursor-pointer transition-all duration-200"
               :class="selectedModerationId === m.id ? 'bg-amber-500 text-white border-amber-500 shadow-md shadow-amber-500/20' : 'bg-slate-50 dark:bg-slate-900/50 border-transparent hover:border-amber-300'"
             >
@@ -578,12 +664,12 @@
           </div>
         </div>
 
-        <div class="lg:col-span-3 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col h-[700px] overflow-y-auto" v-if="moderationDraft">
-          <div class="p-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50">
-            <h2 class="text-xl font-bold text-slate-800 dark:text-white">审核{{ moderationKind === 'comment' ? '评论' : 'Bug反馈' }}</h2>
+        <div class="lg:col-span-3 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col" :class="{ 'hidden': isMobile && mobileView === 'list' }" v-if="moderationDraft">
+          <div class="p-4 lg:p-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50">
+            <h2 class="text-lg lg:text-xl font-bold text-slate-800 dark:text-white">审核{{ moderationKind === 'comment' ? '评论' : 'Bug反馈' }}</h2>
           </div>
-          <div class="p-8 space-y-6">
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+          <div class="flex-1 overflow-y-auto p-4 lg:p-8 space-y-4 lg:space-y-6" style="max-height: 500px;">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
               <div class="p-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
                 <div class="text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">项目</div>
                 <div class="text-sm text-slate-900 dark:text-white">{{ moderationDraft.project_name }}</div>
@@ -613,14 +699,10 @@
 
             <div class="space-y-2">
               <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">驳回原因（可选）</label>
-              <textarea v-model="moderationReviewNote" rows="2" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-amber-500 resize-none"></textarea>
+              <textarea v-model="moderationReviewNote" rows="2" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-amber-500 resize-none text-base"></textarea>
             </div>
 
-            <div class="flex flex-col sm:flex-row gap-3" v-if="moderationDraft.status === 'pending'">
-              <button @click="approveModeration" class="flex-1 px-4 py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold transition-colors">通过</button>
-              <button @click="rejectModeration" class="flex-1 px-4 py-3 rounded-2xl bg-rose-500 hover:bg-rose-600 text-white font-bold transition-colors">驳回</button>
-            </div>
-            <div v-else class="p-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
+            <div v-if="moderationDraft.status !== 'pending'" class="p-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
               <div class="text-sm font-bold text-slate-700 dark:text-slate-300">审核状态</div>
               <div class="text-sm mt-1" :class="moderationDraft.status === 'approved' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'">
                 {{ moderationDraft.status === 'approved' ? '已通过' : '已驳回' }}
@@ -628,8 +710,13 @@
               </div>
             </div>
           </div>
+          <!-- Mobile Fixed Action Bar -->
+          <div class="p-4 border-t border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 flex flex-col sm:flex-row gap-3" v-if="moderationDraft.status === 'pending'">
+            <button @click="approveModeration" class="flex-1 px-4 py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold transition-colors">通过</button>
+            <button @click="rejectModeration" class="flex-1 px-4 py-3 rounded-2xl bg-rose-500 hover:bg-rose-600 text-white font-bold transition-colors">驳回</button>
+          </div>
         </div>
-        <div v-else class="col-span-3 flex items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-3xl h-[700px]">
+        <div v-else class="lg:col-span-3 flex items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-3xl min-h-[300px] lg:min-h-[700px]" :class="{ 'hidden': isMobile && mobileView === 'list' }">
           <p class="text-slate-400">请在左侧选择一条待审核内容</p>
         </div>
       </div>
@@ -640,30 +727,30 @@
       </div>
 
       <!-- Users Tab -->
-      <div v-else-if="activeTab === 'users'" class="grid grid-cols-1 lg:grid-cols-4 gap-8">
-        <div class="lg:col-span-1 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col h-[700px]">
+      <div v-else-if="activeTab === 'users'" class="grid grid-cols-1 lg:grid-cols-4 gap-4 lg:gap-8">
+        <div class="lg:col-span-1 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col" :class="{ 'hidden lg:flex': isMobile && mobileView === 'detail' }" style="height: auto; min-height: 400px; max-height: 700px;">
           <div class="p-4 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
             <h2 class="font-bold text-lg">用户列表</h2>
           </div>
           <div class="p-4 border-b border-slate-100 dark:border-slate-700 space-y-3">
-            <input v-model="userQuery.q" @keyup.enter="fetchUsers" type="text" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-emerald-500 text-sm" placeholder="搜索（用户名/邮箱/STCN ID）" />
-            <select v-model="userQuery.role" @change="userQuery.page = 1; fetchUsers()" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-emerald-500 text-sm">
+            <input v-model="userQuery.q" @keyup.enter="fetchUsers" type="text" class="w-full px-3 py-3 lg:py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-emerald-500 text-base lg:text-sm" placeholder="搜索（用户名/邮箱/STCN ID）" />
+            <select v-model="userQuery.role" @change="userQuery.page = 1; fetchUsers()" class="w-full px-3 py-3 lg:py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-emerald-500 text-base lg:text-sm">
               <option value="">全部角色</option>
               <option value="user">普通用户</option>
               <option value="dev">开发者</option>
               <option value="ops">运维</option>
             </select>
-            <button @click="userQuery.page = 1; fetchUsers()" class="w-full px-3 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold transition-colors">刷新</button>
+            <button @click="userQuery.page = 1; fetchUsers()" class="w-full px-3 py-3 lg:py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-base lg:text-sm font-bold transition-colors">刷新</button>
           </div>
           <div class="flex-1 overflow-y-auto p-4 space-y-2">
             <div
               v-for="u in usersPage.items"
               :key="u.id"
-              @click="selectUser(u)"
+              @click="selectUser(u); if (isMobile) openDetail()"
               class="p-3 rounded-xl border cursor-pointer transition-all duration-200 flex items-center gap-3"
               :class="selectedUserId === u.id ? 'bg-emerald-500 text-white border-emerald-500 shadow-md shadow-emerald-500/20' : 'bg-slate-50 dark:bg-slate-900/50 border-transparent hover:border-emerald-300'"
             >
-              <div class="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-xs font-bold overflow-hidden">
+              <div class="w-10 h-10 lg:w-8 lg:h-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-xs font-bold overflow-hidden">
                 <img v-if="u.avatar_url" :src="u.avatar_url" class="w-full h-full object-cover" />
                 <span v-else :class="selectedUserId === u.id ? 'text-white' : 'text-slate-500'">{{ (u.name || '?').charAt(0) }}</span>
               </div>
@@ -681,11 +768,11 @@
           </div>
         </div>
 
-        <div class="lg:col-span-3 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col h-[700px] overflow-y-auto" v-if="userDraft">
-          <div class="p-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50">
-            <h2 class="text-xl font-bold text-slate-800 dark:text-white">用户详情</h2>
+        <div class="lg:col-span-3 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col" :class="{ 'hidden': isMobile && mobileView === 'list' }" v-if="userDraft">
+          <div class="p-4 lg:p-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50">
+            <h2 class="text-lg lg:text-xl font-bold text-slate-800 dark:text-white">用户详情</h2>
           </div>
-          <div class="p-8 space-y-6">
+          <div class="flex-1 overflow-y-auto p-4 lg:p-8 space-y-4 lg:space-y-6" style="max-height: 600px;">
             <div class="flex items-center gap-4">
               <div class="w-16 h-16 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
                 <img v-if="userDraft.avatar_url" :src="userDraft.avatar_url" class="w-full h-full object-cover" />
@@ -697,7 +784,7 @@
               </div>
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
               <div class="p-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
                 <div class="text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">用户 ID</div>
                 <div class="text-sm text-slate-900 dark:text-white font-mono">{{ userDraft.id }}</div>
@@ -724,10 +811,10 @@
               </div>
             </div>
 
-            <div class="p-6 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 space-y-4">
+            <div class="p-4 lg:p-6 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 space-y-4">
               <div class="text-sm font-extrabold text-slate-800 dark:text-slate-200">权限管理</div>
               
-              <div class="flex items-center justify-between">
+              <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                 <div>
                   <div class="text-sm font-bold text-slate-700 dark:text-slate-300">当前角色</div>
                   <div class="text-xs text-slate-500 dark:text-slate-400">决定用户可以访问的功能</div>
@@ -735,21 +822,21 @@
                 <div class="flex gap-2">
                   <button 
                     @click="updateUserRole('user')"
-                    class="px-4 py-2 rounded-xl font-bold transition-colors"
+                    class="flex-1 lg:flex-none px-4 py-3 lg:py-2 rounded-xl font-bold transition-colors"
                     :class="userDraft.role === 'user' ? 'bg-emerald-500 text-white' : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'"
                   >
                     普通用户
                   </button>
                   <button 
                     @click="updateUserRole('dev')"
-                    class="px-4 py-2 rounded-xl font-bold transition-colors"
+                    class="flex-1 lg:flex-none px-4 py-3 lg:py-2 rounded-xl font-bold transition-colors"
                     :class="userDraft.role === 'dev' ? 'bg-blue-500 text-white' : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'"
                   >
                     开发者
                   </button>
                   <button 
                     @click="updateUserRole('ops')"
-                    class="px-4 py-2 rounded-xl font-bold transition-colors"
+                    class="flex-1 lg:flex-none px-4 py-3 lg:py-2 rounded-xl font-bold transition-colors"
                     :class="userDraft.role === 'ops' ? 'bg-purple-500 text-white' : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'"
                   >
                     运维
@@ -759,14 +846,14 @@
 
               <div class="h-px bg-slate-200 dark:bg-slate-700"></div>
 
-              <div class="flex items-center justify-between">
+              <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                 <div>
                   <div class="text-sm font-bold text-slate-700 dark:text-slate-300">账号状态</div>
                   <div class="text-xs text-slate-500 dark:text-slate-400">禁用后用户将无法登录</div>
                 </div>
                 <button 
                   @click="updateUserActive(!userDraft.is_active)"
-                  class="px-4 py-2 rounded-xl font-bold transition-colors"
+                  class="px-4 py-3 lg:py-2 rounded-xl font-bold transition-colors"
                   :class="userDraft.is_active ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300' : 'bg-rose-100 dark:bg-rose-500/20 text-rose-700 dark:text-rose-300'"
                 >
                   {{ userDraft.is_active ? '已启用' : '已禁用' }}
@@ -775,8 +862,24 @@
             </div>
           </div>
         </div>
-        <div v-else class="col-span-3 flex items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-3xl h-[700px]">
+        <div v-else class="lg:col-span-3 flex items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-3xl min-h-[300px] lg:min-h-[700px]" :class="{ 'hidden': isMobile && mobileView === 'list' }">
           <p class="text-slate-400">请在左侧选择一个用户进行管理</p>
+        </div>
+      </div>
+
+      <!-- Mobile Bottom Tab Bar -->
+      <div v-if="isMobile" class="fixed bottom-0 left-0 right-0 z-50 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-t border-slate-200 dark:border-slate-700 safe-area-pb">
+        <div class="flex items-center justify-around h-16">
+          <button 
+            v-for="tab in bottomTabs" 
+            :key="tab.key" 
+            @click="activeTab = tab.key" 
+            class="flex flex-col items-center gap-0.5 px-3 py-1 min-w-[60px]"
+            :class="activeTab === tab.key ? 'text-emerald-500' : 'text-slate-400'"
+          >
+            <component :is="tab.icon" class="w-5 h-5" />
+            <span class="text-[10px] font-medium">{{ tab.label }}</span>
+          </button>
         </div>
       </div>
 
@@ -857,15 +960,55 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
-import { Save, Plus, Bold, Italic, Heading, Quote, List, Image as ImageIcon } from 'lucide-vue-next';
+import { Save, Plus, Bold, Italic, Heading, Quote, List, Image as ImageIcon, FileText, Package, ClipboardCheck, Shield, MessageSquare, Users, ArrowLeft } from 'lucide-vue-next';
 import MarkdownIt from 'markdown-it';
 import DOMPurify from 'dompurify';
 import CommentPanel from '../components/CommentPanel.vue';
 
 const router = useRouter();
 const md = new MarkdownIt({ html: true, breaks: true });
+
+// Mobile responsive detection
+const isMobile = ref(false);
+const updateIsMobile = () => { 
+  if (typeof window !== 'undefined') {
+    isMobile.value = window.innerWidth < 1024; 
+  }
+};
+onMounted(() => {
+  updateIsMobile();
+  window.addEventListener('resize', updateIsMobile);
+});
+onUnmounted(() => {
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('resize', updateIsMobile);
+  }
+});
+
+// Mobile view state for list/detail navigation
+const mobileView = ref<'list' | 'detail'>('list');
+const openDetail = () => { mobileView.value = 'detail'; };
+const backToList = () => {
+  mobileView.value = 'list';
+  // Clear selections when going back
+  if (activeTab.value === 'stories') selectedIndex.value = null;
+  if (activeTab.value === 'projects') { selectedProjectId.value = null; projectDraft.value = null; projectMobileStep.value = 1; }
+  if (activeTab.value === 'submissions') { selectedSubmissionId.value = null; submissionDraft.value = null; }
+  if (activeTab.value === 'moderation') { selectedModerationId.value = null; moderationDraft.value = null; }
+  if (activeTab.value === 'users') { selectedUserId.value = null; userDraft.value = null; }
+};
+
+// Bottom tabs configuration
+const bottomTabs = [
+  { key: 'stories' as const, label: '文章', icon: FileText },
+  { key: 'projects' as const, label: '项目', icon: Package },
+  { key: 'submissions' as const, label: '审核', icon: ClipboardCheck },
+  { key: 'moderation' as const, label: '内容', icon: Shield },
+  { key: 'feedback' as const, label: '反馈', icon: MessageSquare },
+  { key: 'users' as const, label: '用户', icon: Users },
+];
 
 const isAuthenticated = ref(false);
 const apiTokenInput = ref('');
@@ -919,6 +1062,11 @@ const isSaving = ref(false);
 
 const activeTab = ref<'stories' | 'projects' | 'submissions' | 'moderation' | 'feedback' | 'users'>('stories');
 
+// Watch activeTab changes to reset mobile view
+watch(activeTab, () => {
+  mobileView.value = 'list';
+});
+
 const adminCategories = ref<any[]>([]);
 const projectsPage = ref<{ items: any[]; page: number; pageSize: number; total: number }>({
   items: [],
@@ -934,6 +1082,7 @@ const projectQuery = ref<{ q: string; category: string; page: number; pageSize: 
 });
 const selectedProjectId = ref<string | null>(null);
 const projectDraft = ref<any | null>(null);
+const projectMobileStep = ref(1);
 
 const importJsonInput = ref<HTMLInputElement | null>(null);
 const importCsvInput = ref<HTMLInputElement | null>(null);

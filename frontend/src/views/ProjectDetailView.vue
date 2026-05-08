@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, watch, onBeforeUnmount } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { useHead } from '@vueuse/head';
+import { useHead } from '@unhead/vue';
 import MarkdownIt from 'markdown-it';
 import DOMPurify from 'dompurify';
 import ProjectLineageGraph from '../components/ProjectLineageGraph.vue';
@@ -313,13 +313,55 @@ const fetchAndSetProject = async () => {
   project.value = await fetchProjectByName(projectName);
   
   if (project.value) {
+    const projectUrl = `https://aiwb.stcn.moe/project/${encodeURIComponent(project.value.name)}`;
+    const imageUrl = project.value.banner || project.value.icon || project.value.avatar || 'https://aiwb.stcn.moe/assets/brand/aiwb-icon.webp';
     useHead({
       title: `${project.value.name} - Awesome IWB`,
       meta: [
         { name: 'description', content: project.value.description },
         { property: 'og:title', content: `${project.value.name} - Awesome IWB` },
         { property: 'og:description', content: project.value.description },
-        { property: 'og:image', content: project.value.banner || project.value.icon || project.value.avatar }
+        { property: 'og:image', content: imageUrl },
+        { property: 'og:url', content: projectUrl },
+        { property: 'og:type', content: 'article' },
+        { property: 'og:locale', content: 'zh_CN' },
+        { name: 'twitter:card', content: 'summary_large_image' },
+        { name: 'twitter:title', content: `${project.value.name} - Awesome IWB` },
+        { name: 'twitter:description', content: project.value.description },
+      ],
+      link: [
+        { rel: 'canonical', href: projectUrl }
+      ],
+      script: [
+        {
+          type: 'application/ld+json',
+          children: JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'SoftwareApplication',
+            name: project.value.name,
+            description: project.value.description,
+            applicationCategory: 'EducationalApplication',
+            operatingSystem: 'Windows',
+            author: {
+              '@type': 'Person',
+              name: project.value.developer
+            },
+            ...(project.value.language ? { programmingLanguage: project.value.language } : {}),
+            ...(project.value.stars ? {
+              aggregateRating: {
+                '@type': 'AggregateRating',
+                ratingValue: Math.min(5, 3 + Math.log10(Math.max(1, project.value.stars)) * 0.8).toFixed(1),
+                ratingCount: String(project.value.stars)
+              }
+            } : {}),
+            offers: {
+              '@type': 'Offer',
+              price: '0',
+              priceCurrency: 'CNY'
+            },
+            url: projectUrl
+          })
+        }
       ]
     });
   }

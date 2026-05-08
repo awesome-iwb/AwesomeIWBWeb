@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
+import { useHead } from '@unhead/vue';
 import { 
   Image as ImageIcon, 
   Github, 
@@ -8,6 +9,22 @@ import {
   CheckCircle2,
   ExternalLink
 } from 'lucide-vue-next';
+
+useHead({
+  title: '提交新项目 - Awesome IWB',
+  meta: [
+    { name: 'description', content: '向 Awesome IWB 提交新的交互式白板开源项目，帮助更多教师发现优质软件工具。' },
+    { property: 'og:title', content: '提交新项目 - Awesome IWB' },
+    { property: 'og:description', content: '向 Awesome IWB 提交新的交互式白板开源项目。' },
+    { property: 'og:type', content: 'website' },
+    { property: 'og:url', content: 'https://aiwb.stcn.moe/submit' },
+    { property: 'og:image', content: 'https://aiwb.stcn.moe/assets/brand/aiwb-icon.webp' },
+    { name: 'twitter:card', content: 'summary' },
+  ],
+  link: [
+    { rel: 'canonical', href: 'https://aiwb.stcn.moe/submit' }
+  ]
+})
 
 // Form State
 const form = ref({

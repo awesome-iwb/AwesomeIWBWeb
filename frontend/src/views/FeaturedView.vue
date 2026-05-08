@@ -1,8 +1,25 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
+import { useHead } from '@unhead/vue';
 import { Star, X, Download } from 'lucide-vue-next';
 import DOMPurify from 'dompurify';
+
+useHead({
+  title: '精选推荐 - Awesome IWB',
+  meta: [
+    { name: 'description', content: 'Awesome IWB 精选推荐，发现最优质的交互式白板开源软件和专题故事。' },
+    { property: 'og:title', content: '精选推荐 - Awesome IWB' },
+    { property: 'og:description', content: '发现最优质的交互式白板开源软件和专题故事。' },
+    { property: 'og:type', content: 'website' },
+    { property: 'og:url', content: 'https://aiwb.stcn.moe/today' },
+    { property: 'og:image', content: 'https://aiwb.stcn.moe/assets/brand/aiwb-icon.webp' },
+    { name: 'twitter:card', content: 'summary' },
+  ],
+  link: [
+    { rel: 'canonical', href: 'https://aiwb.stcn.moe/today' }
+  ]
+})
 
 interface FeaturedProject {
   name: string;

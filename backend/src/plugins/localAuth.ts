@@ -1,6 +1,7 @@
 import { Elysia, t } from "elysia";
 import { signJwt } from "../utils/jwt";
 import {
+  assertOpsRoleForLocalLogin,
   dummyVerifyPassword,
   ensureSuperadminInitialized,
   findLocalAccountByUsername,
@@ -14,7 +15,7 @@ import { logAudit } from "../services/audit";
 import { setSessionCookie } from "../utils/cookies";
 
 const dbEnabled = Boolean(process.env.DATABASE_URL);
-const SUPERADMIN_INITIAL_USERNAME = process.env.SUPERADMIN_INITIAL_USERNAME ?? "admin";
+const SUPERADMIN_INITIAL_USERNAME = (process.env.SUPERADMIN_INITIAL_USERNAME ?? "lincube").trim();
 
 // Simple in-memory rate limiter per IP
 const ipAttempts = new Map<string, { count: number; resetAt: number }>();
@@ -140,6 +141,19 @@ export const localAuthPlugin = new Elysia({ prefix: "/api/auth" })
         set.headers["retry-after"] = "1800";
         await logAttempt({ ip: clientIp, ua, username, status: "locked", reason: "account_locked" });
         return { error: { code: "RATE_LIMITED", message: "登录失败" } };
+      }
+
+      // Gate: only users whose role is 'ops' (in users table) may use password
+      // login. The seed superadmin (default "lincube") is grandfathered in via
+      // assertOpsRoleForLocalLogin, which auto-seeds the users row if missing.
+      try {
+        await assertOpsRoleForLocalLogin(username);
+      } catch {
+        countSuperadminFailure();
+        await dummyVerifyPassword(password);
+        await logAttempt({ ip: clientIp, ua, username, status: "failed", reason: "not_ops_role" });
+        set.status = 403;
+        return { error: { code: "LOCAL_LOGIN_NOT_ALLOWED", message: "登录失败" } };
       }
 
       const isValid = await verifyLocalPassword(account, password);

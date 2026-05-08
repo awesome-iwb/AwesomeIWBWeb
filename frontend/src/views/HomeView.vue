@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
+import { useHead } from '@unhead/vue';
 import { Search, MessageCircle, Sparkles, Zap, Plus, Star, Tag, Code2, Award, Flame, Scale, ShieldCheck } from 'lucide-vue-next';
 import HeroCarousel from '../components/HeroCarousel.vue';
 import { useProjects } from '../composables/useProjects';
@@ -10,6 +11,52 @@ import { includesNormalized } from '../utils/search';
 
 const router = useRouter();
 const { categories, loading, fetchProjects, allProjects } = useProjects();
+
+useHead({
+  title: 'Awesome IWB - 交互式白板软件合集',
+  meta: [
+    { name: 'description', content: 'Awesome IWB 是交互式白板软件的精选合集，收录了希沃白板工具、课堂管理软件、课表看板、随机点名等优质开源项目，助力教师高效教学。' },
+    { property: 'og:title', content: 'Awesome IWB - 交互式白板软件合集' },
+    { property: 'og:description', content: '精选交互式白板开源软件合集，涵盖课堂工具、白板软件、课表看板等分类。' },
+    { property: 'og:type', content: 'website' },
+    { property: 'og:url', content: 'https://aiwb.stcn.moe' },
+    { property: 'og:image', content: 'https://aiwb.stcn.moe/assets/brand/aiwb-icon.webp' },
+    { property: 'og:locale', content: 'zh_CN' },
+    { name: 'twitter:card', content: 'summary_large_image' },
+    { name: 'twitter:title', content: 'Awesome IWB - 交互式白板软件合集' },
+    { name: 'twitter:description', content: '精选交互式白板开源软件合集' },
+  ],
+  link: [
+    { rel: 'canonical', href: 'https://aiwb.stcn.moe' }
+  ],
+  script: [
+    {
+      type: 'application/ld+json',
+      children: JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'WebSite',
+        name: 'Awesome IWB',
+        url: 'https://aiwb.stcn.moe',
+        description: '交互式白板软件精选合集',
+        potentialAction: {
+          '@type': 'SearchAction',
+          target: 'https://aiwb.stcn.moe/?q={search_term_string}',
+          'query-input': 'required name=search_term_string'
+        }
+      })
+    },
+    {
+      type: 'application/ld+json',
+      children: JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'Organization',
+        name: 'Awesome IWB',
+        url: 'https://aiwb.stcn.moe',
+        logo: 'https://aiwb.stcn.moe/assets/brand/aiwb-icon.webp'
+      })
+    }
+  ]
+})
 
 const getOrg = (project: any) => project?.organization || project?.extra?.feishu?.organization || '';
 

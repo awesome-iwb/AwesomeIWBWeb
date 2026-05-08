@@ -234,7 +234,10 @@ export const casdoorAuthPlugin = new Elysia({ prefix: "/api/auth" })
 
     const account = casdoorUser.data ?? casdoorUser;
     const casdoorId = String(account?.id ?? account?.sub ?? "");
-    const name = String(account?.displayName ?? account?.name ?? account?.username ?? "User");
+    // STCN username = Casdoor's `name` field (unique account name)
+    // Display name = Casdoor's `displayName` field (shown in UI)
+    const stcnUsername = String(account?.name ?? account?.username ?? "");
+    const displayName = String(account?.displayName ?? stcnUsername ?? "User");
     const avatar = String(account?.avatar ?? "");
     const email = String(account?.email ?? "");
 
@@ -246,17 +249,21 @@ export const casdoorAuthPlugin = new Elysia({ prefix: "/api/auth" })
     let user = await findUserByCasdoorId(casdoorId);
     if (user) {
       user = await updateUserLogin(user.id, {
-        name,
+        name: displayName,
         avatar_url: avatar,
+        avatar_source: avatar ? "casdoor" : "default",
         email,
+        stcn_username: stcnUsername,
       });
     } else {
       user = await createUser({
         casdoor_id: casdoorId,
-        name,
+        name: displayName,
         avatar_url: avatar,
+        avatar_source: avatar ? "casdoor" : "default",
         email,
         role: "user",
+        stcn_username: stcnUsername,
       });
     }
 
@@ -318,7 +325,9 @@ export const casdoorAuthPlugin = new Elysia({ prefix: "/api/auth" })
         name: user.name,
         role: user.role,
         avatar_url: user.avatar_url,
+        avatar_source: user.avatar_source,
         email: user.email,
+        stcn_username: user.stcn_username,
         stcn_user_id: user.stcn_user_id,
         sectl_user_id: user.sectl_user_id,
         lincube_user_id: user.lincube_user_id,

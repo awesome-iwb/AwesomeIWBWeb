@@ -55,7 +55,7 @@ import {
 import { authPlugin, requireAuth, requireRole } from "./plugins/auth";
 import { casdoorAuthPlugin } from "./plugins/casdoorAuth";
 import { localAuthPlugin } from "./plugins/localAuth";
-import { listUsers, setUserRole, setUserActive } from "./services/users";
+import { listUsers, setUserRole, setUserActive, updateUserLogin } from "./services/users";
 import { ensureSuperadminInitialized } from "./services/localAccounts";
 import { appConfig } from "./config";
 import { checkRateLimit } from "./plugins/rateLimit";
@@ -96,6 +96,8 @@ if (appConfig.isProduction && !dbEnabled) {
   throw new Error("DATABASE_URL is required in production");
 }
 if (dbEnabled) await migrate();
+// Seed bootstrap superadmin (default username from SUPERADMIN_INITIAL_USERNAME env, "lincube").
+// Other ops users are created via the admin UI or scripts/set-user-role.ts.
 if (dbEnabled) await ensureSuperadminInitialized();
 
 /**
@@ -383,7 +385,7 @@ const app = new Elysia()
           actor_username,
           actor_role,
         });
-        return { success: true, moderationId: created?.id, status: "pending", message: "评论已提交，等待审核" };
+        return { success: true, moderationId: created?.id, status: "pending", message: "璇勮宸叉彁浜わ紝绛夊緟瀹℃牳" };
       }
       const created = await createBugModeration({
         project_name,
@@ -393,7 +395,7 @@ const app = new Elysia()
         actor_username,
         actor_role,
       });
-      return { success: true, moderationId: created?.id, status: "pending", message: "Bug反馈已提交，等待审核" };
+      return { success: true, moderationId: created?.id, status: "pending", message: "Bug鍙嶉宸叉彁浜わ紝绛夊緟瀹℃牳" };
     }
 
     const now = new Date().toISOString();
@@ -560,7 +562,7 @@ const app = new Elysia()
       const removed = (data as any).categories.splice(idx, 1)[0];
       let uncat = (data as any).categories.find((c: any) => String(c.id) === "uncat");
       if (!uncat) {
-        uncat = { id: "uncat", name: "📦 未分类", description: "", projects: [] };
+        uncat = { id: "uncat", name: "Uncategorized", description: "", projects: [] };
         (data as any).categories.unshift(uncat);
       }
       if (Array.isArray(removed?.projects) && removed.projects.length) {
@@ -1262,7 +1264,7 @@ const app = new Elysia()
         await createProjectRevision(before.id);
         const next = await updateProject(before.id, {
           description: typeof patch.description === "string" ? patch.description : undefined,
-          keywords: Array.isArray(patch.keywords) ? patch.keywords : typeof patch.keywords === "string" ? patch.keywords.split(/[,，;]/).map((x: any) => String(x).trim()).filter(Boolean) : undefined
+          keywords: Array.isArray(patch.keywords) ? patch.keywords : typeof patch.keywords === "string" ? patch.keywords.split(/[,锛?]/).map((x: any) => String(x).trim()).filter(Boolean) : undefined
         } as any);
         if (!next) {
           set.status = 500;
@@ -1485,6 +1487,51 @@ const app = new Elysia()
       image: t.File()
     })
   })
+  .post("/api/user/avatar", async ({ body: { image }, set, user, headers }) => {
+    if (checkRateLimit({ headers, path: "/api/user/avatar", set })) return { error: "Too Many Requests" };
+    if (checkAuth(user, set)) return { error: "Unauthorized" };
+    if (!image) throw new Error("No image provided");
+    if (image.size > appConfig.uploadMaxBytes) {
+      set.status = 400;
+      return { error: "File too large" };
+    }
+    const mime = String(image.type || "");
+    if (!["image/png", "image/jpeg", "image/webp"].includes(mime)) {
+      set.status = 400;
+      return { error: "Unsupported image type" };
+    }
+    const ext = extFromMime(mime);
+    if (!ext) {
+      set.status = 400;
+      return { error: "Unsupported image type" };
+    }
+    const buffer = Buffer.from(await image.arrayBuffer());
+    const isPng = buffer.length > 8 && buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47;
+    const isJpeg = buffer.length > 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
+    const isWebp = buffer.length > 12 && buffer.toString("ascii", 0, 4) === "RIFF" && buffer.toString("ascii", 8, 12) === "WEBP";
+    if (!(isPng || isJpeg || isWebp)) {
+      set.status = 400;
+      return { error: "Invalid file signature" };
+    }
+    const filename = `${crypto.createHash("sha256").update(buffer).digest("hex")}.${ext}`;
+    const uploadPath = path.join(UPLOADS_DIR, filename);
+    await Bun.write(uploadPath, buffer);
+    const avatarUrl = `/api/uploads/${filename}`;
+
+    // Update user's avatar in database
+    if (user?.id && !String(user.id).startsWith("local:")) {
+      await updateUserLogin(user.id, {
+        avatar_url: avatarUrl,
+        avatar_source: "upload",
+      });
+    }
+
+    return { url: avatarUrl };
+  }, {
+    body: t.Object({
+      image: t.File()
+    })
+  })
   .get("/api/admin/users", async ({ query, set, user }) => {
     if (checkOps(user, set)) return { error: "Forbidden" };
     const q = typeof query.q === "string" ? query.q : undefined;
@@ -1655,7 +1702,7 @@ const app = new Elysia()
     await markAllNotificationsRead(user.name);
     return { success: true };
   })
-  .listen(8080);
+  .listen(Number(process.env.PORT ?? 8081));
 
 /**
  * Normalize a CSV row into the internal project payload shape.
@@ -1663,20 +1710,12 @@ const app = new Elysia()
  * The CSV import supports bilingual / alias column headers and maps them into canonical keys.
  * The return value is a partial project input that is further sanitized by {@link normalizeProjectInput}.
  */
-function normalizeCsvRow(row: Record<string, string>) {
-  const aliases: Record<string, string> = {
-    项目名: "name",
-    名称: "name",
+function normalizeCsvRow(row: Record<string, string>) {  const aliases: Record<string, string> = {
+    name: "name",
     github: "github_url",
     repo: "github_url",
     desc: "description",
-    标签: "keywords",
-    推荐: "recommendation",
-    分类: "category_name",
-    分类名: "category_name",
-    分类ID: "category_id",
     slug: "slug",
-    name: "name",
     developer: "developer",
     github_url: "github_url",
     stars: "stars",
@@ -1703,5 +1742,5 @@ function normalizeCsvRow(row: Record<string, string>) {
 }
 
 console.log(
-  `🦊 Elysia is running at ${app.server?.hostname}:${app.server?.port}`
+  `馃 Elysia is running at ${app.server?.hostname}:${app.server?.port}`
 );

@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /admin-login
+Disallow: /me
+Disallow: /dev
+Disallow: /api/
+
+Sitemap: https://aiwb.stcn.moe/sitemap.xml

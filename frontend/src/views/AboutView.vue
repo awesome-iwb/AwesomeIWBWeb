@@ -1,8 +1,25 @@
 <script setup lang="ts">
+import { useHead } from '@unhead/vue';
 import { contributors } from '../content/contributors.generated';
 import { operations as operationsTeam } from '../content/ops.generated';
 import { thanks as thanksTeam } from '../content/thanks.generated';
 import { friendLinks } from '../content/friendLinks';
+
+useHead({
+  title: '关于我们 - Awesome IWB',
+  meta: [
+    { name: 'description', content: '了解 Awesome IWB 团队、贡献者、运营组和友情链接。我们致力于收录和推广交互式白板开源软件。' },
+    { property: 'og:title', content: '关于我们 - Awesome IWB' },
+    { property: 'og:description', content: '了解 Awesome IWB 团队、贡献者与友情链接。' },
+    { property: 'og:type', content: 'website' },
+    { property: 'og:url', content: 'https://aiwb.stcn.moe/about' },
+    { property: 'og:image', content: 'https://aiwb.stcn.moe/assets/brand/aiwb-icon.webp' },
+    { name: 'twitter:card', content: 'summary' },
+  ],
+  link: [
+    { rel: 'canonical', href: 'https://aiwb.stcn.moe/about' }
+  ]
+})
 
 type Member = {
   key: string;

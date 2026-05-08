@@ -1,0 +1,106 @@
+# Awesome IWB
+
+> Awesome IWB（交互式白板软件合集）是一个收录交互式白板相关开源软件的社区项目，涵盖课堂管理、白板工具、课表看板、随机点名等分类。
+
+## 核心页面
+- / 首页，所有项目分类浏览与搜索
+- /project/{name} 项目详情页，包含功能介绍、下载链接、GitHub统计
+- /today 精选推荐与专题故事
+- /about 关于我们、贡献者与友情链接
+- /compare 项目横向对比
+- /submit 提交新项目
+
+## 收录项目
+
+### ✏️ 屏幕批注与白板软件
+- Ink Canvas - Ink Canvas 画板是一款轻量级画板软件，基于 WPF/C#，其针对希沃一体机进行了特别优化，与预装的"希沃白板 5"软件相比，启动速度大幅度提升（提升 5-10 倍），系统资源占用更小，使用体验更佳
+- Ink Canvas Plus - Ink Canvas Plus 是一款由 Clover Yan 维护、复刻自 WXRIW/Ink Canvas 的 Windows 画板应用，旨在优化各方面的使用体验，并尽可能保留原版 Ink Canvas 的操作体验
+- Ink Canvas Artistry - Ink Canvas 的优化版本，添加了更多功能（比如自动收纳、自动查杀、荧光笔、图片插入等功能），并优化了使用体验，使其更适合课堂授课使用
+- 智绘教Inkeys - 将你的创意随心所欲地书写在屏幕的任意角落
+- ICC-CE - InkCanvasForClass 的社区版本，支持 Windows 平台（最低支持Windows 7 SP1）
+- InkCanvasForClass - InkCanvasForClass的readme仓库
+- ICC-Re - InkCanvasForClass-Remastered是由开发者 LiuYan-xwx 发起的一个开源教学辅助工具
+- ppInk - ppInk is a user-friendly on-screen annotation software for Windows, compatible with Mouse use, touchscreen or drawing tablet(also with pressure)
+- Ink Canvas Better - Ink Canvas Better 是一款基于 InkCanvas/Ink-Canvas-Artistry 开发的 Windows 画板应用，使用 WPF/C# 构建
+- ShowWrite视频展台 - ShowWrite 是一款为视频展台、直播教学等场景设计的软件，支持视频展台功能、屏幕批注、画面录制等功能
+- LanStartWrite - LanStartWrite 是一款基于 Electron 的书写应用，集成了高性能书写画布、智能图形识别与强大的 .lanmod 插件系统
+
+### 📊 课表与看板类软件
+- ClassIsland - ClassIsland 是一款适用于班级多媒体屏幕的课表信息显示工具，可以在 Windows 屏幕上显示各种信息
+- ZongziTEK 黑板贴 - 用于白板一体机的桌面小部件，享受抬手即用的小黑板、高效的信息展示、便捷的课程管理和多项实用功能
+- StickyHomeworks2 - StickyHomeworks2 是一款支持富文本的桌面作业贴工具
+- 考试看板 - DSZ 考试看板
+- ExtraIsland - ExtraIsland 是一个 ClassIsland 插件，为 ClassIsland 提供了一些小小的扩充功能，比如流畅时钟，更好的倒计时等
+- Class Widgets - Class Widgets 是一款能够显示实时教学进度的桌面组件应用
+- 凌云班级组件 - 凌云班级组件 LingYun Class Widgets 是一个功能丰富的桌面工具，专为班级管理和教学设计
+- Education Clock - Education Clock 是一个实用的班级信息看板
+- ClassBoardSharp - ClassBoard 是一款高自由度的，用于显示教学信息的壁纸软件
+- Class Hot Search 班级热搜排行 - 班级热搜排行榜是一款适用于班级多媒体大屏等场景，展示不同事件热度并支持投票的互动小工具
+- Ris_ClassTool 瑞思课堂工具 - 让每堂课都充满活力，让每个学生都能享受到科技带来的教育革新
+- TimerIn - TimerIn 是由思锐工作室开发的一款桌面时钟小工具软件
+- ExamSchedule - 考试看板网页版
+- Classworks - HomeworkBoard 的继任者，一个全新的作业板
+- CountBoard - CountBoard 是一个基于 Tkinter 开源的桌面日程倒计时应用
+- ElectronClassSchedule - ElectronClassSchedule 具有显示当天课表，当前星期，天数倒计时，下课/上课倒计时等功能
+- ClassTools - 这是一个用在班级电脑上面的教室系统，以动态壁纸方式呈现高考倒计时、作业、课程表、值日生等看板
+- StickyHomeworks - StickyHomeworks 是一款支持富文本的桌面作业贴工具
+- Sticky-attention - StickyAttention 是一款适用于 Windows 系统教室一体机的作业显示工具
+- HomeworkBoard - 作业板，可以在班级内记录并排版清晰地展示作业、快捷记录出勤情况
+- ClassPaper - ClassPaper v4 是一款现代化桌面课程表/壁纸/告示牌应用，基于Rust + alcro构建
+- 考试语音播报系统 - 考试语音播报系统是一个支持通过语音方式播报的考试看板类软件
+- iClass - 一个使用 Electron 和 Vue 3 构建的教室大屏实用工具箱
+- ExamClock - 一款被招安的考试时钟，可以在大屏上展示科目信息、起止时间、考试进度
+- FinitoBoard - 一个教室大屏作业看板
+- ElectronClassScheduleX - 一款基于ECS v1进行魔改的电子课表软件
+- 每日作业面板 - 一个简洁实用的作业管理工具，提供作业展示、布置和管理功能
+- LanMountainDesktop - LanMountainDesktop 是一个基于 Avalonia 的桌面壳层项目，把桌面变成可编排的信息与交互空间
+
+### 🛠️ 辅助类软件与实用工具
+- PPT 触屏辅助(PowerPoint Touch Assist) - PPT 触屏辅助此程序让你能在 Windows 10/11 中更高效地以"单击"翻页
+- （希沃）定制启动器 - 定制启动器，旨在让大多数软件的启动方式更加绚丽多彩
+- 全能班辅 - 显示今天的值日生，小工具，随机点名功能，展示自定义课表
+- OpenLuckyRandom - 启发于某沃一体机中的 LuckyRandom 人脸识别随机抽人，使用 WinForms 开发的玩具
+- MythwareToolkit - 极域工具包，支持多种控制极域以及学生机房管理助手的工具
+- ENAL 希沃易登 - 希沃白板的自动登录插件，通过替代 EasiAgent 来实现多账号自动免密登录
+- EasiAuto - EasiAuto 是一个轻量级 CLI 工具，用 Python 编写，专门用于一键自动登录希沃白板
+- ex-caller - 简约风格的随机点名工具，使用 Vue 开发
+- ClassNamePicker - ClassNamePicker 是一款功能强大的课堂随机点名工具
+- SectionIstool - 该软件会使您在学校班级电脑中方便、快捷的下载适合班级下载各类软件
+- CountDownControl - 这是一个支持高度自定义的倒计时小工具
+- LockTime - 一个具有深/浅色主题，云母/亚克力背景，Fluent UI 2 界面的时钟锁屏（屏保）
+- UsefulControl - 这是一个为大屏类电脑（如希沃）编写的实用工具，可以理解为一堆工具的整合包
+- Rand 抽号器 - Rand 是一款简洁、现代化、易用的抽号软件，专为触摸屏设备和Windows 7及以上版本操作系统设计
+- NamePicker - NamePicker 是用 Python 开发的一款简洁的点名软件
+- IslandCaller - IslandCaller 是一个基于 ClassIsland 提醒服务的轻量级点名器
+- SecRandom - SecRandom 是一个便捷且现代化的随机抽取工具，支持多种抽取方式
+- RandPicker - RandPicker 是一款简单易用的随机抽取工具，支持多种抽取方式
+- SmartBoardTools - SmartBoardTools是一个看板软件
+- SeewoSplash - SeewoSplash 是一个 Fluent 风格的图形化工具，允许你自定义希沃白板以及 WPS Office 的启动图
+- ClassWebsite - ClassWebsite是一个网页类项目，它可以用来为您的班级建立专属的班级网页
+- Class-Scoring-Program - Class-Scoring-Program是一个用于协助班委统计和分析班级同学量化积分的程序
+- 沉浸式时钟 - 沉浸式时钟是一个现代化的全屏时钟应用，支持时钟、倒计时、秒表与晚自习模式
+- 沉浸式噪音监测 - 沉浸式时钟衍生作品
+- 360拖堂卫士 - 360拖堂卫士是一款防拖堂软件，会在下课时间弹窗警告，必要时强制关闭PPT、希沃白板等教学软件
+- 教室座位安排系统 - 教室座位安排系统是一个基于PyQt5开发的图形化工具，旨在帮助教师和管理人员快速、灵活地安排教室座位
+- ClassAware - 一款基于Flutter的跨平台的电子班牌APP
+- CsesWebEditor - 一个基于Web的课程表编辑器，支持CSES格式的课程表创建、管理和导出
+- CSES规范 - CSES 是一种通用的课程表交换格式，用于在不同软件之间交换课程表
+- HugoAura - HugoAura 是一款专为希沃教育生态打造的深度注入式修改方案
+- VoiceHub - 这是一个使用Nuxt 3全栈框架开发的现代化校园广播站点歌管理系统
+- 学生任务分配系统 - 简单而优雅的课堂任务分配工具
+- Class-Roster-Picker-NEXT - 一个课堂点名工具
+- 蓝屏抽奖机 - 一个置顶在屏幕左侧中间方便老师在上课时点名的程序
+- 考试倒计时桌面小工具 - 一个简洁、实用的桌面倒计时小工具，帮助学生及家长精准掌握距离中考/高考的剩余时间
+- 国家中小学智慧教育平台电子课本下载工具 - 本工具可以帮助您从国家中小学智慧教育平台获取电子课本的 PDF 文件网址并进行下载
+- 希沃白板5激活工具 - 一款用于激活希沃白板5至专业版的工具
+- SeewoGadgets - 希沃一体机实用小工具与资源合集
+- Luminalium - 一款用于演示软件上的批注工具，支持屏幕画笔、荧光笔、橡皮擦、撤销/重做等功能
+- ClassWindow - ClassWindow是一个美丽，精巧的用于班级的桌面悬浮窗，基于Electron构建，用于显示信息等
+- C30 智能教学自动登录工具 - 一个基于图像识别与自动化控制的C30教学软件自动登录工具
+- ClassScreenLock - ClassScreenLock是一款防止无计算机基础的学生会在下课/放学后对计算机进行操作而造成不必要的麻烦的软件
+- SidebarForClass - 一个为班级大屏设计的侧边栏应用，使用 Electron + React
+- DD-CLASS - 一个现代化的班级管理系统，使用 FastAPI 后端和 Vue3 前端构建
+- EasiNote Theme Patcher - 一个用于编辑与打包希沃白板主题资源的桌面工具
+- SeatingChartEditor2 - 一个跨平台、现代化的座位表可视化编辑器
+- 随机点名Plus 3 - 一个基于PyGame开发的课堂点名工具，支持多种点名模式和概率调整
+- 不想排座位 - 一个基于 Django 的教室排座系统，覆盖班级管理、名单导入、布局编辑、自动排座、约束规则、小组管理和多格式导出
