@@ -11,7 +11,7 @@
     "sync:contributors": "bun run scripts/sync-contributors.ts"
   },
   "dependencies": {
-    "@unhead/vue": "^3.0.5",
+    "@unhead/vue": "^2.1.15",
     "@vueuse/core": "^14.2.1",
     "@vueuse/head": "^2.0.0",
     "dompurify": "^3.4.1",
