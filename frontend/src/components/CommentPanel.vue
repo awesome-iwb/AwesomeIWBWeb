@@ -1,12 +1,18 @@
 <script setup lang="ts">
-import { computed, ref, watch, onMounted } from 'vue';
+import { computed, ref, watch, onMounted, onUnmounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { Bug, MessageSquare, Send, LogIn, X, CircleDot, CheckCircle2, Bold, Italic, Code, Link as LinkIcon, Image as ImageIcon } from 'lucide-vue-next';
+import {
+  Bug, MessageSquare, Send, LogIn, X, CircleDot, CheckCircle2,
+  Bold, Italic, Code, Link as LinkIcon, Image as ImageIcon,
+  Reply
+} from 'lucide-vue-next';
 import { useAuth } from '../composables/useAuth';
 import MarkdownIt from 'markdown-it';
 import DOMPurify from 'dompurify';
 
 type CommentKind = 'comment' | 'bug';
+
+type ModerationStatus = 'pending' | 'approved' | 'rejected';
 
 type EntryBase = {
   id: string;
@@ -14,6 +20,8 @@ type EntryBase = {
   project_name: string;
   author: string;
   created_at: string;
+  moderation_status?: ModerationStatus;
+  moderation_id?: string;
 };
 
 type CommentEntry = EntryBase & {
@@ -32,6 +40,15 @@ type IssueEntry = EntryBase & {
 };
 
 type Entry = CommentEntry | IssueEntry;
+
+type ReplyItem = {
+  id: string;
+  feedback_id: string;
+  body: string;
+  actor_username: string;
+  actor_role: string;
+  created_at: string;
+};
 
 const props = defineProps<{
   projectName: string;
@@ -62,6 +79,10 @@ const mapFromApi = (item: any): Entry | null => {
     author: String(item.actor_username ?? item.author ?? '用户'),
     created_at: String(item.created_at ?? new Date().toISOString())
   };
+  if (item.moderation_status) {
+    base.moderation_status = item.moderation_status;
+    base.moderation_id = item.moderation_id;
+  }
   if (!base.id) return null;
 
   if (kind === 'comment') {
@@ -103,12 +124,14 @@ const fetchEntries = async () => {
 onMounted(fetchEntries);
 watch(() => props.projectName, () => { void fetchEntries(); });
 
-const canManageIssueStatus = computed(() => {
+// Permission: can manage issue status if ops/dev OR the original author
+const canManageIssue = (issue: IssueEntry) => {
   if (props.variant === 'ops') return true;
   if (!isAuthenticated.value) return false;
   const role = user.value?.role;
-  return role === 'dev' || role === 'ops';
-});
+  if (role === 'dev' || role === 'ops') return true;
+  return user.value?.name === issue.author;
+};
 
 const comments = computed(() => entries.value.filter((e) => e.kind === 'comment') as CommentEntry[]);
 const issuesAll = computed(() => entries.value.filter((e) => e.kind === 'bug') as IssueEntry[]);
@@ -283,6 +306,8 @@ const requireLogin = () => {
   return true;
 };
 
+const moderationMessage = ref('');
+
 const submitComment = async () => {
   if (!requireLogin()) return;
   const body = commentBody.value.trim();
@@ -300,6 +325,12 @@ const submitComment = async () => {
     });
     const json = await res.json();
     if (!res.ok) throw new Error(json?.error ?? 'submit failed');
+    if (json.status === 'pending') {
+      moderationMessage.value = json.message || '评论已提交，等待审核';
+      commentBody.value = '';
+      setTimeout(() => { moderationMessage.value = ''; }, 5000);
+      return;
+    }
     const created = mapFromApi(json);
     if (!created || created.kind !== 'comment') return;
     entries.value = [created, ...entries.value];
@@ -327,6 +358,14 @@ const submitIssue = async () => {
     });
     const json = await res.json();
     if (!res.ok) throw new Error(json?.error ?? 'submit failed');
+    if (json.status === 'pending') {
+      moderationMessage.value = json.message || 'Bug反馈已提交，等待审核';
+      issueTitle.value = '';
+      issueBody.value = '';
+      issueLabels.value = [];
+      setTimeout(() => { moderationMessage.value = ''; }, 5000);
+      return;
+    }
     const created = mapFromApi(json);
     if (!created || created.kind !== 'bug') return;
     entries.value = [created, ...entries.value];
@@ -338,10 +377,7 @@ const submitIssue = async () => {
 
 const openIssue = (id: string) => {
   selectedIssueId.value = id;
-};
-
-const closeIssue = () => {
-  selectedIssueId.value = null;
+  void fetchReplies(id);
 };
 
 const setIssueStatus = async (id: string, status: IssueStatus) => {
@@ -371,51 +407,110 @@ const formatTime = (iso: string) => {
     return iso;
   }
 };
+
+// Modal state - only for issue detail
+const isModalOpen = ref(false);
+const openModal = () => {
+  isModalOpen.value = true;
+  document.body.style.overflow = 'hidden';
+};
+const closeModal = () => {
+  isModalOpen.value = false;
+  selectedIssueId.value = null;
+  replies.value = [];
+  document.body.style.overflow = '';
+};
+
+// Close on Escape key
+const onKeydown = (e: KeyboardEvent) => {
+  if (e.key === 'Escape' && isModalOpen.value) {
+    closeModal();
+  }
+};
+
+onMounted(() => {
+  window.addEventListener('keydown', onKeydown);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', onKeydown);
+  document.body.style.overflow = '';
+});
+
+// Replies
+const replies = ref<ReplyItem[]>([]);
+const replyBody = ref('');
+const isLoadingReplies = ref(false);
+const replyError = ref('');
+
+const fetchReplies = async (feedbackId: string) => {
+  isLoadingReplies.value = true;
+  replyError.value = '';
+  try {
+    const res = await fetch(`/api/feedback/${encodeURIComponent(feedbackId)}/replies`);
+    const json = await res.json();
+    if (!res.ok) throw new Error(json?.error ?? 'load failed');
+    replies.value = Array.isArray(json) ? json : [];
+  } catch (e: any) {
+    replyError.value = e?.message ?? '加载回复失败';
+    replies.value = [];
+  } finally {
+    isLoadingReplies.value = false;
+  }
+};
+
+const submitReply = async () => {
+  if (!requireLogin()) return;
+  const body = replyBody.value.trim();
+  if (!body || !selectedIssueId.value) return;
+  replyError.value = '';
+  try {
+    const res = await fetch(`/api/feedback/${encodeURIComponent(selectedIssueId.value)}/replies`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        body,
+        actor: { username: user.value?.name ?? '', role: user.value?.role ?? '' }
+      })
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json?.error ?? 'submit failed');
+    replies.value = [json, ...replies.value];
+    replyBody.value = '';
+  } catch (e: any) {
+    replyError.value = e?.message ?? '回复失败';
+  }
+};
+
+const handleIssueClick = (id: string) => {
+  openIssue(id);
+  openModal();
+};
 </script>
 
 <template>
-  <section class="mt-16 pt-10 border-t border-slate-200 dark:border-slate-800">
-    <div class="flex items-end justify-between gap-4 mb-6">
-      <div>
-        <h2 class="text-2xl font-bold text-slate-900 dark:text-white">评论与反馈</h2>
-        <p class="text-slate-500 mt-1">发表评论或提交 Bug 反馈时必须登录。</p>
-      </div>
-      <div class="hidden sm:flex items-center gap-2">
-        <button
-          @click="tab = 'comment'"
-          class="px-4 py-2 rounded-full font-extrabold transition-colors inline-flex items-center gap-2"
-          :class="tab === 'comment' ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900' : 'bg-white/70 dark:bg-slate-900/30 border border-slate-200/70 dark:border-slate-800/70 text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-900/50'"
-        >
-          <MessageSquare class="w-4 h-4" /> 评论
-        </button>
-        <button
-          @click="tab = 'bug'"
-          class="px-4 py-2 rounded-full font-extrabold transition-colors inline-flex items-center gap-2"
-          :class="tab === 'bug' ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900' : 'bg-white/70 dark:bg-slate-900/30 border border-slate-200/70 dark:border-slate-800/70 text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-900/50'"
-        >
-          <Bug class="w-4 h-4" /> Bug 反馈
-        </button>
-      </div>
-    </div>
-
-    <div class="sm:hidden flex gap-2 mb-6">
+  <div class="space-y-6">
+    <!-- Tabs -->
+    <div class="flex items-center gap-3">
       <button
         @click="tab = 'comment'"
-        class="flex-1 px-4 py-2 rounded-2xl font-extrabold transition-colors"
-        :class="tab === 'comment' ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900' : 'bg-white/70 dark:bg-slate-900/30 border border-slate-200/70 dark:border-slate-800/70 text-slate-600 dark:text-slate-300'"
+        class="px-4 py-2 rounded-full font-extrabold transition-colors inline-flex items-center gap-2"
+        :class="tab === 'comment' ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'"
       >
-        评论
+        <MessageSquare class="w-4 h-4" /> 评论
       </button>
       <button
         @click="tab = 'bug'"
-        class="flex-1 px-4 py-2 rounded-2xl font-extrabold transition-colors"
-        :class="tab === 'bug' ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900' : 'bg-white/70 dark:bg-slate-900/30 border border-slate-200/70 dark:border-slate-800/70 text-slate-600 dark:text-slate-300'"
+        class="px-4 py-2 rounded-full font-extrabold transition-colors inline-flex items-center gap-2"
+        :class="tab === 'bug' ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'"
       >
-        Bug
+        <Bug class="w-4 h-4" /> Bug 反馈
       </button>
     </div>
 
-    <div v-if="tab === 'comment'" class="bg-white dark:bg-[#111827] rounded-3xl p-6 sm:p-8 border border-slate-200/80 dark:border-slate-800/80 shadow-sm">
+    <!-- Comment Tab -->
+    <div v-if="tab === 'comment'" class="space-y-6">
+      <!-- Comment Form -->
       <div class="space-y-3">
         <textarea
           v-model="commentBody"
@@ -465,29 +560,45 @@ const formatTime = (iso: string) => {
         </button>
       </div>
 
-      <div class="mt-8 space-y-3">
+      <!-- Moderation Message -->
+      <div v-if="moderationMessage" class="p-4 rounded-2xl border border-amber-200 dark:border-amber-500/20 bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300 text-sm font-extrabold">
+        {{ moderationMessage }}
+      </div>
+
+      <!-- Comments List -->
+      <div class="space-y-3">
         <div v-if="comments.length === 0" class="text-center py-10 text-slate-500">暂无评论</div>
-        <div v-for="e in comments" :key="e.id" class="p-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/30">
+        <div v-for="e in comments" :key="e.id" class="p-5 rounded-2xl border" :class="e.moderation_status === 'pending' ? 'border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800/50 opacity-70' : 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/30'">
           <div class="flex items-center justify-between gap-3">
             <div class="min-w-0">
               <div class="font-extrabold text-slate-900 dark:text-white truncate">{{ e.author }}</div>
               <div class="text-xs text-slate-500 dark:text-slate-400">{{ formatTime(e.created_at) }}</div>
             </div>
+            <div v-if="e.moderation_status === 'pending'" class="shrink-0 px-2.5 py-1 rounded-full border text-xs font-extrabold bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-600">
+              审核中
+            </div>
+            <div v-else-if="e.moderation_status === 'rejected'" class="shrink-0 px-2.5 py-1 rounded-full border text-xs font-extrabold bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-200/60 dark:border-rose-500/20">
+              审核未通过
+            </div>
           </div>
           <div class="mt-3 prose prose-sm prose-slate dark:prose-invert max-w-none" v-html="renderMarkdown(e.body)"></div>
+          <div v-if="e.moderation_status === 'pending'" class="mt-2 text-xs text-slate-500 dark:text-slate-400">
+            此评论正在审核中，仅您自己可见
+          </div>
+          <div v-else-if="e.moderation_status === 'rejected'" class="mt-2 text-xs text-rose-500 dark:text-rose-400">
+            此评论审核未通过
+          </div>
         </div>
       </div>
     </div>
 
-    <div v-else class="bg-white dark:bg-[#111827] rounded-3xl p-6 sm:p-8 border border-slate-200/80 dark:border-slate-800/80 shadow-sm">
-      <div class="flex items-end justify-between gap-4">
-        <div>
-          <div class="text-lg font-extrabold text-slate-900 dark:text-white">新建 Issue</div>
-          <div class="text-sm text-slate-500 mt-1">提交后默认“未解决”，之后可在详情里调整状态。</div>
-        </div>
-      </div>
+    <!-- Bug Tab -->
+    <div v-else-if="tab === 'bug'" class="space-y-6">
+      <!-- Issue Form -->
+      <div class="space-y-3">
+        <div class="text-lg font-extrabold text-slate-900 dark:text-white">新建 Issue</div>
+        <div class="text-sm text-slate-500">提交后默认"未解决"，之后可在详情里调整状态。</div>
 
-      <div class="mt-6 space-y-3">
         <input
           v-model="issueTitle"
           class="w-full px-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 outline-none focus:border-emerald-500"
@@ -556,7 +667,13 @@ const formatTime = (iso: string) => {
         </button>
       </div>
 
-      <div class="mt-10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <!-- Moderation Message -->
+      <div v-if="moderationMessage" class="p-4 rounded-2xl border border-amber-200 dark:border-amber-500/20 bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300 text-sm font-extrabold">
+        {{ moderationMessage }}
+      </div>
+
+      <!-- Issue Filter -->
+      <div class="flex items-center justify-between gap-3 pt-4 border-t border-slate-200 dark:border-slate-800">
         <div class="text-sm font-extrabold text-slate-700 dark:text-slate-300">筛选</div>
         <div class="flex items-center gap-2">
           <button
@@ -576,13 +693,15 @@ const formatTime = (iso: string) => {
         </div>
       </div>
 
-      <div class="mt-4 space-y-2">
+      <!-- Issues List -->
+      <div class="space-y-2">
         <div v-if="issues.length === 0" class="text-center py-10 text-slate-500">暂无 Issue</div>
         <button
           v-for="i in issues"
           :key="i.id"
-          @click="openIssue(i.id)"
-          class="w-full text-left p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/30 hover:bg-white dark:hover:bg-slate-900/50 transition-colors"
+          @click="i.moderation_status === 'pending' ? undefined : handleIssueClick(i.id)"
+          class="w-full text-left p-4 rounded-2xl border transition-colors"
+          :class="i.moderation_status === 'pending' ? 'border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800/50 opacity-70 cursor-default' : 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/30 hover:bg-white dark:hover:bg-slate-900/50'"
         >
           <div class="flex items-start gap-3">
             <div class="mt-0.5">
@@ -601,73 +720,191 @@ const formatTime = (iso: string) => {
                   {{ ISSUE_LABELS.find(x => x.id === lid)?.name ?? lid }}
                 </span>
               </div>
+              <div v-if="i.moderation_status === 'pending'" class="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                此 Bug 反馈正在审核中，仅您自己可见
+              </div>
+              <div v-else-if="i.moderation_status === 'rejected'" class="mt-2 text-xs text-rose-500 dark:text-rose-400">
+                此 Bug 反馈审核未通过
+              </div>
             </div>
-            <div class="shrink-0 px-2.5 py-1 rounded-full border text-xs font-extrabold" :class="statusClass(i.status)">
-              {{ statusLabel(i.status) }}
+            <div class="shrink-0 flex flex-col items-end gap-1">
+              <div class="px-2.5 py-1 rounded-full border text-xs font-extrabold" :class="statusClass(i.status)">
+                {{ statusLabel(i.status) }}
+              </div>
+              <div v-if="i.moderation_status === 'pending'" class="px-2.5 py-1 rounded-full border text-xs font-extrabold bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-600">
+                审核中
+              </div>
+              <div v-else-if="i.moderation_status === 'rejected'" class="px-2.5 py-1 rounded-full border text-xs font-extrabold bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-200/60 dark:border-rose-500/20">
+                审核未通过
+              </div>
             </div>
           </div>
         </button>
       </div>
     </div>
 
-    <div v-if="selectedIssue" class="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-sm" @click.self="closeIssue">
-      <div class="w-full max-w-xl h-full bg-white dark:bg-[#0B1120] border-l border-slate-200 dark:border-slate-800 shadow-2xl overflow-y-auto">
-        <div class="p-6 border-b border-slate-100 dark:border-slate-800 flex items-start justify-between gap-4">
-          <div class="min-w-0">
-            <div class="text-xl font-extrabold text-slate-900 dark:text-white truncate">{{ selectedIssue.title }}</div>
-            <div class="text-sm text-slate-500 mt-1">{{ selectedIssue.author }} · {{ formatTime(selectedIssue.created_at) }}</div>
-          </div>
-          <button class="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-900 transition-colors" @click="closeIssue" aria-label="Close">
-            <X class="w-5 h-5" />
-          </button>
-        </div>
-
-        <div class="p-6 space-y-4">
-          <div class="flex items-center justify-between gap-3">
-            <div class="px-3 py-1.5 rounded-full border text-sm font-extrabold" :class="statusClass(selectedIssue.status)">
-              {{ statusLabel(selectedIssue.status) }}
-            </div>
-            <select
-              v-if="canManageIssueStatus"
-              :value="selectedIssue.status"
-              @change="setIssueStatus(selectedIssue.id, ($event.target as HTMLSelectElement).value as any)"
-              class="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-700 dark:text-slate-200 font-extrabold outline-none"
-            >
-              <option value="open">未处理</option>
-              <option value="doing">处理中</option>
-              <option value="done">已解决</option>
-            </select>
-          </div>
-
-          <div class="space-y-2">
-            <div class="text-sm font-extrabold text-slate-700 dark:text-slate-300">标签</div>
-            <div class="flex flex-wrap gap-2">
+    <!-- Centered Modal for Issue Detail -->
+    <Transition
+      enter-active-class="transition-opacity duration-300 ease-out"
+      enter-from-class="opacity-0"
+      enter-to-class="opacity-100"
+      leave-active-class="transition-opacity duration-200 ease-in"
+      leave-from-class="opacity-100"
+      leave-to-class="opacity-0"
+    >
+      <div
+        v-if="isModalOpen"
+        class="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4"
+        @click="closeModal"
+      >
+        <Transition
+          enter-active-class="transition-all duration-300 ease-out-expo"
+          enter-from-class="opacity-0 scale-95"
+          enter-to-class="opacity-100 scale-100"
+          leave-active-class="transition-all duration-200 ease-in-expo"
+          leave-from-class="opacity-100 scale-100"
+          leave-to-class="opacity-0 scale-95"
+        >
+          <div
+            v-if="isModalOpen"
+            class="w-full max-w-2xl max-h-[85vh] bg-white dark:bg-[#0B1120] rounded-3xl shadow-2xl flex flex-col border border-slate-200 dark:border-slate-800 overflow-hidden"
+            @click.stop
+          >
+            <!-- Modal Header -->
+            <div class="flex items-center justify-between gap-4 px-6 py-4 border-b border-slate-200 dark:border-slate-800 shrink-0">
+              <div class="font-extrabold text-slate-900 dark:text-white truncate max-w-xs">
+                {{ selectedIssue?.title }}
+              </div>
               <button
-                v-for="l in ISSUE_LABELS"
-                :key="l.id"
-                type="button"
-                :disabled="!isAuthenticated && !canManageIssueStatus"
-                @click="toggleIssueLabel(l.id)"
-                class="px-3 py-1.5 rounded-full border text-sm font-extrabold transition-colors disabled:opacity-50"
-                :class="selectedIssueLabels.includes(l.id) ? labelColorClass(l.color) : 'bg-white/70 dark:bg-slate-900/40 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-900/60'"
+                @click="closeModal"
+                class="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                aria-label="Close"
               >
-                {{ l.name }}
+                <X class="w-5 h-5" />
               </button>
             </div>
-            <button
-              v-if="isAuthenticated"
-              @click="setIssueLabels(selectedIssue.id, selectedIssueLabels)"
-              class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-extrabold transition-colors"
-            >
-              保存标签
-            </button>
-          </div>
 
-          <div class="prose prose-slate dark:prose-invert max-w-none" v-html="renderMarkdown(selectedIssue.body)"></div>
-        </div>
+            <!-- Modal Content -->
+            <div class="flex-1 overflow-y-auto p-6 space-y-6">
+              <div v-if="selectedIssue" class="space-y-4">
+                <!-- Issue Header Info -->
+                <div class="flex items-start justify-between gap-4">
+                  <div class="min-w-0 flex-1">
+                    <div class="text-xl font-extrabold text-slate-900 dark:text-white">{{ selectedIssue.title }}</div>
+                    <div class="text-sm text-slate-500 mt-1">{{ selectedIssue.author }} · {{ formatTime(selectedIssue.created_at) }}</div>
+                  </div>
+                  <div class="px-3 py-1.5 rounded-full border text-sm font-extrabold shrink-0" :class="statusClass(selectedIssue.status)">
+                    {{ statusLabel(selectedIssue.status) }}
+                  </div>
+                </div>
+
+                <!-- Status Control -->
+                <div v-if="canManageIssue(selectedIssue)" class="flex items-center gap-3">
+                  <span class="text-sm font-extrabold text-slate-700 dark:text-slate-300">状态：</span>
+                  <select
+                    :value="selectedIssue.status"
+                    @change="setIssueStatus(selectedIssue.id, ($event.target as HTMLSelectElement).value as any)"
+                    class="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-700 dark:text-slate-200 font-extrabold outline-none"
+                  >
+                    <option value="open">未处理</option>
+                    <option value="doing">处理中</option>
+                    <option value="done">已解决</option>
+                  </select>
+                </div>
+
+                <!-- Labels -->
+                <div class="space-y-2">
+                  <div class="text-sm font-extrabold text-slate-700 dark:text-slate-300">标签</div>
+                  <div class="flex flex-wrap gap-2">
+                    <button
+                      v-for="l in ISSUE_LABELS"
+                      :key="l.id"
+                      type="button"
+                      :disabled="!canManageIssue(selectedIssue)"
+                      @click="toggleIssueLabel(l.id)"
+                      class="px-3 py-1.5 rounded-full border text-sm font-extrabold transition-colors disabled:opacity-50"
+                      :class="selectedIssueLabels.includes(l.id) ? labelColorClass(l.color) : 'bg-white/70 dark:bg-slate-900/40 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-900/60'"
+                    >
+                      {{ l.name }}
+                    </button>
+                  </div>
+                  <button
+                    v-if="canManageIssue(selectedIssue)"
+                    @click="setIssueLabels(selectedIssue.id, selectedIssueLabels)"
+                    class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-extrabold transition-colors"
+                  >
+                    保存标签
+                  </button>
+                </div>
+
+                <!-- Body -->
+                <div class="prose prose-slate dark:prose-invert max-w-none" v-html="renderMarkdown(selectedIssue.body)"></div>
+              </div>
+
+              <!-- Replies Section -->
+              <div class="border-t border-slate-200 dark:border-slate-800 pt-6 space-y-4">
+                <div class="text-lg font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                  <Reply class="w-5 h-5" />
+                  回复
+                </div>
+
+                <!-- Reply Form -->
+                <div v-if="isAuthenticated" class="space-y-3">
+                  <textarea
+                    v-model="replyBody"
+                    rows="3"
+                    class="w-full px-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 outline-none focus:border-emerald-500 resize-none"
+                    placeholder="写下你的回复..."
+                  ></textarea>
+                  <button
+                    @click="submitReply"
+                    :disabled="!replyBody.trim()"
+                    class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-extrabold transition-colors"
+                  >
+                    <Send class="w-4 h-4" />
+                    回复
+                  </button>
+                </div>
+                <div v-else class="p-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/40 text-slate-700 dark:text-slate-200">
+                  <div class="font-extrabold">需要登录</div>
+                  <div class="text-sm text-slate-600 dark:text-slate-300 mt-1">登录后即可回复。</div>
+                  <button
+                    @click="router.push({ path: '/me', query: { redirect: route.fullPath } })"
+                    class="mt-3 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold transition-colors"
+                  >
+                    <LogIn class="w-4 h-4" />
+                    智教联盟登录
+                  </button>
+                </div>
+
+                <!-- Reply Error -->
+                <div v-if="replyError" class="p-3 rounded-xl border border-rose-200 dark:border-rose-500/20 bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-300 text-sm font-extrabold">
+                  {{ replyError }}
+                </div>
+
+                <!-- Replies List -->
+                <div class="space-y-3">
+                  <div v-if="isLoadingReplies" class="text-center py-4 text-slate-400">加载中...</div>
+                  <div v-else-if="replies.length === 0" class="text-center py-6 text-slate-500">暂无回复</div>
+                  <div
+                    v-for="r in replies"
+                    :key="r.id"
+                    class="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/30"
+                  >
+                    <div class="flex items-center justify-between gap-3">
+                      <div class="font-extrabold text-slate-900 dark:text-white">{{ r.actor_username }}</div>
+                      <div class="text-xs text-slate-500 dark:text-slate-400">{{ formatTime(r.created_at) }}</div>
+                    </div>
+                    <div class="mt-2 prose prose-sm prose-slate dark:prose-invert max-w-none" v-html="renderMarkdown(r.body)"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Transition>
       </div>
-    </div>
+    </Transition>
 
     <input ref="uploadEl" type="file" accept="image/*" class="hidden" @change="onUploadChange" />
-  </section>
+  </div>
 </template>

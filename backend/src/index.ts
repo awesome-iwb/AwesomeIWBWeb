@@ -31,8 +31,27 @@ import { normalizeAiUsageState, readAiUsageStateField } from "./domain/aiUsage";
 import { applyProjectPatch } from "./domain/projectUpdate";
 import { normalizeProjectInput } from "./domain/normalizeProjectInput";
 import { createFeedback, listFeedback, updateFeedback } from "./services/feedback";
+import { createReply, listReplies } from "./services/feedbackReplies";
 import { sanitizeIssueLabels } from "./domain/feedbackLabels";
 import { normalizeProjectTags } from "./domain/projectTags";
+import {
+  createCommentModeration,
+  createBugModeration,
+  listCommentModeration,
+  listBugModeration,
+  getCommentModeration,
+  getBugModeration,
+  updateCommentModerationStatus,
+  updateBugModerationStatus,
+  setCommentFeedbackEntryId,
+  setBugFeedbackEntryId,
+} from "./services/contentModeration";
+import {
+  createNotification,
+  listNotifications,
+  markNotificationRead,
+  markAllNotificationsRead,
+} from "./services/notifications";
 import { authPlugin, requireAuth, requireRole } from "./plugins/auth";
 import { casdoorAuthPlugin } from "./plugins/casdoorAuth";
 import { localAuthPlugin } from "./plugins/localAuth";
@@ -64,6 +83,7 @@ const SUBMISSIONS_PATH = path.join(RUNTIME_DIR, "submissions.json");
 const AUDIT_PATH = path.join(RUNTIME_DIR, "audit.json");
 const REVISIONS_PATH = path.join(RUNTIME_DIR, "revisions.json");
 const FEEDBACK_PATH = path.join(RUNTIME_DIR, "feedback.json");
+const FEEDBACK_REPLIES_PATH = path.join(RUNTIME_DIR, "feedback_replies.json");
 
 /**
  * Toggle DB mode via environment.
@@ -107,6 +127,7 @@ const submissionsFile = await loadJsonFile<any[]>(SUBMISSIONS_PATH, []);
 const auditFile = await loadJsonFile<any[]>(AUDIT_PATH, []);
 const revisionsFile = await loadJsonFile<Record<string, any[]>>(REVISIONS_PATH, {});
 const feedbackFile = await loadJsonFile<any[]>(FEEDBACK_PATH, []);
+const feedbackRepliesFile = await loadJsonFile<any[]>(FEEDBACK_REPLIES_PATH, []);
 
 /**
  * Ensure every project payload returned by JSON mode has a stable `ai_usage_state`.
@@ -148,7 +169,7 @@ async function logAuditCompat(input: { actor?: string; action: string; entity_ty
 
 function checkOps(user: any, set: any) {
   if (!dbEnabled) return false;
-  if (!user || user.role !== 'ops') {
+  if (!user || (user.role !== 'ops' && user.role !== 'superadmin')) {
     set.status = 403;
     return true;
   }
@@ -266,19 +287,57 @@ const app = new Elysia()
     }
     return await getStats();
   })
-  .get("/api/feedback", async ({ query }) => {
+  .get("/api/feedback", async ({ query, user }) => {
     const project_name = typeof (query as any)?.project_name === "string" ? String((query as any).project_name) : "";
     const kind = typeof (query as any)?.kind === "string" ? String((query as any).kind) : "";
     const status = typeof (query as any)?.status === "string" ? String((query as any).status) : "";
     const limit = typeof (query as any)?.limit === "string" ? Number((query as any).limit) : undefined;
 
     if (dbEnabled) {
-      return await listFeedback({
+      const approvedItems = await listFeedback({
         project_name: project_name || undefined,
         kind: kind === "comment" || kind === "bug" ? (kind as any) : undefined,
         status: status === "open" || status === "closed" ? (status as any) : undefined,
         limit
       });
+      // Include current user's pending moderation entries so they can see their own pending submissions
+      if (user?.name) {
+        const [pendingComments, pendingBugs] = await Promise.all([
+          listCommentModeration({ status: "pending", actor_username: user.name, pageSize: 100 }),
+          listBugModeration({ status: "pending", actor_username: user.name, pageSize: 100 }),
+        ]);
+        const moderatedComments = pendingComments.items.map((m) => ({
+          id: `mod-comment-${m.id}`,
+          project_name: m.project_name,
+          kind: "comment",
+          body: m.body,
+          actor_username: m.actor_username,
+          actor_role: m.actor_role,
+          created_at: m.created_at,
+          updated_at: m.updated_at,
+          moderation_status: m.status,
+          moderation_id: m.id,
+        }));
+        const moderatedBugs = pendingBugs.items.map((m) => ({
+          id: `mod-bug-${m.id}`,
+          project_name: m.project_name,
+          kind: "bug",
+          title: m.title,
+          body: m.body,
+          labels: m.labels,
+          status: "open",
+          actor_username: m.actor_username,
+          actor_role: m.actor_role,
+          created_at: m.created_at,
+          updated_at: m.updated_at,
+          moderation_status: m.status,
+          moderation_id: m.id,
+        }));
+        return [...moderatedComments, ...moderatedBugs, ...approvedItems].sort(
+          (a: any, b: any) => String(b.created_at ?? "").localeCompare(String(a.created_at ?? ""))
+        );
+      }
+      return approvedItems;
     }
 
     const items = feedbackFile
@@ -317,17 +376,24 @@ const app = new Elysia()
     }
 
     if (dbEnabled) {
-      const created = await createFeedback({
+      if (kind === "comment") {
+        const created = await createCommentModeration({
+          project_name,
+          body: bodyText,
+          actor_username,
+          actor_role,
+        });
+        return { success: true, moderationId: created?.id, status: "pending", message: "评论已提交，等待审核" };
+      }
+      const created = await createBugModeration({
         project_name,
-        kind,
-        title: kind === "bug" ? title : "",
+        title,
         body: bodyText,
-        labels: kind === "bug" ? labels : [],
-        status: "open",
+        labels,
         actor_username,
-        actor_role
-      } as any);
-      return created;
+        actor_role,
+      });
+      return { success: true, moderationId: created?.id, status: "pending", message: "Bug反馈已提交，等待审核" };
     }
 
     const now = new Date().toISOString();
@@ -350,10 +416,6 @@ const app = new Elysia()
   })
   .patch("/api/feedback/:id", async ({ params: { id }, body, set, user }) => {
     if (checkAuth(user, set)) return { error: "Unauthorized" };
-    if (user.role !== 'dev' && user.role !== 'ops') {
-      set.status = 403;
-      return { error: "Forbidden" };
-    }
     const payload: any = body as any;
     const status = typeof payload?.status === "string" ? payload.status : undefined;
     const labels = payload?.labels ? sanitizeIssueLabels(payload.labels) : undefined;
@@ -363,6 +425,13 @@ const app = new Elysia()
     }
 
     if (dbEnabled) {
+      const target = await sql()`select actor_username from feedback_entries where id = ${id}`;
+      const actorUsername = target?.[0]?.actor_username ?? '';
+      const canManage = user?.role === 'dev' || user?.role === 'ops' || user?.name === actorUsername;
+      if (!canManage) {
+        set.status = 403;
+        return { error: "Forbidden" };
+      }
       const updated = await updateFeedback({ id, status, labels } as any);
       if (!updated) {
         set.status = 404;
@@ -377,6 +446,11 @@ const app = new Elysia()
       return { error: "Not found" };
     }
     const before = feedbackFile[idx];
+    const canManage = user?.role === 'dev' || user?.role === 'ops' || user?.name === before.actor_username;
+    if (!canManage) {
+      set.status = 403;
+      return { error: "Forbidden" };
+    }
     const next = {
       ...before,
       status: status ?? before.status,
@@ -386,6 +460,50 @@ const app = new Elysia()
     feedbackFile[idx] = next;
     await saveJsonFile(FEEDBACK_PATH, feedbackFile);
     return next;
+  })
+  .get("/api/feedback/:id/replies", async ({ params: { id } }) => {
+    if (dbEnabled) {
+      return await listReplies(id);
+    }
+    return feedbackRepliesFile
+      .filter((r: any) => String(r.feedback_id ?? '') === id)
+      .sort((a: any, b: any) => String(b.created_at ?? '').localeCompare(String(a.created_at ?? '')));
+  })
+  .post("/api/feedback/:id/replies", async ({ params: { id }, body, set, user }) => {
+    if (checkAuth(user, set)) return { error: "Unauthorized" };
+    const payload: any = body as any;
+    const bodyText = String(payload?.body ?? '').trim();
+    const actor_username = String(payload?.actor?.username ?? user?.name ?? '').trim();
+    const actor_role = String(payload?.actor?.role ?? user?.role ?? '').trim();
+
+    if (!bodyText) {
+      set.status = 400;
+      return { error: "body is required" };
+    }
+
+    if (dbEnabled) {
+      const created = await createReply({
+        feedback_id: id,
+        body: bodyText,
+        actor_username,
+        actor_role
+      });
+      return created;
+    }
+
+    const now = new Date().toISOString();
+    const created = {
+      id: randomUUID(),
+      feedback_id: id,
+      body: bodyText,
+      actor_username,
+      actor_role,
+      created_at: now,
+      updated_at: now
+    };
+    feedbackRepliesFile.unshift(created);
+    await saveJsonFile(FEEDBACK_REPLIES_PATH, feedbackRepliesFile);
+    return created;
   })
   .post("/api/admin/categories", async ({ body, set, user }) => {
     if (checkOps(user, set)) return { error: "Forbidden" };
@@ -1404,6 +1522,138 @@ const app = new Elysia()
     }
     await logAuditCompat({ action: isActive ? "activate" : "deactivate", entity_type: "user", entity_id: id });
     return updated;
+  })
+  .get("/api/admin/moderation/comments", async ({ query, set, user }) => {
+    if (checkOps(user, set)) return { error: "Forbidden" };
+    const status = typeof query.status === "string" ? query.status : undefined;
+    const actor_username = typeof query.actor_username === "string" ? query.actor_username : undefined;
+    const page = typeof query.page === "string" ? Number(query.page) : undefined;
+    const pageSize = typeof query.pageSize === "string" ? Number(query.pageSize) : undefined;
+    return await listCommentModeration({ status: status as any, actor_username, page, pageSize });
+  })
+  .get("/api/admin/moderation/bugs", async ({ query, set, user }) => {
+    if (checkOps(user, set)) return { error: "Forbidden" };
+    const status = typeof query.status === "string" ? query.status : undefined;
+    const actor_username = typeof query.actor_username === "string" ? query.actor_username : undefined;
+    const page = typeof query.page === "string" ? Number(query.page) : undefined;
+    const pageSize = typeof query.pageSize === "string" ? Number(query.pageSize) : undefined;
+    return await listBugModeration({ status: status as any, actor_username, page, pageSize });
+  })
+  .post("/api/admin/moderation/comments/:id/approve", async ({ params: { id }, set, user }) => {
+    if (checkOps(user, set)) return { error: "Forbidden" };
+    const moderation = await getCommentModeration(id);
+    if (!moderation) {
+      set.status = 404;
+      return { error: "Not found" };
+    }
+    if (moderation.status !== "pending") {
+      set.status = 400;
+      return { error: "Already processed" };
+    }
+    const feedback = await createFeedback({
+      project_name: moderation.project_name,
+      kind: "comment",
+      title: "",
+      body: moderation.body,
+      labels: [],
+      status: "open",
+      actor_username: moderation.actor_username,
+      actor_role: moderation.actor_role,
+    } as any);
+    await setCommentFeedbackEntryId(id, feedback.id);
+    await updateCommentModerationStatus(id, "approved");
+    await logAuditCompat({ action: "approve_comment", entity_type: "comment_moderation", entity_id: id }, user?.name);
+    return { success: true, feedback_entry_id: feedback.id };
+  })
+  .post("/api/admin/moderation/comments/:id/reject", async ({ params: { id }, body, set, user }) => {
+    if (checkOps(user, set)) return { error: "Forbidden" };
+    const moderation = await getCommentModeration(id);
+    if (!moderation) {
+      set.status = 404;
+      return { error: "Not found" };
+    }
+    if (moderation.status !== "pending") {
+      set.status = 400;
+      return { error: "Already processed" };
+    }
+    const note = String((body as any)?.review_note ?? "");
+    await updateCommentModerationStatus(id, "rejected", note);
+    await logAuditCompat({ action: "reject_comment", entity_type: "comment_moderation", entity_id: id, diff: { review_note: note } }, user?.name);
+    return { success: true };
+  })
+  .post("/api/admin/moderation/bugs/:id/approve", async ({ params: { id }, set, user }) => {
+    if (checkOps(user, set)) return { error: "Forbidden" };
+    const moderation = await getBugModeration(id);
+    if (!moderation) {
+      set.status = 404;
+      return { error: "Not found" };
+    }
+    if (moderation.status !== "pending") {
+      set.status = 400;
+      return { error: "Already processed" };
+    }
+    const feedback = await createFeedback({
+      project_name: moderation.project_name,
+      kind: "bug",
+      title: moderation.title,
+      body: moderation.body,
+      labels: moderation.labels,
+      status: "open",
+      actor_username: moderation.actor_username,
+      actor_role: moderation.actor_role,
+    } as any);
+    await setBugFeedbackEntryId(id, feedback.id);
+    await updateBugModerationStatus(id, "approved");
+    await logAuditCompat({ action: "approve_bug", entity_type: "bug_moderation", entity_id: id }, user?.name);
+    return { success: true, feedback_entry_id: feedback.id };
+  })
+  .post("/api/admin/moderation/bugs/:id/reject", async ({ params: { id }, body, set, user }) => {
+    if (checkOps(user, set)) return { error: "Forbidden" };
+    const moderation = await getBugModeration(id);
+    if (!moderation) {
+      set.status = 404;
+      return { error: "Not found" };
+    }
+    if (moderation.status !== "pending") {
+      set.status = 400;
+      return { error: "Already processed" };
+    }
+    const note = String((body as any)?.review_note ?? "");
+    await updateBugModerationStatus(id, "rejected", note);
+    await logAuditCompat({ action: "reject_bug", entity_type: "bug_moderation", entity_id: id, diff: { review_note: note } }, user?.name);
+    return { success: true };
+  })
+  .get("/api/moderation/my", async ({ query, set, user }) => {
+    if (checkAuth(user, set)) return { error: "Unauthorized" };
+    const status = typeof query.status === "string" ? query.status : undefined;
+    const page = typeof query.page === "string" ? Number(query.page) : undefined;
+    const pageSize = typeof query.pageSize === "string" ? Number(query.pageSize) : undefined;
+    const [comments, bugs] = await Promise.all([
+      listCommentModeration({ status: status as any, actor_username: user.name, page, pageSize }),
+      listBugModeration({ status: status as any, actor_username: user.name, page, pageSize }),
+    ]);
+    return { comments, bugs };
+  })
+  .get("/api/notifications", async ({ query, set, user }) => {
+    if (checkAuth(user, set)) return { error: "Unauthorized" };
+    const unreadOnly = query.unreadOnly === "true";
+    const page = typeof query.page === "string" ? Number(query.page) : undefined;
+    const pageSize = typeof query.pageSize === "string" ? Number(query.pageSize) : undefined;
+    return await listNotifications({ user_name: user.name, unreadOnly, page, pageSize });
+  })
+  .patch("/api/notifications/:id/read", async ({ params: { id }, set, user }) => {
+    if (checkAuth(user, set)) return { error: "Unauthorized" };
+    const updated = await markNotificationRead(id, user.name);
+    if (!updated) {
+      set.status = 404;
+      return { error: "Not found" };
+    }
+    return updated;
+  })
+  .post("/api/notifications/read-all", async ({ set, user }) => {
+    if (checkAuth(user, set)) return { error: "Unauthorized" };
+    await markAllNotificationsRead(user.name);
+    return { success: true };
   })
   .listen(8080);
 

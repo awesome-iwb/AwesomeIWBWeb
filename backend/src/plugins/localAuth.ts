@@ -14,7 +14,7 @@ import { logAudit } from "../services/audit";
 import { setSessionCookie } from "../utils/cookies";
 
 const dbEnabled = Boolean(process.env.DATABASE_URL);
-const SUPERADMIN_USERNAME = "lincube";
+const SUPERADMIN_INITIAL_USERNAME = process.env.SUPERADMIN_INITIAL_USERNAME ?? "admin";
 
 // Simple in-memory rate limiter per IP
 const ipAttempts = new Map<string, { count: number; resetAt: number }>();
@@ -96,11 +96,7 @@ export const localAuthPlugin = new Elysia({ prefix: "/api/auth" })
   .post(
     "/login",
     async ({ body, set, headers }) => {
-      if (!dbEnabled) {
-        set.status = 503;
-        return { error: { code: "LOCAL_LOGIN_DISABLED", message: "登录失败" } };
-      }
-      await ensureSuperadminInitialized();
+      await ensureSuperadminInitialized(String(body.username ?? "").trim());
 
       cleanOldIpAttempts();
 
@@ -114,13 +110,6 @@ export const localAuthPlugin = new Elysia({ prefix: "/api/auth" })
         set.headers["retry-after"] = String(Math.ceil(IP_WINDOW_MS / 1000));
         await logAttempt({ ip: clientIp, ua, username, status: "locked", reason: "ip_rate_limited" });
         return { error: { code: "RATE_LIMITED", message: "登录失败" } };
-      }
-
-      if (username !== SUPERADMIN_USERNAME) {
-        await dummyVerifyPassword(password);
-        await logAttempt({ ip: clientIp, ua, username, status: "failed", reason: "LOCAL_LOGIN_NOT_ALLOWED" });
-        set.status = 403;
-        return { error: { code: "LOCAL_LOGIN_NOT_ALLOWED", message: "请使用第三方登录" } };
       }
 
       if (shouldLockSuperadmin()) {
@@ -221,11 +210,12 @@ export const localAuthPlugin = new Elysia({ prefix: "/api/auth" })
       }
       const { verifyJwt } = await import("../utils/jwt");
       const payload = verifyJwt(match[1]);
-      if (!payload || payload.name !== SUPERADMIN_USERNAME) {
+      if (!payload || !payload.name) {
         set.status = 403;
         return { error: { code: "FORBIDDEN", message: "登录失败" } };
       }
-      const account = await findLocalAccountByUsername(SUPERADMIN_USERNAME);
+      const username = payload.name;
+      const account = await findLocalAccountByUsername(username);
       if (!account) {
         set.status = 404;
         return { error: { code: "NOT_FOUND", message: "登录失败" } };
@@ -235,11 +225,11 @@ export const localAuthPlugin = new Elysia({ prefix: "/api/auth" })
         set.status = 401;
         return { error: { code: "AUTH_FAILED", message: "登录失败" } };
       }
-      await setLocalAccountPassword(SUPERADMIN_USERNAME, String(body.newPassword ?? ""), false);
+      await setLocalAccountPassword(username, String(body.newPassword ?? ""), false);
       await logAudit({
         action: "superadmin_password_changed",
         entity_type: "local_account",
-        entity_id: SUPERADMIN_USERNAME,
+        entity_id: username,
         diff: { ip: getClientIp(headers), ua: headers["user-agent"] ?? "" }
       }).catch(() => {});
       return { success: true };
@@ -247,19 +237,13 @@ export const localAuthPlugin = new Elysia({ prefix: "/api/auth" })
     {
       body: t.Object({
         currentPassword: t.String({ minLength: 1, maxLength: 200 }),
-        newPassword: t.String({ minLength: 12, maxLength: 200 })
+        newPassword: t.String({ minLength: 8, maxLength: 200 })
       })
     }
   )
   .get("/local/status", async ({ set }) => {
-    if (!dbEnabled) {
-      return { enabled: false, reason: "Database mode required" };
-    }
-
-    const account = await findLocalAccountByUsername("lincube");
     return {
       enabled: true,
-      accountExists: !!account,
-      accountActive: account?.is_active ?? false,
+      message: "Local auth is enabled",
     };
   });

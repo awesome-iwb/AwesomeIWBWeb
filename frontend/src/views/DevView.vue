@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { Bug, MessageSquare, PencilLine, Send, X } from 'lucide-vue-next';
+import { MessageSquare, PencilLine, Send, X } from 'lucide-vue-next';
 import { useAuth } from '../composables/useAuth';
 import CommentPanel from '../components/CommentPanel.vue';
+
 
 type DevLink = { username: string; stcn_user_id?: string; sectl_user_id?: string; lincube_user_id?: string };
 
@@ -22,7 +23,7 @@ type Catalog = { categories: Array<{ projects: Project[] }> };
 const router = useRouter();
 const { user } = useAuth();
 
-const activeTab = ref<'projects' | 'bugs' | 'comments'>('projects');
+const activeTab = ref<'projects' | 'feedback'>('projects');
 const catalog = ref<Catalog | null>(null);
 const isLoading = ref(false);
 const loadError = ref('');
@@ -124,11 +125,8 @@ onMounted(fetchCatalog);
         <button @click="activeTab = 'projects'" class="px-4 py-2 rounded-full font-extrabold transition-colors" :class="activeTab === 'projects' ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900' : 'bg-white/70 dark:bg-slate-900/30 border border-slate-200/70 dark:border-slate-800/70 text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-900/50'">
           我的项目
         </button>
-        <button @click="activeTab = 'bugs'" class="px-4 py-2 rounded-full font-extrabold transition-colors inline-flex items-center gap-2" :class="activeTab === 'bugs' ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900' : 'bg-white/70 dark:bg-slate-900/30 border border-slate-200/70 dark:border-slate-800/70 text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-900/50'">
-          <Bug class="w-4 h-4" /> Bug 反馈
-        </button>
-        <button @click="activeTab = 'comments'" class="px-4 py-2 rounded-full font-extrabold transition-colors inline-flex items-center gap-2" :class="activeTab === 'comments' ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900' : 'bg-white/70 dark:bg-slate-900/30 border border-slate-200/70 dark:border-slate-800/70 text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-900/50'">
-          <MessageSquare class="w-4 h-4" /> 评论
+        <button @click="activeTab = 'feedback'" class="px-4 py-2 rounded-full font-extrabold transition-colors inline-flex items-center gap-2" :class="activeTab === 'feedback' ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900' : 'bg-white/70 dark:bg-slate-900/30 border border-slate-200/70 dark:border-slate-800/70 text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-900/50'">
+          <MessageSquare class="w-4 h-4" /> 评论与反馈
         </button>
       </div>
 
@@ -152,17 +150,14 @@ onMounted(fetchCatalog);
                   <PencilLine class="w-4 h-4" />
                   发起变更
                 </button>
+                <CommentPanel :project-name="p.name" variant="dev" initial-tab="bug" />
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      <div v-else-if="activeTab === 'bugs'">
-        <CommentPanel project-name="__dev__" variant="dev" initial-tab="bug" />
-      </div>
-
-      <div v-else>
+      <div v-else-if="activeTab === 'feedback'">
         <CommentPanel project-name="__dev__" variant="dev" initial-tab="comment" />
       </div>
 

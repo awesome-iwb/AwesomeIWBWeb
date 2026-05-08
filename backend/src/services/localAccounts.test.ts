@@ -2,15 +2,16 @@ import { describe, expect, test } from "bun:test";
 import { setLocalAccountPassword, validateSuperadminPassword } from "./localAccounts";
 
 describe("superadmin local account policy", () => {
-  test("rejects password writes for non-lincube", async () => {
-    await expect(setLocalAccountPassword("someone-else", "Abcd!2345678")).rejects.toThrow(
-      "LOCAL_ACCOUNT_WRITE_FORBIDDEN"
-    );
+  test("allows password writes for any username", async () => {
+    // Should not throw LOCAL_ACCOUNT_WRITE_FORBIDDEN anymore
+    // In JSON mode, it will create the account if not exists
+    await expect(setLocalAccountPassword("any-username", "aiwb1246790")).resolves.toBeUndefined();
   });
 
-  test("enforces strong password policy", () => {
+  test("enforces password policy", () => {
     expect(validateSuperadminPassword("weak")).toBe(false);
+    expect(validateSuperadminPassword("short1")).toBe(false);
+    expect(validateSuperadminPassword("aiwb1246790")).toBe(true);
     expect(validateSuperadminPassword("Strong!Password1")).toBe(true);
   });
 });
-

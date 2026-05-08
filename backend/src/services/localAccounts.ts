@@ -18,7 +18,7 @@ export type LocalAccount = {
   updated_at: string;
 };
 
-const DEFAULT_ADMIN_USERNAME = "lincube";
+const SUPERADMIN_INITIAL_USERNAME = process.env.SUPERADMIN_INITIAL_USERNAME ?? "admin";
 const SUPERADMIN_INITIAL_PASSWORD = process.env.SUPERADMIN_INITIAL_PASSWORD ?? "";
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCKOUT_DURATION_MINUTES = 15;
@@ -29,16 +29,24 @@ const ARGON2_OPTIONS: argon2.Options & { raw?: false } = {
   parallelism: 1
 };
 
-// In-memory fallback for JSON mode (not recommended for production)
-let memoryAccount: LocalAccount | null = null;
+// In-memory accounts for JSON mode (keyed by username)
+const memoryAccounts = new Map<string, LocalAccount>();
 
-async function ensureDefaultAccount(): Promise<void> {
+async function ensureDefaultAccount(username: string): Promise<void> {
   if (!dbEnabled) {
-    if (!memoryAccount) {
+    // JSON mode is ONLY allowed in development/testing
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("DATABASE_URL is required in production; JSON mode is not allowed");
+    }
+    // JSON mode: only allow the configured default username
+    if (username !== SUPERADMIN_INITIAL_USERNAME) {
+      return;
+    }
+    if (!memoryAccounts.has(username)) {
       const password = SUPERADMIN_INITIAL_PASSWORD || "changeme-local-dev";
-      memoryAccount = {
-        id: "local-admin-1",
-        username: DEFAULT_ADMIN_USERNAME,
+      memoryAccounts.set(username, {
+        id: `local-admin-${username}`,
+        username: username,
         password_hash: await argon2.hash(password, ARGON2_OPTIONS),
         role: "ops",
         is_active: true,
@@ -48,18 +56,17 @@ async function ensureDefaultAccount(): Promise<void> {
         must_change_password: true,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
-      };
+      });
     }
     return;
   }
 }
 
 export async function findLocalAccountByUsername(username: string): Promise<LocalAccount | null> {
-  await ensureDefaultAccount();
+  await ensureDefaultAccount(username);
 
   if (!dbEnabled) {
-    if (memoryAccount && memoryAccount.username === username) return memoryAccount;
-    return null;
+    return memoryAccounts.get(username) ?? null;
   }
 
   const rows = await sql()<LocalAccount[]>`
@@ -80,11 +87,14 @@ export async function dummyVerifyPassword(password: string): Promise<void> {
 
 export async function recordLoginSuccess(id: string): Promise<void> {
   if (!dbEnabled) {
-    if (memoryAccount) {
-      memoryAccount.last_login_at = new Date().toISOString();
-      memoryAccount.failed_attempts = 0;
-      memoryAccount.locked_until = null;
-      memoryAccount.role = "ops";
+    for (const account of memoryAccounts.values()) {
+      if (account.id === id) {
+        account.last_login_at = new Date().toISOString();
+        account.failed_attempts = 0;
+        account.locked_until = null;
+        account.role = "ops";
+        break;
+      }
     }
     return;
   }
@@ -98,11 +108,14 @@ export async function recordLoginSuccess(id: string): Promise<void> {
 
 export async function recordLoginFailure(id: string): Promise<void> {
   if (!dbEnabled) {
-    if (memoryAccount) {
-      memoryAccount.failed_attempts++;
-      if (memoryAccount.failed_attempts >= MAX_FAILED_ATTEMPTS) {
-        const lockUntil = new Date(Date.now() + LOCKOUT_DURATION_MINUTES * 60 * 1000);
-        memoryAccount.locked_until = lockUntil.toISOString();
+    for (const account of memoryAccounts.values()) {
+      if (account.id === id) {
+        account.failed_attempts++;
+        if (account.failed_attempts >= MAX_FAILED_ATTEMPTS) {
+          const lockUntil = new Date(Date.now() + LOCKOUT_DURATION_MINUTES * 60 * 1000);
+          account.locked_until = lockUntil.toISOString();
+        }
+        break;
       }
     }
     return;
@@ -124,45 +137,41 @@ export function isAccountLocked(account: LocalAccount): boolean {
 
 export function validateSuperadminPassword(password: string) {
   const rules = [
-    password.length >= 12,
-    /[A-Z]/.test(password),
+    password.length >= 8,
     /[a-z]/.test(password),
-    /\d/.test(password),
-    /[^A-Za-z0-9]/.test(password)
+    /\d/.test(password)
   ];
   return rules.every(Boolean);
 }
 
 export async function setLocalAccountPassword(username: string, password: string, mustChangePassword = false) {
-  if (username !== DEFAULT_ADMIN_USERNAME) {
-    throw new Error("LOCAL_ACCOUNT_WRITE_FORBIDDEN");
-  }
   if (!validateSuperadminPassword(password)) {
     throw new Error("WEAK_PASSWORD");
   }
   const nextHash = await argon2.hash(password, ARGON2_OPTIONS);
   if (!dbEnabled) {
-    if (!memoryAccount) await ensureDefaultAccount();
-    if (!memoryAccount) throw new Error("SUPERADMIN_NOT_INITIALIZED");
-    memoryAccount.password_hash = nextHash;
-    memoryAccount.must_change_password = mustChangePassword;
-    memoryAccount.role = "ops";
-    memoryAccount.updated_at = new Date().toISOString();
+    await ensureDefaultAccount(username);
+    const account = memoryAccounts.get(username);
+    if (!account) throw new Error("SUPERADMIN_NOT_INITIALIZED");
+    account.password_hash = nextHash;
+    account.must_change_password = mustChangePassword;
+    account.role = "ops";
+    account.updated_at = new Date().toISOString();
     return;
   }
   await sql()`
     update local_accounts
     set password_hash = ${nextHash}, must_change_password = ${mustChangePassword}, role = 'ops', updated_at = now()
-    where username = ${DEFAULT_ADMIN_USERNAME}
+    where username = ${username}
   `;
 }
 
-export async function ensureSuperadminInitialized() {
-  await ensureDefaultAccount();
+export async function ensureSuperadminInitialized(username: string) {
+  await ensureDefaultAccount(username);
   if (!dbEnabled) return;
   const rows = await sql()<LocalAccount[]>`
     select id, username, password_hash, role, is_active, last_login_at, failed_attempts, locked_until, must_change_password, created_at, updated_at
-    from local_accounts where username = ${DEFAULT_ADMIN_USERNAME} limit 1
+    from local_accounts where username = ${username} limit 1
   `;
   if (rows[0]) return;
 
@@ -173,16 +182,16 @@ export async function ensureSuperadminInitialized() {
   const passwordHash = await argon2.hash(generated, ARGON2_OPTIONS);
   await sql()`
     insert into local_accounts (username, password_hash, role, is_active, must_change_password)
-    values (${DEFAULT_ADMIN_USERNAME}, ${passwordHash}, 'ops', true, true)
+    values (${username}, ${passwordHash}, 'ops', true, true)
   `;
   if (!SUPERADMIN_INITIAL_PASSWORD && process.env.NODE_ENV !== "production") {
-    console.warn(`[security] generated superadmin password for lincube: ${generated}`);
+    console.warn(`[security] generated superadmin password for ${username}: ${generated}`);
   }
-  console.warn("[security] 已创建超管账号 lincube，请立即登录修改密码");
+  console.warn(`[security] 已创建超管账号 ${username}，请立即登录修改密码`);
   await logAudit({
     action: "superadmin_seeded",
     entity_type: "local_account",
-    entity_id: DEFAULT_ADMIN_USERNAME,
+    entity_id: username,
     diff: { must_change_password: true }
   }).catch(() => {});
 }
