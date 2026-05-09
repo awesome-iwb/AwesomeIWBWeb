@@ -190,11 +190,18 @@ function checkAuth(user: any, set: any) {
 const storyIdPattern = /^[a-zA-Z0-9_-]{1,64}$/;
 const storyFilePattern = /^[a-zA-Z0-9._-]{1,128}$/;
 const storyFileAllowlist = new Set(["meta.json", "content.md"]);
+const storyImageExtensions = new Set([".webp", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".avif"]);
+
+function isStoryImageFile(filename: string) {
+  const dot = filename.lastIndexOf(".");
+  if (dot === -1) return false;
+  return storyImageExtensions.has(filename.substring(dot).toLowerCase());
+}
 
 function resolveStoryFile(id: string, filename: string) {
   const safeId = path.basename(id);
   const safeFilename = path.basename(filename);
-  if (!storyIdPattern.test(safeId) || !storyFilePattern.test(safeFilename) || !storyFileAllowlist.has(safeFilename)) {
+  if (!storyIdPattern.test(safeId) || !storyFilePattern.test(safeFilename) || (!storyFileAllowlist.has(safeFilename) && !isStoryImageFile(safeFilename))) {
     return null;
   }
   const base = path.resolve(STORIES_DIR);

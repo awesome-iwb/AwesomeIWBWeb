@@ -10,6 +10,7 @@ export async function createSubmission(payload: any) {
 }
 
 export async function listSubmissions(params: { status?: string; q?: string; page?: number; pageSize?: number }) {
+  const db = sql();
   const page = Math.max(1, params.page ?? 1);
   const pageSize = Math.min(100, Math.max(1, params.pageSize ?? 20));
   const offset = (page - 1) * pageSize;
@@ -17,11 +18,11 @@ export async function listSubmissions(params: { status?: string; q?: string; pag
   const status = params.status?.trim() || "pending";
   const q = params.q?.trim();
 
-  const whereParts = [sql`status = ${status}`];
-  if (q) whereParts.push(sql`(payload->>'name' ilike ${"%" + q + "%"} or payload->>'github_url' ilike ${"%" + q + "%"})`);
-  const where = sql.join(whereParts, sql` and `);
+  const whereParts = [db`status = ${status}`];
+  if (q) whereParts.push(db`(payload->>'name' ilike ${"%" + q + "%"} or payload->>'github_url' ilike ${"%" + q + "%"})`);
+  const where = db.join(whereParts, db` and `);
 
-  const items = await sql()<Array<any>>`
+  const items = await db<Array<any>>`
     select id, status, payload, review_note, created_at, updated_at
     from project_submissions
     where ${where}
@@ -29,7 +30,7 @@ export async function listSubmissions(params: { status?: string; q?: string; pag
     limit ${pageSize} offset ${offset}
   `;
 
-  const [{ count }] = await sql()<Array<{ count: string }>>`
+  const [{ count }] = await db<Array<{ count: string }>>`
     select count(*)::text as count
     from project_submissions
     where ${where}

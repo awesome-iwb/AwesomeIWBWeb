@@ -181,7 +181,7 @@ const option = computed(() => {
 
 const handleChartClick = (params: any) => {
   if (params.dataType === 'node' && params.data.name !== props.currentProjectName) {
-    router.push({ name: 'project-detail', params: { name: encodeURIComponent(params.data.name) } });
+    router.push({ name: 'project-detail', params: { name: params.data.name } });
     window.scrollTo(0, 0);
   }
 };

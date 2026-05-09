@@ -6,7 +6,7 @@ import './style.css'
 export const createApp = ViteSSG(
   App,
   { routes },
-  ({ app, router }) => {
+  ({ router }) => {
     setupRouterGuard(router)
   }
 )

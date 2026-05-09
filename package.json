@@ -1,0 +1,33 @@
+{
+  "name": "awesomeiwbweb",
+  "version": "1.0.0",
+  "description": "> 上线必读：`deploy/README.md`",
+  "main": "deploy_backend.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "dependencies": {
+    "asn1": "^0.2.6",
+    "bcrypt-pbkdf": "^1.0.2",
+    "nan": "^2.26.2",
+    "safer-buffer": "^2.1.2",
+    "ssh2": "^1.17.0",
+    "tweetnacl": "^0.14.5"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/awesome-iwb/AwesomeIWBWeb.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/awesome-iwb/AwesomeIWBWeb/issues"
+  },
+  "homepage": "https://github.com/awesome-iwb/AwesomeIWBWeb#readme"
+}

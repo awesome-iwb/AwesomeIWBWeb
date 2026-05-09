@@ -59,10 +59,10 @@ const navigateToProject = (projectName: string) => {
   if (isStoryOpen.value) {
     closeStory();
     setTimeout(() => {
-      router.push({ name: 'project-detail', params: { name: encodeURIComponent(projectName) } });
+      router.push({ name: 'project-detail', params: { name: projectName } });
     }, 500);
   } else {
-    router.push({ name: 'project-detail', params: { name: encodeURIComponent(projectName) } });
+    router.push({ name: 'project-detail', params: { name: projectName } });
   }
 };
 

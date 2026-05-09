@@ -23,7 +23,7 @@ export function buildSessionCookie(token: string) {
     "SameSite=Lax",
     `Max-Age=${JWT_MAX_AGE}`
   ];
-  if (appConfig.isProduction) segments.push("Secure");
+  if (appConfig.cookieSecure) segments.push("Secure");
   if (appConfig.cookieDomain) segments.push(`Domain=${appConfig.cookieDomain}`);
   return segments.join("; ");
 }
@@ -36,7 +36,7 @@ export function buildClearSessionCookie() {
     "SameSite=Lax",
     "Max-Age=0"
   ];
-  if (appConfig.isProduction) segments.push("Secure");
+  if (appConfig.cookieSecure) segments.push("Secure");
   if (appConfig.cookieDomain) segments.push(`Domain=${appConfig.cookieDomain}`);
   return segments.join("; ");
 }

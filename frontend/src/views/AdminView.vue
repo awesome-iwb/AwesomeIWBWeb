@@ -1210,10 +1210,14 @@ const saveProjects = async () => {
 const saveStories = async () => {
   isSaving.value = true;
   try {
-    await adminFetch('/api/stories', {
+    const res = await adminFetch('/api/stories', {
       method: 'POST',
       body: JSON.stringify(stories.value)
     });
+    if (!res.ok) {
+      const json = await res.json().catch(() => ({}));
+      throw new Error(json?.error ?? 'save failed');
+    }
     alert('保存成功！');
   } catch (e) {
     alert('保存失败');

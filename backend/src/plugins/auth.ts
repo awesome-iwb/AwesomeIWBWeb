@@ -21,6 +21,7 @@ const dbEnabled = Boolean(process.env.DATABASE_URL);
 const devAllowDemoAdmin = process.env.DEV_ALLOW_DEMO_ADMIN === "true";
 
 export const authPlugin = new Elysia({ name: "auth" }).derive(
+  { as: "global" },
   async ({ headers, path }): Promise<AuthContext> => {
     // JSON mode: skip auth unless explicitly testing
     if (!dbEnabled) {

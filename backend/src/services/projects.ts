@@ -145,6 +145,7 @@ export async function listProjects(params: {
   page?: number;
   pageSize?: number;
 }) {
+  const db = sql();
   const page = Math.max(1, params.page ?? 1);
   const pageSize = Math.min(100, Math.max(1, params.pageSize ?? 50));
   const offset = (page - 1) * pageSize;
@@ -155,17 +156,17 @@ export async function listProjects(params: {
 
   const orderBy =
     sort === "stars"
-      ? sql`stars desc nulls last, name asc`
+      ? db`stars desc nulls last, name asc`
       : sort === "updated"
-        ? sql`last_update desc nulls last, name asc`
-        : sql`name asc`;
+        ? db`last_update desc nulls last, name asc`
+        : db`name asc`;
 
   const whereParts = [];
-  if (q) whereParts.push(sql`(name ilike ${"%" + q + "%"} or developer ilike ${"%" + q + "%"} or ${q} = any(keywords))`);
-  if (category) whereParts.push(sql`category_id = ${category}`);
-  const where = whereParts.length ? sql.join(whereParts, sql` and `) : sql`true`;
+  if (q) whereParts.push(db`(name ilike ${"%" + q + "%"} or developer ilike ${"%" + q + "%"} or ${q} = any(keywords))`);
+  if (category) whereParts.push(db`category_id = ${category}`);
+  const where = whereParts.length ? db.join(whereParts, db` and `) : db`true`;
 
-  const items = await sql()<ProjectRow[]>`
+  const items = await db<ProjectRow[]>`
     select id, slug, name, category_id, developer, status, version, ai_usage_state, description, keywords, recommendation, github_url, avatar, icon, banner, stars, language, last_update, github_is_fork, github_parent_url, github_source_url, extra
     from projects
     where ${where}
@@ -173,7 +174,7 @@ export async function listProjects(params: {
     limit ${pageSize} offset ${offset}
   `;
 
-  const [{ count }] = await sql()<Array<{ count: string }>>`
+  const [{ count }] = await db<Array<{ count: string }>>`
     select count(*)::text as count from projects where ${where}
   `;
 

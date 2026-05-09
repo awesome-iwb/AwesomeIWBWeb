@@ -4,15 +4,17 @@ export function normalizeProjectTags<T extends Record<string, any>>(project: T):
   const techSet = new Set(tech.map((x: any) => String(x).trim()).filter(Boolean));
 
   const base = stateTags.map((x: any) => String(x).trim()).filter(Boolean);
-  const keywords: string[] = [];
+  const merged: string[] = [];
   const seen = new Set<string>();
 
   for (const t of base) {
     if (techSet.has(t)) continue;
     if (seen.has(t)) continue;
     seen.add(t);
-    keywords.push(t);
+    merged.push(t);
   }
+
+  const keywords = merged.length > 0 ? merged : (Array.isArray(project.keywords) ? project.keywords : []);
 
   return { ...project, keywords } as T;
 }

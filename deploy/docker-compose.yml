@@ -1,0 +1,48 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: awesomeiwb-pg
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - /var/lib/awesomeiwb-pg:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: awesomeiwb-backend
+    restart: unless-stopped
+    env_file:
+      - /etc/awesomeiwb/backend.env
+    environment:
+      HOST: "0.0.0.0"
+      PORT: "8081"
+      DATABASE_URL: ${DATABASE_URL:-postgres://awesomeiwb:awesomeiwb@postgres:5432/awesomeiwb}
+    ports:
+      - "127.0.0.1:8081:8081"
+    volumes:
+      - /opt/awesomeiwb/backend/stories:/app/stories
+      - /opt/awesomeiwb/backend/runtime:/app/runtime
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8081/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s

@@ -54,6 +54,32 @@ if (!process.env.JWT_SECRET && nodeEnv !== "production") {
   console.warn("[security] JWT_SECRET not set in non-production, using ephemeral secret");
 }
 
+/** Session cookies: Secure only when the public site URL is HTTPS (or inferred safe). Never force Secure on plain HTTP deployments. */
+function resolveCookieSecure(): boolean {
+  if (process.env.FORCE_INSECURE_COOKIES === "true") return false;
+
+  const raw =
+    process.env.PUBLIC_BASE_URL?.trim() ||
+    process.env.FRONTEND_URL?.trim() ||
+    process.env.VITE_PUBLIC_BASE_URL?.trim() ||
+    "";
+
+  try {
+    if (raw) {
+      const u = new URL(raw);
+      return u.protocol === "https:";
+    }
+  } catch {
+    /* fall through */
+  }
+
+  if (process.env.COOKIE_SECURE === "true") return true;
+  if (process.env.COOKIE_SECURE === "false") return false;
+
+  // Without an explicit https:// base URL, do not set Secure (plain HTTP / IP deployments).
+  return false;
+}
+
 export const appConfig = {
   nodeEnv,
   isProduction: nodeEnv === "production",
@@ -78,5 +104,6 @@ export const appConfig = {
     application: process.env.CASDOOR_APPLICATION_NAME?.trim() || "awesome-iwb",
     redirectUri: process.env.CASDOOR_REDIRECT_URI?.trim() || "http://localhost:8080/api/auth/callback",
     allowedRedirectOrigins: parseList(process.env.AUTH_REDIRECT_ALLOWLIST || process.env.ALLOWED_ORIGINS)
-  }
+  },
+  cookieSecure: resolveCookieSecure()
 } as const;

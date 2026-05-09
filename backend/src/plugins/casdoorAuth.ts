@@ -1,7 +1,7 @@
 import { Elysia } from "elysia";
 import { createHash, createHmac, randomBytes, randomUUID } from "crypto";
 import { signJwt } from "../utils/jwt";
-import { bumpUserTokenVersion, createUser, findUserByCasdoorId, updateUserLogin } from "../services/users";
+import { bumpUserTokenVersion, createUser, findUserByCasdoorId, findUserById, findUserByName, updateUserLogin } from "../services/users";
 import { appConfig } from "../config";
 import { clearSessionCookie, parseCookieHeader, setSessionCookie } from "../utils/cookies";
 import { checkRateLimit } from "./rateLimit";
@@ -13,6 +13,19 @@ const CASDOOR_ORGANIZATION = process.env.CASDOOR_ORGANIZATION_NAME ?? "stcn";
 const CASDOOR_APPLICATION = process.env.CASDOOR_APPLICATION_NAME ?? "awesome-iwb";
 const CASDOOR_REDIRECT_URI = process.env.CASDOOR_REDIRECT_URI ?? "http://localhost:5173/me";
 const FRONTEND_URL = process.env.FRONTEND_URL ?? "http://localhost:5173";
+
+const JWT_SUB_LOCAL_PREFIX = "local:";
+const JWT_SUB_TOKEN_PREFIX = "token:";
+const PG_ENABLED = Boolean(process.env.DATABASE_URL);
+
+/** Postgres `local_accounts.id` is a UUID; JSON/dev mode may use non-UUID ids. */
+const LOCAL_SUBJECT_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function isAllowedLocalSubjectId(raw: string): boolean {
+  if (!raw) return false;
+  if (LOCAL_SUBJECT_UUID_RE.test(raw)) return true;
+  return !PG_ENABLED && /^[\w.-]+$/.test(raw) && raw.length <= 160;
+}
 
 const stateStore = new Map<string, { createdAt: number }>();
 const OAUTH_STATE_COOKIE = "awesomeiwb_oauth_state";
@@ -55,14 +68,14 @@ function decodeStateCookie(cookieValue?: string) {
 function setOauthStateCookie(set: any, payload: { state: string; codeVerifier: string; returnTo: string }) {
   const value = encodeStateCookie(payload);
   const parts = [`${OAUTH_STATE_COOKIE}=${value}`, "Path=/", "HttpOnly", "SameSite=Lax", "Max-Age=600"];
-  if (appConfig.isProduction) parts.push("Secure");
+  if (appConfig.cookieSecure) parts.push("Secure");
   if (appConfig.cookieDomain) parts.push(`Domain=${appConfig.cookieDomain}`);
   set.headers["set-cookie"] = parts.join("; ");
 }
 
 function clearOauthStateCookie(set: any) {
   const parts = [`${OAUTH_STATE_COOKIE}=`, "Path=/", "HttpOnly", "SameSite=Lax", "Max-Age=0"];
-  if (appConfig.isProduction) parts.push("Secure");
+  if (appConfig.cookieSecure) parts.push("Secure");
   if (appConfig.cookieDomain) parts.push(`Domain=${appConfig.cookieDomain}`);
   set.headers["set-cookie"] = parts.join("; ");
 }
@@ -234,10 +247,7 @@ export const casdoorAuthPlugin = new Elysia({ prefix: "/api/auth" })
 
     const account = casdoorUser.data ?? casdoorUser;
     const casdoorId = String(account?.id ?? account?.sub ?? "");
-    // STCN username = Casdoor's `name` field (unique account name)
-    // Display name = Casdoor's `displayName` field (shown in UI)
-    const stcnUsername = String(account?.name ?? account?.username ?? "");
-    const displayName = String(account?.displayName ?? stcnUsername ?? "User");
+    const name = String(account?.displayName ?? account?.name ?? account?.username ?? "User");
     const avatar = String(account?.avatar ?? "");
     const email = String(account?.email ?? "");
 
@@ -249,21 +259,17 @@ export const casdoorAuthPlugin = new Elysia({ prefix: "/api/auth" })
     let user = await findUserByCasdoorId(casdoorId);
     if (user) {
       user = await updateUserLogin(user.id, {
-        name: displayName,
+        name,
         avatar_url: avatar,
-        avatar_source: avatar ? "casdoor" : "default",
         email,
-        stcn_username: stcnUsername,
       });
     } else {
       user = await createUser({
         casdoor_id: casdoorId,
-        name: displayName,
+        name,
         avatar_url: avatar,
-        avatar_source: avatar ? "casdoor" : "default",
         email,
         role: "user",
-        stcn_username: stcnUsername,
       });
     }
 
@@ -306,14 +312,41 @@ export const casdoorAuthPlugin = new Elysia({ prefix: "/api/auth" })
     }
 
     const { verifyJwt } = await import("../utils/jwt");
-    const { findUserById } = await import("../services/users");
+    const { findLocalAccountByUsername } = await import("../services/localAccounts");
     const payload = verifyJwt(token);
     if (!payload) {
       set.status = 401;
       return { error: "Invalid token" };
     }
+    if (!payload.name) {
+      set.status = 401;
+      return { error: "Invalid token" };
+    }
 
-    const user = await findUserById(payload.sub);
+    const subject = payload.sub;
+
+    let user =
+      subject.startsWith(JWT_SUB_LOCAL_PREFIX)
+        ? await (async () => {
+            const localId = subject.slice(JWT_SUB_LOCAL_PREFIX.length);
+            if (!isAllowedLocalSubjectId(localId)) return null;
+
+            const account = await findLocalAccountByUsername(payload.name);
+            if (!account || account.id !== localId || !account.is_active) return null;
+
+            const u = await findUserByName(account.username);
+            if (!u || !u.is_active) return null;
+            return u;
+          })()
+        : subject.startsWith(JWT_SUB_TOKEN_PREFIX)
+          ? null
+          : await (async () => {
+              const u = await findUserById(subject);
+              if (!u || !u.is_active) return null;
+              if ((payload.tv ?? 0) !== (u.token_version ?? 0)) return null;
+              return u;
+            })();
+
     if (!user || !user.is_active) {
       set.status = 401;
       return { error: "User not found or inactive" };
@@ -325,9 +358,7 @@ export const casdoorAuthPlugin = new Elysia({ prefix: "/api/auth" })
         name: user.name,
         role: user.role,
         avatar_url: user.avatar_url,
-        avatar_source: user.avatar_source,
         email: user.email,
-        stcn_username: user.stcn_username,
         stcn_user_id: user.stcn_user_id,
         sectl_user_id: user.sectl_user_id,
         lincube_user_id: user.lincube_user_id,

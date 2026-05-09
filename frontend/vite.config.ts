@@ -154,7 +154,7 @@ export default defineConfig({
     includedRoutes(paths: string[]) {
       return paths.filter(i => !i.includes(':')).concat(projectRoutes);
     },
-    onPageRendered(route, html) {
+    onPageRendered(route: string, html: string) {
       return injectHeadTags(html, route);
     },
     async onFinished() {
