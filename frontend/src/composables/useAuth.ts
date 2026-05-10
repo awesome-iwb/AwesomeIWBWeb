@@ -14,6 +14,8 @@ export type AuthUser = {
   lincube_user_id: string;
   email?: string;
   avatar_url?: string;
+  is_superadmin?: boolean;
+  capabilities?: string[];
 };
 
 const user = ref<AuthUser | null>(null);
@@ -27,13 +29,22 @@ const loadOnce = () => {
 };
 
 const persist = () => {
-  // Cookie-based auth: no localStorage persistence.
 };
 
 export const useAuth = () => {
   loadOnce();
 
   const isAuthenticated = computed(() => Boolean(user.value));
+
+  const isSuperadmin = computed(() => user.value?.is_superadmin === true);
+
+  const capabilities = computed(() => user.value?.capabilities ?? []);
+
+  const hasCapability = (cap: string) => {
+    if (!user.value) return false;
+    if (user.value.is_superadmin) return true;
+    return user.value.capabilities?.includes(cap) ?? false;
+  };
 
   const setToken = (newToken: string, newUser?: Partial<AuthUser>) => {
     token.value = newToken;
@@ -49,6 +60,8 @@ export const useAuth = () => {
         lincube_user_id: newUser.lincube_user_id ?? user.value?.lincube_user_id ?? '',
         id: newUser.id ?? user.value?.id,
         email: newUser.email ?? user.value?.email,
+        is_superadmin: newUser.is_superadmin ?? user.value?.is_superadmin ?? false,
+        capabilities: newUser.capabilities ?? user.value?.capabilities ?? [],
       };
     }
     persist();
@@ -98,6 +111,17 @@ export const useAuth = () => {
           sectl_user_id: json.user.sectl_user_id,
           lincube_user_id: json.user.lincube_user_id,
         };
+        try {
+          const capRes = await fetch('/api/user/capabilities', { credentials: 'include' });
+          if (capRes.ok) {
+            const capJson = await capRes.json();
+            user.value = {
+              ...user.value,
+              is_superadmin: capJson.is_superadmin ?? false,
+              capabilities: capJson.capabilities ?? [],
+            };
+          }
+        } catch {}
         persist();
         return true;
       }
@@ -196,6 +220,9 @@ export const useAuth = () => {
     user,
     token,
     isAuthenticated,
+    isSuperadmin,
+    capabilities,
+    hasCapability,
     loginWithPassword,
     loginWithCasdoor,
     handleCallback,

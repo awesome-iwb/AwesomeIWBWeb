@@ -52,11 +52,12 @@ import {
   markNotificationRead,
   markAllNotificationsRead,
 } from "./services/notifications";
-import { authPlugin, requireAuth, requireRole } from "./plugins/auth";
+import { authPlugin, requireAuth, requireRole, requireCapability } from "./plugins/auth";
 import { casdoorAuthPlugin } from "./plugins/casdoorAuth";
 import { localAuthPlugin } from "./plugins/localAuth";
 import { listUsers, setUserRole, setUserActive, updateUserLogin } from "./services/users";
-import { ensureSuperadminInitialized } from "./services/localAccounts";
+import { ensureSuperadminInitialized, SUPERADMIN_INITIAL_USERNAME } from "./services/localAccounts";
+import { listCapabilities, getUserCapabilitiesWithInfo, setUserCapabilities, isSuperadmin as isSuperadminUser } from "./services/capabilities";
 import { appConfig } from "./config";
 import { checkRateLimit } from "./plugins/rateLimit";
 
@@ -169,19 +170,27 @@ async function logAuditCompat(input: { actor?: string; action: string; entity_ty
   } catch {}
 }
 
-function checkOps(user: any, set: any) {
+function checkAuth(user: any, set: any) {
   if (!dbEnabled) return false;
-  if (!user || (user.role !== 'ops' && user.role !== 'superadmin')) {
-    set.status = 403;
+  if (!user) {
+    set.status = 401;
     return true;
   }
   return false;
 }
 
-function checkAuth(user: any, set: any) {
+async function checkCap(user: any, set: any, capabilityId: string): Promise<boolean> {
   if (!dbEnabled) return false;
   if (!user) {
     set.status = 401;
+    return true;
+  }
+  if (isSuperadminUser(user.name)) return false;
+  if (user.id?.startsWith("token:")) return false;
+  const { userHasCapability } = await import("./services/capabilities");
+  const has = await userHasCapability(user.id, user.name, capabilityId);
+  if (!has) {
+    set.status = 403;
     return true;
   }
   return false;
@@ -309,11 +318,10 @@ const app = new Elysia()
         status: status === "open" || status === "closed" ? (status as any) : undefined,
         limit
       });
-      // Include current user's pending moderation entries so they can see their own pending submissions
       if (user?.name) {
         const [pendingComments, pendingBugs] = await Promise.all([
-          listCommentModeration({ status: "pending", actor_username: user.name, pageSize: 100 }),
-          listBugModeration({ status: "pending", actor_username: user.name, pageSize: 100 }),
+          listCommentModeration({ status: "pending", actor_username: user.name, project_name: project_name || undefined, pageSize: 100 }),
+          listBugModeration({ status: "pending", actor_username: user.name, project_name: project_name || undefined, pageSize: 100 }),
         ]);
         const moderatedComments = pendingComments.items.map((m) => ({
           id: `mod-comment-${m.id}`,
@@ -515,7 +523,7 @@ const app = new Elysia()
     return created;
   })
   .post("/api/admin/categories", async ({ body, set, user }) => {
-    if (checkOps(user, set)) return { error: "Forbidden" };
+    if (await checkCap(user, set, "category:manage")) return { error: "Forbidden" };
     const input = body as any;
     if (!input?.name) {
       set.status = 400;
@@ -533,7 +541,7 @@ const app = new Elysia()
     return created;
   })
   .put("/api/admin/categories/:id", async ({ params: { id }, body, set, user }) => {
-    if (checkOps(user, set)) return { error: "Forbidden" };
+    if (await checkCap(user, set, "category:manage")) return { error: "Forbidden" };
     if (!dbEnabled) {
       const cat = (data as any).categories.find((c: any) => String(c.id) === String(id));
       if (!cat) {
@@ -559,7 +567,7 @@ const app = new Elysia()
     return updated;
   })
   .delete("/api/admin/categories/:id", async ({ params: { id }, set, user }) => {
-    if (checkOps(user, set)) return { error: "Forbidden" };
+    if (await checkCap(user, set, "category:manage")) return { error: "Forbidden" };
     if (!dbEnabled) {
       const idx = (data as any).categories.findIndex((c: any) => String(c.id) === String(id));
       if (idx === -1) {
@@ -584,7 +592,7 @@ const app = new Elysia()
     return res;
   })
   .post("/api/admin/projects", async ({ body, set, user }) => {
-    if (checkOps(user, set)) return { error: "Forbidden" };
+    if (await checkCap(user, set, "project:create")) return { error: "Forbidden" };
     const input = body as any;
     if (!input?.name) {
       set.status = 400;
@@ -630,7 +638,7 @@ const app = new Elysia()
     return created;
   })
   .put("/api/admin/projects/:id", async ({ params: { id }, body, set, user }) => {
-    if (checkOps(user, set)) return { error: "Forbidden" };
+    if (await checkCap(user, set, "project:update")) return { error: "Forbidden" };
     if (!dbEnabled) {
       const key = decodeURIComponent(id);
       let foundCat: any = null;
@@ -708,7 +716,7 @@ const app = new Elysia()
     return updated;
   })
   .delete("/api/admin/projects/:id", async ({ params: { id }, set, user }) => {
-    if (checkOps(user, set)) return { error: "Forbidden" };
+    if (await checkCap(user, set, "project:delete")) return { error: "Forbidden" };
     if (!dbEnabled) {
       const key = decodeURIComponent(id);
       for (const c of (data as any).categories) {
@@ -729,14 +737,14 @@ const app = new Elysia()
     return res;
   })
   .get("/api/admin/categories", async ({ set, user }) => {
-    if (checkOps(user, set)) return { error: "Forbidden" };
+    if (await checkCap(user, set, "category:manage")) return { error: "Forbidden" };
     if (!dbEnabled) {
       return (data as any).categories.map((c: any) => ({ id: c.id ?? c.name, name: c.name, description: c.description ?? "", sort_index: 0 }));
     }
     return await listCategories();
   })
   .get("/api/admin/projects", async ({ query, set, user }) => {
-    if (checkOps(user, set)) return { error: "Forbidden" };
+    if (await checkCap(user, set, "project:read")) return { error: "Forbidden" };
     const q = typeof query.q === "string" ? query.q : undefined;
     const category = typeof query.category === "string" ? query.category : undefined;
     const sort =
@@ -765,7 +773,7 @@ const app = new Elysia()
     return await listProjects({ q, category, sort, page, pageSize });
   })
   .get("/api/admin/projects/export.json", async ({ set, user }) => {
-    if (checkOps(user, set)) return { error: "Forbidden" };
+    if (await checkCap(user, set, "project:export")) return { error: "Forbidden" };
     if (!dbEnabled) {
       await logAuditCompat({ action: "export_json", entity_type: "project", entity_id: "" }, user?.name);
       return data;
@@ -774,7 +782,7 @@ const app = new Elysia()
     return await getCatalog();
   })
   .get("/api/admin/projects/export.csv", async ({ set, user }) => {
-    if (checkOps(user, set)) return { error: "Forbidden" };
+    if (await checkCap(user, set, "project:export")) return { error: "Forbidden" };
     if (!dbEnabled) {
       await logAuditCompat({ action: "export_csv", entity_type: "project", entity_id: "" }, user?.name);
       const rows: Record<string, any>[] = [];
@@ -863,7 +871,7 @@ const app = new Elysia()
     });
   })
   .post("/api/admin/projects/import.json", async ({ body, set, user }) => {
-    if (checkOps(user, set)) return { error: "Forbidden" };
+    if (await checkCap(user, set, "project:import")) return { error: "Forbidden" };
       const payload: any = body as any;
       const incomingProjects: any[] = [];
       const incomingCategories: any[] = Array.isArray(payload?.categories) ? payload.categories : [];
@@ -947,7 +955,7 @@ const app = new Elysia()
   .post(
     "/api/admin/projects/import.csv",
     async ({ body, set, user }) => {
-      if (checkOps(user, set)) return { error: "Forbidden" };
+      if (await checkCap(user, set, "project:import")) return { error: "Forbidden" };
       const file = (body as any).file as File | undefined;
       if (!file) {
         set.status = 400;
@@ -1031,7 +1039,7 @@ const app = new Elysia()
     }
   )
   .get("/api/admin/audit-logs", async ({ query, set, user }) => {
-    if (checkOps(user, set)) return { error: "Forbidden" };
+    if (await checkCap(user, set, "audit:read")) return { error: "Forbidden" };
     const page = typeof query.page === "string" ? Number(query.page) : undefined;
     const pageSize = typeof query.pageSize === "string" ? Number(query.pageSize) : undefined;
     if (!dbEnabled) {
@@ -1043,12 +1051,12 @@ const app = new Elysia()
     return await listAuditLogs({ page, pageSize });
   })
   .get("/api/admin/projects/:id/revisions", async ({ params: { id }, set, user }) => {
-    if (checkOps(user, set)) return { error: "Forbidden" };
+    if (await checkCap(user, set, "project:read")) return { error: "Forbidden" };
     if (!dbEnabled) return revisionsFile[id] ?? [];
     return await listProjectRevisions(id);
   })
   .post("/api/admin/projects/:id/rollback", async ({ params: { id }, body, set, user }) => {
-    if (checkOps(user, set)) return { error: "Forbidden" };
+    if (await checkCap(user, set, "project:rollback")) return { error: "Forbidden" };
     const revisionId = (body as any)?.revisionId;
     if (!revisionId) {
       set.status = 400;
@@ -1151,7 +1159,7 @@ const app = new Elysia()
     return { success: true, submissionId: created.id };
   })
   .get("/api/admin/submissions", async ({ query, set, user }) => {
-    if (checkOps(user, set)) return { error: "Forbidden" };
+    if (await checkCap(user, set, "submission:read")) return { error: "Forbidden" };
     const status = typeof query.status === "string" ? query.status : undefined;
     const q = typeof query.q === "string" ? query.q : undefined;
     const page = typeof query.page === "string" ? Number(query.page) : undefined;
@@ -1172,7 +1180,7 @@ const app = new Elysia()
     return await listSubmissions({ status, q, page, pageSize });
   })
   .get("/api/admin/submissions/:id", async ({ params: { id }, set, user }) => {
-    if (checkOps(user, set)) return { error: "Forbidden" };
+    if (await checkCap(user, set, "submission:read")) return { error: "Forbidden" };
     const item = !dbEnabled ? submissionsFile.find((s: any) => s.id === id) : await getSubmission(id);
     if (!item) {
       set.status = 404;
@@ -1181,7 +1189,7 @@ const app = new Elysia()
     return item;
   })
   .post("/api/admin/submissions/:id/reject", async ({ params: { id }, body, set, user }) => {
-    if (checkOps(user, set)) return { error: "Forbidden" };
+    if (await checkCap(user, set, "submission:reject")) return { error: "Forbidden" };
     const note = String((body as any)?.review_note ?? "");
     if (!dbEnabled) {
       const s = submissionsFile.find((x: any) => x.id === id);
@@ -1205,7 +1213,7 @@ const app = new Elysia()
     return { success: true };
   })
   .post("/api/admin/submissions/:id/approve", async ({ params: { id }, body, set, user }) => {
-    if (checkOps(user, set)) return { error: "Forbidden" };
+    if (await checkCap(user, set, "submission:approve")) return { error: "Forbidden" };
     try {
       const submission = !dbEnabled ? submissionsFile.find((s: any) => s.id === id) : await getSubmission(id);
       if (!submission) {
@@ -1422,7 +1430,7 @@ const app = new Elysia()
     return Bun.file(resolved.resolved);
   })
   .post("/api/stories", async ({ body, set, user }) => {
-    if (checkOps(user, set)) return { error: "Forbidden" };
+    if (await checkCap(user, set, "story:manage")) return { error: "Forbidden" };
     // In a real app, we'd save this to the DB/JSON file. For now, we update in-memory and write to file.
     const newStories = body as any;
     
@@ -1540,7 +1548,7 @@ const app = new Elysia()
     })
   })
   .get("/api/admin/users", async ({ query, set, user }) => {
-    if (checkOps(user, set)) return { error: "Forbidden" };
+    if (await checkCap(user, set, "user:read")) return { error: "Forbidden" };
     const q = typeof query.q === "string" ? query.q : undefined;
     const role = typeof query.role === "string" ? query.role : undefined;
     const page = typeof query.page === "string" ? Number(query.page) : undefined;
@@ -1548,7 +1556,7 @@ const app = new Elysia()
     return await listUsers({ q, role, page, pageSize });
   })
   .patch("/api/admin/users/:id/role", async ({ params: { id }, body, set, user }) => {
-    if (checkOps(user, set)) return { error: "Forbidden" };
+    if (await checkCap(user, set, "user:manage")) return { error: "Forbidden" };
     const role = (body as any)?.role;
     if (!role || !["user", "dev", "ops"].includes(role)) {
       set.status = 400;
@@ -1563,7 +1571,7 @@ const app = new Elysia()
     return updated;
   })
   .patch("/api/admin/users/:id/active", async ({ params: { id }, body, set, user }) => {
-    if (checkOps(user, set)) return { error: "Forbidden" };
+    if (await checkCap(user, set, "user:manage")) return { error: "Forbidden" };
     const isActive = (body as any)?.is_active;
     if (typeof isActive !== "boolean") {
       set.status = 400;
@@ -1578,7 +1586,7 @@ const app = new Elysia()
     return updated;
   })
   .get("/api/admin/moderation/comments", async ({ query, set, user }) => {
-    if (checkOps(user, set)) return { error: "Forbidden" };
+    if (await checkCap(user, set, "moderation:read")) return { error: "Forbidden" };
     const status = typeof query.status === "string" ? query.status : undefined;
     const actor_username = typeof query.actor_username === "string" ? query.actor_username : undefined;
     const page = typeof query.page === "string" ? Number(query.page) : undefined;
@@ -1586,7 +1594,7 @@ const app = new Elysia()
     return await listCommentModeration({ status: status as any, actor_username, page, pageSize });
   })
   .get("/api/admin/moderation/bugs", async ({ query, set, user }) => {
-    if (checkOps(user, set)) return { error: "Forbidden" };
+    if (await checkCap(user, set, "moderation:read")) return { error: "Forbidden" };
     const status = typeof query.status === "string" ? query.status : undefined;
     const actor_username = typeof query.actor_username === "string" ? query.actor_username : undefined;
     const page = typeof query.page === "string" ? Number(query.page) : undefined;
@@ -1594,7 +1602,7 @@ const app = new Elysia()
     return await listBugModeration({ status: status as any, actor_username, page, pageSize });
   })
   .post("/api/admin/moderation/comments/:id/approve", async ({ params: { id }, set, user }) => {
-    if (checkOps(user, set)) return { error: "Forbidden" };
+    if (await checkCap(user, set, "moderation:approve")) return { error: "Forbidden" };
     const moderation = await getCommentModeration(id);
     if (!moderation) {
       set.status = 404;
@@ -1620,7 +1628,7 @@ const app = new Elysia()
     return { success: true, feedback_entry_id: feedback.id };
   })
   .post("/api/admin/moderation/comments/:id/reject", async ({ params: { id }, body, set, user }) => {
-    if (checkOps(user, set)) return { error: "Forbidden" };
+    if (await checkCap(user, set, "moderation:reject")) return { error: "Forbidden" };
     const moderation = await getCommentModeration(id);
     if (!moderation) {
       set.status = 404;
@@ -1636,7 +1644,7 @@ const app = new Elysia()
     return { success: true };
   })
   .post("/api/admin/moderation/bugs/:id/approve", async ({ params: { id }, set, user }) => {
-    if (checkOps(user, set)) return { error: "Forbidden" };
+    if (await checkCap(user, set, "moderation:approve")) return { error: "Forbidden" };
     const moderation = await getBugModeration(id);
     if (!moderation) {
       set.status = 404;
@@ -1662,7 +1670,7 @@ const app = new Elysia()
     return { success: true, feedback_entry_id: feedback.id };
   })
   .post("/api/admin/moderation/bugs/:id/reject", async ({ params: { id }, body, set, user }) => {
-    if (checkOps(user, set)) return { error: "Forbidden" };
+    if (await checkCap(user, set, "moderation:reject")) return { error: "Forbidden" };
     const moderation = await getBugModeration(id);
     if (!moderation) {
       set.status = 404;
@@ -1707,6 +1715,44 @@ const app = new Elysia()
   .post("/api/notifications/read-all", async ({ set, user }) => {
     if (checkAuth(user, set)) return { error: "Unauthorized" };
     await markAllNotificationsRead(user.name);
+    return { success: true };
+  })
+  .get("/api/capabilities", async ({ set, user }) => {
+    if (checkAuth(user, set)) return { error: "Unauthorized" };
+    const allCaps = await listCapabilities();
+    return { capabilities: allCaps };
+  })
+  .get("/api/user/capabilities", async ({ set, user }) => {
+    if (checkAuth(user, set)) return { error: "Unauthorized" };
+    const info = await getUserCapabilitiesWithInfo(user.id, user.name);
+    return info;
+  })
+  .get("/api/admin/users/:id/capabilities", async ({ params: { id }, set, user }) => {
+    if (await checkCap(user, set, "user:manage")) return { error: "Forbidden" };
+    const { findUserById } = await import("./services/users");
+    const target = await findUserById(id);
+    if (!target) {
+      set.status = 404;
+      return { error: "User not found" };
+    }
+    const info = await getUserCapabilitiesWithInfo(id, target.name);
+    return info;
+  })
+  .put("/api/admin/users/:id/capabilities", async ({ params: { id }, body, set, user }) => {
+    if (await checkCap(user, set, "user:manage")) return { error: "Forbidden" };
+    const { findUserById } = await import("./services/users");
+    const target = await findUserById(id);
+    if (!target) {
+      set.status = 404;
+      return { error: "User not found" };
+    }
+    if (isSuperadminUser(target.name)) {
+      set.status = 403;
+      return { error: "Cannot modify superadmin capabilities" };
+    }
+    const capabilityIds: string[] = (body as any)?.capabilities ?? [];
+    await setUserCapabilities(id, capabilityIds);
+    await logAuditCompat({ action: "update_capabilities", entity_type: "user", entity_id: id, diff: { capabilities: capabilityIds } }, user?.name);
     return { success: true };
   })
   .listen(Number(process.env.PORT ?? 8081));

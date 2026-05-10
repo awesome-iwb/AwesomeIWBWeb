@@ -3,6 +3,7 @@ import { verifyJwt, hashToken } from "../utils/jwt";
 import { findUserById } from "../services/users";
 import { findActiveTokenByHash, recordTokenUsage } from "../services/apiTokens";
 import { findLocalAccountByUsername } from "../services/localAccounts";
+import { userHasCapability, isSuperadmin } from "../services/capabilities";
 import { appConfig } from "../config";
 import { parseCookieHeader } from "../utils/cookies";
 
@@ -23,7 +24,6 @@ const devAllowDemoAdmin = process.env.DEV_ALLOW_DEMO_ADMIN === "true";
 export const authPlugin = new Elysia({ name: "auth" }).derive(
   { as: "global" },
   async ({ headers, path }): Promise<AuthContext> => {
-    // JSON mode: skip auth unless explicitly testing
     if (!dbEnabled) {
       return { user: null };
     }
@@ -34,10 +34,8 @@ export const authPlugin = new Elysia({ name: "auth" }).derive(
     const token = cookies[appConfig.sessionCookieName] || bearerMatch?.[1];
     if (!token) return { user: null };
 
-    // Try JWT first
     const jwtPayload = verifyJwt(token, { iss: appConfig.jwtIssuer, aud: appConfig.jwtAudience });
     if (jwtPayload) {
-      // Local account JWT (sub format: "local:<id>")
       if (jwtPayload.sub.startsWith("local:")) {
         const localId = jwtPayload.sub.slice(6);
         const account = await findLocalAccountByUsername(jwtPayload.name);
@@ -54,7 +52,6 @@ export const authPlugin = new Elysia({ name: "auth" }).derive(
         return { user: null };
       }
 
-      // Regular OAuth user JWT
       const dbUser = await findUserById(jwtPayload.sub);
       if (dbUser && dbUser.is_active && (jwtPayload.tv ?? 0) === (dbUser.token_version ?? 0)) {
         return {
@@ -66,11 +63,9 @@ export const authPlugin = new Elysia({ name: "auth" }).derive(
           },
         };
       }
-      // JWT valid but user not in DB or inactive
       return { user: null };
     }
 
-    // Try API token
     if (bearerMatch?.[1]) {
       const tokenHash = hashToken(bearerMatch[1]);
       const apiToken = await findActiveTokenByHash(tokenHash);
@@ -120,6 +115,23 @@ export function requireAuthOrDev() {
     if (!user && !devAllowDemoAdmin) {
       set.status = 401;
       return { error: "Unauthorized" };
+    }
+  };
+}
+
+export function requireCapability(capabilityId: string) {
+  return async ({ user, set }: { user: AuthUser | null; set: any }) => {
+    if (!dbEnabled) return;
+    if (!user) {
+      set.status = 401;
+      return { error: "Unauthorized" };
+    }
+    if (isSuperadmin(user.name)) return;
+    if (user.id.startsWith("token:")) return;
+    const has = await userHasCapability(user.id, user.name, capabilityId);
+    if (!has) {
+      set.status = 403;
+      return { error: "Forbidden: insufficient capability" };
     }
   };
 }

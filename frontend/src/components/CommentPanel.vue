@@ -112,7 +112,11 @@ const fetchEntries = async () => {
     const json = await res.json();
     if (!res.ok) throw new Error(json?.error ?? 'load failed');
     const list = Array.isArray(json) ? json : Array.isArray(json?.items) ? json.items : [];
-    entries.value = list.map(mapFromApi).filter(Boolean) as Entry[];
+    entries.value = list.map(mapFromApi).filter((e: Entry | null): e is Entry => {
+      if (!e) return false;
+      if (e.project_name && e.project_name !== props.projectName) return false;
+      return true;
+    });
   } catch (e: any) {
     loadError.value = e?.message ?? '加载失败';
     entries.value = [];

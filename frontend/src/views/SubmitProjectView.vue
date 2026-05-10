@@ -7,8 +7,11 @@ import {
   Layers, 
   Sparkles,
   CheckCircle2,
-  ExternalLink
+  ExternalLink,
+  Upload,
+  X
 } from 'lucide-vue-next';
+import ImageCropper from '../components/ImageCropper.vue';
 
 useHead({
   title: '提交新项目 - Awesome IWB',
@@ -26,7 +29,6 @@ useHead({
   ]
 })
 
-// Form State
 const form = ref({
   name: '',
   developer: '',
@@ -38,6 +40,8 @@ const form = ref({
   recommendation: '稳定'
 });
 
+const iconUrl = ref('');
+const bannerUrl = ref('');
 const isSubmitted = ref(false);
 
 const categories = ref<string[]>([]);
@@ -63,6 +67,70 @@ const isSubmitting = ref(false);
 const submitError = ref('');
 const submissionId = ref('');
 
+const uploadImage = async (blob: Blob): Promise<string | null> => {
+  const fd = new FormData();
+  fd.append('image', blob, 'upload.webp');
+  const res = await fetch('/api/upload', { method: 'POST', body: fd, credentials: 'include' });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json?.error ?? '上传失败');
+  return String(json?.url ?? '');
+};
+
+const iconInputRef = ref<HTMLInputElement | null>(null);
+const bannerInputRef = ref<HTMLInputElement | null>(null);
+
+const cropperVisible = ref(false);
+const cropperSrc = ref('');
+const cropperTarget = ref<'icon' | 'banner'>('icon');
+
+const triggerIconUpload = () => {
+  iconInputRef.value?.click();
+};
+
+const triggerBannerUpload = () => {
+  bannerInputRef.value?.click();
+};
+
+const handleFileSelected = (event: Event, target: 'icon' | 'banner') => {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    cropperSrc.value = e.target?.result as string;
+    cropperTarget.value = target;
+    cropperVisible.value = true;
+  };
+  reader.readAsDataURL(file);
+
+  input.value = '';
+};
+
+const handleCropConfirm = async (blob: Blob) => {
+  cropperVisible.value = false;
+  try {
+    const url = await uploadImage(blob);
+    if (url) {
+      if (cropperTarget.value === 'icon') {
+        iconUrl.value = url;
+      } else {
+        bannerUrl.value = url;
+      }
+    }
+  } catch {
+    submitError.value = '图片上传失败，请重试';
+  }
+};
+
+const handleCropCancel = () => {
+  cropperVisible.value = false;
+  cropperSrc.value = '';
+};
+
+const removeIcon = () => { iconUrl.value = ''; };
+const removeBanner = () => { bannerUrl.value = ''; };
+
 const handleSubmit = async () => {
   if (!form.value.name || !form.value.developer || !form.value.githubUrl) {
     alert('请填写项目名称、开发者和GitHub链接');
@@ -73,21 +141,25 @@ const handleSubmit = async () => {
   submitError.value = '';
   
   try {
+    const payload: any = {
+      name: form.value.name,
+      developer: form.value.developer,
+      github_url: form.value.githubUrl,
+      description: form.value.description,
+      keywords: form.value.tags,
+      category: form.value.category,
+      status: form.value.status,
+      recommendation: form.value.recommendation,
+    };
+    if (iconUrl.value) payload.icon_url = iconUrl.value;
+    if (bannerUrl.value) payload.banner_url = bannerUrl.value;
+
     const response = await fetch('/api/submissions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({
-        name: form.value.name,
-        developer: form.value.developer,
-        github_url: form.value.githubUrl,
-        description: form.value.description,
-        keywords: form.value.tags,
-        category: form.value.category,
-        status: form.value.status,
-        recommendation: form.value.recommendation
-      })
+      body: JSON.stringify(payload)
     });
     
     const result = await response.json();
@@ -123,9 +195,14 @@ const handleSubmit = async () => {
           
           <!-- App Icon Preview -->
           <div class="relative shrink-0 group drop-shadow-xl">
-            <div class="w-28 h-28 sm:w-36 sm:h-36 z-10 flex items-center justify-center relative">
+            <div class="w-28 h-28 sm:w-36 sm:h-36 z-10 flex items-center justify-center relative rounded-3xl overflow-hidden bg-slate-100 dark:bg-slate-800">
               <img 
-                v-if="form.name"
+                v-if="iconUrl"
+                :src="iconUrl" 
+                class="w-full h-full object-cover"
+              />
+              <img 
+                v-else-if="form.name"
                 :src="getFallbackImage(form.name)" 
                 class="w-full h-full object-contain opacity-50"
               />
@@ -166,6 +243,67 @@ const handleSubmit = async () => {
             <Layers class="w-5 h-5 text-emerald-500" /> 填写项目信息
           </h2>
           
+          <!-- Image Upload Section -->
+          <div class="mb-8 space-y-4">
+            <div class="text-sm font-bold text-slate-700 dark:text-slate-300">项目图片</div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <!-- Icon Upload -->
+              <div class="space-y-2">
+                <div class="text-xs font-medium text-slate-500 dark:text-slate-400">应用图标（正方形）</div>
+                <div class="relative group">
+                  <div 
+                    class="w-full aspect-square rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 flex flex-col items-center justify-center cursor-pointer hover:border-emerald-400 dark:hover:border-emerald-500 transition-colors overflow-hidden"
+                    :class="iconUrl ? 'border-solid border-emerald-300 dark:border-emerald-500/40' : ''"
+                    @click="triggerIconUpload"
+                  >
+                    <img v-if="iconUrl" :src="iconUrl" class="w-full h-full object-cover" />
+                    <template v-else>
+                      <Upload class="w-8 h-8 text-slate-300 dark:text-slate-600 mb-2" />
+                      <div class="text-sm font-medium text-slate-400 dark:text-slate-500">点击上传图标</div>
+                      <div class="text-xs text-slate-400 dark:text-slate-600 mt-1">支持裁剪</div>
+                    </template>
+                  </div>
+                  <button 
+                    v-if="iconUrl"
+                    @click.stop="removeIcon"
+                    class="absolute top-2 right-2 p-1.5 rounded-full bg-rose-500 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <X class="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                <input ref="iconInputRef" type="file" accept="image/png,image/jpeg,image/webp" class="hidden" @change="handleFileSelected($event, 'icon')" />
+              </div>
+
+              <!-- Banner Upload -->
+              <div class="space-y-2">
+                <div class="text-xs font-medium text-slate-500 dark:text-slate-400">Banner 图（横幅）</div>
+                <div class="relative group">
+                  <div 
+                    class="w-full aspect-video rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 flex flex-col items-center justify-center cursor-pointer hover:border-emerald-400 dark:hover:border-emerald-500 transition-colors overflow-hidden"
+                    :class="bannerUrl ? 'border-solid border-emerald-300 dark:border-emerald-500/40' : ''"
+                    @click="triggerBannerUpload"
+                  >
+                    <img v-if="bannerUrl" :src="bannerUrl" class="w-full h-full object-cover" />
+                    <template v-else>
+                      <Upload class="w-8 h-8 text-slate-300 dark:text-slate-600 mb-2" />
+                      <div class="text-sm font-medium text-slate-400 dark:text-slate-500">点击上传 Banner</div>
+                      <div class="text-xs text-slate-400 dark:text-slate-600 mt-1">16:9 横幅图</div>
+                    </template>
+                  </div>
+                  <button 
+                    v-if="bannerUrl"
+                    @click.stop="removeBanner"
+                    class="absolute top-2 right-2 p-1.5 rounded-full bg-rose-500 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <X class="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                <input ref="bannerInputRef" type="file" accept="image/png,image/jpeg,image/webp" class="hidden" @change="handleFileSelected($event, 'banner')" />
+              </div>
+            </div>
+          </div>
+
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <div class="space-y-2">
               <label class="text-sm font-bold text-slate-700 dark:text-slate-300">项目名称 <span class="text-red-500">*</span></label>
@@ -234,7 +372,7 @@ const handleSubmit = async () => {
               <ExternalLink class="w-5 h-5" /> 申请编号：{{ submissionId || '已提交' }}
             </div>
             <button 
-              @click="isSubmitted = false; submissionId = ''" 
+              @click="isSubmitted = false; submissionId = ''; iconUrl = ''; bannerUrl = ''" 
               class="flex-1 inline-flex items-center justify-center gap-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-6 py-3.5 rounded-xl font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
             >
               继续提交
@@ -243,5 +381,17 @@ const handleSubmit = async () => {
         </div>
       </div>
     </main>
+
+    <!-- Image Cropper Modal -->
+    <ImageCropper
+      v-if="cropperVisible && cropperSrc"
+      :imageSrc="cropperSrc"
+      :aspectRatio="cropperTarget === 'icon' ? 1 : 16/9"
+      :outputWidth="cropperTarget === 'icon' ? 512 : 1280"
+      :outputHeight="cropperTarget === 'icon' ? 512 : 720"
+      :title="cropperTarget === 'icon' ? '裁剪应用图标' : '裁剪 Banner 图'"
+      @confirm="handleCropConfirm"
+      @cancel="handleCropCancel"
+    />
   </div>
 </template>

@@ -813,38 +813,94 @@
 
             <div class="p-4 lg:p-6 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 space-y-4">
               <div class="text-sm font-extrabold text-slate-800 dark:text-slate-200">权限管理</div>
-              
-              <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                <div>
-                  <div class="text-sm font-bold text-slate-700 dark:text-slate-300">当前角色</div>
-                  <div class="text-xs text-slate-500 dark:text-slate-400">决定用户可以访问的功能</div>
+
+              <div v-if="userDraftIsSuperadmin" class="p-4 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30">
+                <div class="flex items-center gap-2">
+                  <svg class="w-5 h-5 text-amber-500" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                  <span class="text-sm font-bold text-amber-700 dark:text-amber-300">超级管理员</span>
                 </div>
-                <div class="flex gap-2">
-                  <button 
-                    @click="updateUserRole('user')"
-                    class="flex-1 lg:flex-none px-4 py-3 lg:py-2 rounded-xl font-bold transition-colors"
-                    :class="userDraft.role === 'user' ? 'bg-emerald-500 text-white' : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'"
-                  >
-                    普通用户
-                  </button>
-                  <button 
-                    @click="updateUserRole('dev')"
-                    class="flex-1 lg:flex-none px-4 py-3 lg:py-2 rounded-xl font-bold transition-colors"
-                    :class="userDraft.role === 'dev' ? 'bg-blue-500 text-white' : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'"
-                  >
-                    开发者
-                  </button>
-                  <button 
-                    @click="updateUserRole('ops')"
-                    class="flex-1 lg:flex-none px-4 py-3 lg:py-2 rounded-xl font-bold transition-colors"
-                    :class="userDraft.role === 'ops' ? 'bg-purple-500 text-white' : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'"
-                  >
-                    运维
-                  </button>
+                <div class="text-xs text-amber-600 dark:text-amber-400 mt-1">此用户拥有所有权限，不可修改</div>
+              </div>
+
+              <div v-if="!userDraftIsSuperadmin" class="space-y-3">
+                <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                  <div>
+                    <div class="text-sm font-bold text-slate-700 dark:text-slate-300">当前角色</div>
+                    <div class="text-xs text-slate-500 dark:text-slate-400">决定用户可以访问的功能</div>
+                  </div>
+                  <div class="flex gap-2">
+                    <button 
+                      @click="updateUserRole('user')"
+                      class="flex-1 lg:flex-none px-4 py-3 lg:py-2 rounded-xl font-bold transition-colors"
+                      :class="userDraft.role === 'user' ? 'bg-emerald-500 text-white' : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'"
+                    >
+                      普通用户
+                    </button>
+                    <button 
+                      @click="updateUserRole('dev')"
+                      class="flex-1 lg:flex-none px-4 py-3 lg:py-2 rounded-xl font-bold transition-colors"
+                      :class="userDraft.role === 'dev' ? 'bg-blue-500 text-white' : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'"
+                    >
+                      开发者
+                    </button>
+                    <button 
+                      @click="updateUserRole('ops')"
+                      class="flex-1 lg:flex-none px-4 py-3 lg:py-2 rounded-xl font-bold transition-colors"
+                      :class="userDraft.role === 'ops' ? 'bg-purple-500 text-white' : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'"
+                    >
+                      运维
+                    </button>
+                  </div>
+                </div>
+
+                <div class="h-px bg-slate-200 dark:bg-slate-700"></div>
+
+                <div>
+                  <div class="flex items-center justify-between mb-3">
+                    <div>
+                      <div class="text-sm font-bold text-slate-700 dark:text-slate-300">细粒度权限</div>
+                      <div class="text-xs text-slate-500 dark:text-slate-400">为用户精确分配操作能力</div>
+                    </div>
+                    <div class="flex gap-2">
+                      <button @click="selectAllCapabilities" class="text-xs px-3 py-1.5 rounded-lg bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-bold hover:bg-emerald-200 dark:hover:bg-emerald-500/30 transition-colors">全选</button>
+                      <button @click="deselectAllCapabilities" class="text-xs px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">清空</button>
+                    </div>
+                  </div>
+                  <div v-for="group in capabilityGroups" :key="group.category" class="mb-3">
+                    <div class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">{{ group.label }}</div>
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-2">
+                      <label
+                        v-for="cap in group.items"
+                        :key="cap.id"
+                        class="flex items-center gap-2.5 p-2.5 rounded-xl border cursor-pointer transition-all duration-150"
+                        :class="userDraftCapabilities.includes(cap.id) ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-300 dark:border-emerald-500/40' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-emerald-200 dark:hover:border-emerald-500/30'"
+                      >
+                        <input
+                          type="checkbox"
+                          :checked="userDraftCapabilities.includes(cap.id)"
+                          @change="toggleCapability(cap.id)"
+                          class="w-4 h-4 rounded border-slate-300 text-emerald-500 focus:ring-emerald-500 focus:ring-offset-0"
+                        />
+                        <div class="flex-1 min-w-0">
+                          <div class="text-sm font-medium text-slate-800 dark:text-slate-200">{{ cap.name }}</div>
+                          <div class="text-xs text-slate-500 dark:text-slate-400 truncate">{{ cap.description }}</div>
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+                  <div class="flex justify-end mt-3">
+                    <button
+                      @click="saveCapabilities"
+                      :disabled="savingCapabilities"
+                      class="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-sm transition-colors"
+                    >
+                      {{ savingCapabilities ? '保存中...' : '保存权限' }}
+                    </button>
+                  </div>
                 </div>
               </div>
 
-              <div class="h-px bg-slate-200 dark:bg-slate-700"></div>
+              <div class="h-px bg-slate-200 dark:border-slate-700"></div>
 
               <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                 <div>
@@ -1847,9 +1903,19 @@ const fetchUsers = async () => {
   } catch {}
 };
 
-const selectUser = (u: any) => {
+const selectUser = async (u: any) => {
   selectedUserId.value = u.id;
   userDraft.value = { ...u };
+  userDraftCapabilities.value = [];
+  userDraftIsSuperadmin.value = false;
+  try {
+    const res = await adminFetch(`/api/admin/users/${u.id}/capabilities`);
+    if (res.ok) {
+      const json = await res.json();
+      userDraftCapabilities.value = json.capabilities ?? [];
+      userDraftIsSuperadmin.value = json.is_superadmin ?? false;
+    }
+  } catch {}
 };
 
 const prevUserPage = async () => {
@@ -1897,8 +1963,89 @@ const updateUserActive = async (isActive: boolean) => {
   alert(isActive ? '账号已启用' : '账号已禁用');
 };
 
+const userDraftCapabilities = ref<string[]>([]);
+const userDraftIsSuperadmin = ref(false);
+const savingCapabilities = ref(false);
+
+const allCapabilitiesList = ref<Array<{ id: string; name: string; category: string; description: string }>>([]);
+
+const capabilityCategoryLabels: Record<string, string> = {
+  project: '项目管理',
+  category: '分类管理',
+  submission: '提交审核',
+  moderation: '内容审核',
+  user: '用户管理',
+  audit: '审计日志',
+  story: '故事管理',
+  feedback: '反馈管理',
+};
+
+const capabilityGroups = computed(() => {
+  const groups: Record<string, { category: string; label: string; items: Array<{ id: string; name: string; description: string }> }> = {};
+  for (const cap of allCapabilitiesList.value) {
+    if (!groups[cap.category]) {
+      groups[cap.category] = {
+        category: cap.category,
+        label: capabilityCategoryLabels[cap.category] ?? cap.category,
+        items: [],
+      };
+    }
+    groups[cap.category].items.push(cap);
+  }
+  return Object.values(groups).sort((a, b) => a.items[0]?.id?.localeCompare(b.items[0]?.id ?? '') ?? 0);
+});
+
+const fetchCapabilities = async () => {
+  try {
+    const res = await adminFetch('/api/capabilities');
+    if (res.ok) {
+      const json = await res.json();
+      allCapabilitiesList.value = json.capabilities ?? [];
+    }
+  } catch {}
+};
+
+const toggleCapability = (capId: string) => {
+  const idx = userDraftCapabilities.value.indexOf(capId);
+  if (idx >= 0) {
+    userDraftCapabilities.value.splice(idx, 1);
+  } else {
+    userDraftCapabilities.value.push(capId);
+  }
+};
+
+const selectAllCapabilities = () => {
+  userDraftCapabilities.value = allCapabilitiesList.value.map(c => c.id);
+};
+
+const deselectAllCapabilities = () => {
+  userDraftCapabilities.value = [];
+};
+
+const saveCapabilities = async () => {
+  if (!userDraft.value?.id) return;
+  savingCapabilities.value = true;
+  try {
+    const res = await adminFetch(`/api/admin/users/${userDraft.value.id}/capabilities`, {
+      method: 'PUT',
+      body: JSON.stringify({ capabilities: userDraftCapabilities.value })
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      alert(json?.error ?? '保存失败');
+      return;
+    }
+    alert('权限保存成功');
+  } catch {
+    alert('保存失败');
+  } finally {
+    savingCapabilities.value = false;
+  }
+};
+
 // Restore session on mount
 maybeRestoreSession();
+fetchCapabilities();
 </script>
 
 <style scoped>

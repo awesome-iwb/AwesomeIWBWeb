@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { useHead } from '@unhead/vue';
 import { Github, LogIn, LogOut, Shield, Wrench, AlertCircle, Camera } from 'lucide-vue-next';
 import { useAuth } from '../composables/useAuth';
+import ImageCropper from '../components/ImageCropper.vue';
 
 useHead({
   title: '个人中心 - Awesome IWB',
@@ -33,14 +34,14 @@ const goNext = () => router.push(redirectTo.value);
 const isLoggingIn = ref(false);
 const loginError = ref('');
 
-// Avatar upload state
 const isUploadingAvatar = ref(false);
 const avatarUploadError = ref('');
 const fileInputRef = ref<HTMLInputElement | null>(null);
 
-// Handle Casdoor OAuth callback (two modes: backend redirect with token, or direct code+state)
+const showCropper = ref(false);
+const cropperImageSrc = ref('');
+
 onMounted(async () => {
-  // Mode 1: Backend redirect with token in URL
   const token = route.query.token as string | undefined;
   const userId = route.query.user_id as string | undefined;
   const userName = route.query.user_name as string | undefined;
@@ -56,9 +57,7 @@ onMounted(async () => {
         name: userName || '',
         role: (userRole as any) || 'user',
       });
-      // Fetch full user info from backend
       await fetchUser();
-      // Clean URL
       await router.replace({ path: '/me', query: {} });
       goNext();
       return;
@@ -69,7 +68,6 @@ onMounted(async () => {
     }
   }
 
-  // Mode 2: Direct code+state (fallback for API mode)
   const code = route.query.code as string | undefined;
   const state = route.query.state as string | undefined;
 
@@ -103,7 +101,6 @@ const startStcnLogin = async () => {
   }
 };
 
-// Avatar upload handlers
 const triggerFileInput = () => {
   fileInputRef.value?.click();
 };
@@ -114,9 +111,27 @@ const handleAvatarChange = async (event: Event) => {
   if (!file) return;
 
   avatarUploadError.value = '';
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    cropperImageSrc.value = e.target?.result as string;
+    showCropper.value = true;
+  };
+  reader.onerror = () => {
+    avatarUploadError.value = '无法读取图片文件';
+  };
+  reader.readAsDataURL(file);
+
+  if (fileInputRef.value) fileInputRef.value.value = '';
+};
+
+const handleCropConfirm = async (blob: Blob) => {
+  showCropper.value = false;
   isUploadingAvatar.value = true;
+  avatarUploadError.value = '';
 
   try {
+    const file = new File([blob], 'avatar.webp', { type: 'image/webp' });
     const url = await uploadAvatar(file);
     if (!url) {
       avatarUploadError.value = '头像上传失败，请重试';
@@ -125,11 +140,13 @@ const handleAvatarChange = async (event: Event) => {
     avatarUploadError.value = e?.message || '头像上传失败';
   } finally {
     isUploadingAvatar.value = false;
-    // Reset input so the same file can be selected again
-    if (fileInputRef.value) fileInputRef.value.value = '';
   }
 };
 
+const handleCropCancel = () => {
+  showCropper.value = false;
+  cropperImageSrc.value = '';
+};
 </script>
 
 <template>
@@ -286,5 +303,17 @@ const handleAvatarChange = async (event: Event) => {
         </div>
       </div>
     </main>
+
+    <!-- Avatar Cropper Modal -->
+    <ImageCropper
+      v-if="showCropper && cropperImageSrc"
+      :imageSrc="cropperImageSrc"
+      :aspectRatio="1"
+      :outputWidth="512"
+      :outputHeight="512"
+      title="裁剪头像"
+      @confirm="handleCropConfirm"
+      @cancel="handleCropCancel"
+    />
   </div>
 </template>

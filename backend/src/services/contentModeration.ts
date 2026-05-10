@@ -63,6 +63,7 @@ export async function createBugModeration(input: {
 export async function listCommentModeration(params: {
   status?: ModerationStatus;
   actor_username?: string;
+  project_name?: string;
   page?: number;
   pageSize?: number;
 }) {
@@ -80,6 +81,10 @@ export async function listCommentModeration(params: {
   if (params.actor_username) {
     queryParams.push(params.actor_username);
     conditions.push(`actor_username = $${queryParams.length}`);
+  }
+  if (params.project_name) {
+    queryParams.push(params.project_name);
+    conditions.push(`project_name = $${queryParams.length}`);
   }
 
   const whereClause = conditions.length ? `where ${conditions.join(" and ")}` : "";
@@ -101,6 +106,7 @@ export async function listCommentModeration(params: {
 export async function listBugModeration(params: {
   status?: ModerationStatus;
   actor_username?: string;
+  project_name?: string;
   page?: number;
   pageSize?: number;
 }) {
@@ -118,6 +124,10 @@ export async function listBugModeration(params: {
   if (params.actor_username) {
     queryParams.push(params.actor_username);
     conditions.push(`actor_username = $${queryParams.length}`);
+  }
+  if (params.project_name) {
+    queryParams.push(params.project_name);
+    conditions.push(`project_name = $${queryParams.length}`);
   }
 
   const whereClause = conditions.length ? `where ${conditions.join(" and ")}` : "";
