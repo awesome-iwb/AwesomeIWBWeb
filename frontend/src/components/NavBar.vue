@@ -21,7 +21,7 @@ const isMobileMenuOpen = ref(false);
 const isUserMenuOpen = ref(false);
 const userMenuCloseTimer = ref<number | null>(null);
 
-const { user, isAuthenticated, logout } = useAuth();
+const { user, isAuthenticated, logout, hasCapability } = useAuth();
 
 const userInitial = computed(() => (user.value?.name ? user.value.name.charAt(0).toUpperCase() : '?'));
 
@@ -267,7 +267,7 @@ onMounted(() => {
                   个人中心
                 </button>
                 <button
-                  v-if="user?.role === 'ops'"
+                  v-if="hasCapability('admin_panel_access')"
                   @click="closeUserMenuNow(); router.push('/admin')"
                   class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-extrabold transition-colors"
                 >
@@ -275,7 +275,7 @@ onMounted(() => {
                   运维后台
                 </button>
                 <button
-                  v-if="user?.role === 'dev'"
+                  v-if="hasCapability('dev_panel_access')"
                   @click="closeUserMenuNow(); router.push('/dev')"
                   class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-extrabold transition-colors"
                 >

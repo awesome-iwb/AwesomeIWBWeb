@@ -13,6 +13,8 @@ export type Capability = {
 };
 
 const ALL_CAPABILITIES: Capability[] = [
+  { id: "admin_panel_access", name: "访问运维后台", category: "panel", description: "查看和进入运维管理后台", sort_index: 10 },
+  { id: "dev_panel_access", name: "访问开发者后台", category: "panel", description: "查看和进入开发者后台", sort_index: 20 },
   { id: "project:read", name: "查看项目", category: "project", description: "查看项目列表和详情", sort_index: 100 },
   { id: "project:create", name: "创建项目", category: "project", description: "创建新项目", sort_index: 200 },
   { id: "project:update", name: "编辑项目", category: "project", description: "编辑项目信息", sort_index: 300 },
@@ -32,6 +34,7 @@ const ALL_CAPABILITIES: Capability[] = [
   { id: "audit:read", name: "查看审计日志", category: "audit", description: "查看系统审计日志", sort_index: 1700 },
   { id: "story:manage", name: "故事管理", category: "story", description: "管理首页故事", sort_index: 1800 },
   { id: "feedback:manage", name: "反馈管理", category: "feedback", description: "管理反馈状态和标签", sort_index: 1900 },
+  { id: "comment:manage", name: "管理评论", category: "comment", description: "管理自己和他人的评论/Issue状态", sort_index: 1950 },
 ];
 
 const ALL_CAPABILITY_IDS = new Set(ALL_CAPABILITIES.map(c => c.id));

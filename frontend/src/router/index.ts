@@ -22,7 +22,7 @@ export const routes: RouteRecordRaw[] = [
     path: '/admin',
     name: 'admin',
     component: AdminView,
-    meta: { showNavBar: false, requiresAuth: true, requiresRole: 'ops' }
+    meta: { showNavBar: false, requiresAuth: true, requiresCapability: 'admin_panel_access' }
   },
   {
     path: '/admin-login',
@@ -69,7 +69,7 @@ export const routes: RouteRecordRaw[] = [
         path: '/dev',
         name: 'dev',
         component: () => import('../views/DevView.vue'),
-        meta: { showNavBar: true, showBack: true, title: '开发者后台', requiresAuth: true, requiresRole: 'dev' }
+        meta: { showNavBar: true, showBack: true, title: '开发者后台', requiresAuth: true, requiresCapability: 'dev_panel_access' }
       } as RouteRecordRaw]
     : []),
   {
@@ -81,16 +81,27 @@ export const routes: RouteRecordRaw[] = [
 ]
 
 export function setupRouterGuard(router: Router) {
-  router.beforeEach((to) => {
-    if (typeof window === 'undefined') return true;
+  let initPromise: Promise<void> | null = null
+
+  const ensureAuthInitialized = (): Promise<void> => {
+    if (initPromise) return initPromise
+    const { isAuthenticated, fetchUser } = useAuth()
+    if (isAuthenticated.value) return Promise.resolve()
+    initPromise = fetchUser().then(() => {})
+    return initPromise
+  }
+
+  router.beforeEach(async (to) => {
+    if (typeof window === 'undefined') return true
+    await ensureAuthInitialized()
     const { isAuthenticated } = useAuth();
     if ((to.meta as any)?.requiresAuth && !isAuthenticated.value) {
       return { path: '/me', query: { redirect: to.fullPath } };
     }
-    const role = (to.meta as any)?.requiresRole;
-    if (role) {
-      const { user } = useAuth();
-      if (user.value?.role !== role) return { path: '/me', query: { redirect: to.fullPath } };
+    const capability = (to.meta as any)?.requiresCapability;
+    if (capability) {
+      const { hasCapability } = useAuth();
+      if (!hasCapability(capability)) return { path: '/me', query: { redirect: to.fullPath } };
     }
     return true;
   });

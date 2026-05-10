@@ -6,12 +6,12 @@ import { appConfig } from "../config";
 import { clearSessionCookie, parseCookieHeader, setSessionCookie } from "../utils/cookies";
 import { checkRateLimit } from "./rateLimit";
 
-const CASDOOR_ENDPOINT = process.env.CASDOOR_ENDPOINT ?? "";
+const CASDOOR_ENDPOINT = process.env.CASDOOR_ENDPOINT ?? "https://auth.smart-teach.cn";
 const CASDOOR_CLIENT_ID = process.env.CASDOOR_CLIENT_ID ?? "";
 const CASDOOR_CLIENT_SECRET = process.env.CASDOOR_CLIENT_SECRET ?? "";
 const CASDOOR_ORGANIZATION = process.env.CASDOOR_ORGANIZATION_NAME ?? "stcn";
 const CASDOOR_APPLICATION = process.env.CASDOOR_APPLICATION_NAME ?? "awesome-iwb";
-const CASDOOR_REDIRECT_URI = process.env.CASDOOR_REDIRECT_URI ?? "http://localhost:5173/me";
+const CASDOOR_REDIRECT_URI = process.env.CASDOOR_REDIRECT_URI ?? "http://localhost:5173/api/auth/callback";
 const FRONTEND_URL = process.env.FRONTEND_URL ?? "http://localhost:5173";
 
 const JWT_SUB_LOCAL_PREFIX = "local:";
@@ -98,10 +98,12 @@ function buildAuthorizeUrl(state: string, codeChallenge: string): string {
   url.searchParams.set("client_id", CASDOOR_CLIENT_ID);
   url.searchParams.set("redirect_uri", CASDOOR_REDIRECT_URI);
   url.searchParams.set("response_type", "code");
-  url.searchParams.set("scope", "profile");
+  url.searchParams.set("scope", "openid profile email");
   url.searchParams.set("state", state);
   url.searchParams.set("code_challenge_method", "S256");
   url.searchParams.set("code_challenge", codeChallenge);
+  url.searchParams.set("organization", CASDOOR_ORGANIZATION);
+  url.searchParams.set("application", CASDOOR_APPLICATION);
   return url.toString();
 }
 
@@ -127,8 +129,12 @@ async function fetchCasdoorUser(accessToken: string): Promise<any | null> {
   const res = await fetch(`${CASDOOR_ENDPOINT}/api/get-account`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
-  if (!res.ok) return null;
-  return await res.json();
+  if (res.ok) return await res.json();
+  const oidcRes = await fetch(`${CASDOOR_ENDPOINT}/api/userinfo`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (oidcRes.ok) return await oidcRes.json();
+  return null;
 }
 
 // Demo mode: when Casdoor is not configured, simulate a login redirect
@@ -221,10 +227,10 @@ export const casdoorAuthPlugin = new Elysia({ prefix: "/api/auth" })
 
       if (isBrowserRedirect) {
         const redirectUrl = new URL(`${FRONTEND_URL}/me`);
-        redirectUrl.searchParams.set("token", jwt);
-        redirectUrl.searchParams.set("user_id", user.id);
-        redirectUrl.searchParams.set("user_name", user.name);
-        redirectUrl.searchParams.set("user_role", user.role);
+        redirectUrl.searchParams.set("auth", "success");
+        const requested = oauthCookie.returnTo || "/";
+        if (requested.startsWith("/")) redirectUrl.searchParams.set("returnTo", requested);
+        setSessionCookie(set, jwt);
         set.status = 302;
         set.redirect = redirectUrl.toString();
         return;
@@ -247,8 +253,8 @@ export const casdoorAuthPlugin = new Elysia({ prefix: "/api/auth" })
 
     const account = casdoorUser.data ?? casdoorUser;
     const casdoorId = String(account?.id ?? account?.sub ?? "");
-    const name = String(account?.displayName ?? account?.name ?? account?.username ?? "User");
-    const avatar = String(account?.avatar ?? "");
+    const name = String(account?.displayName ?? account?.name ?? account?.username ?? account?.preferred_username ?? "User");
+    const avatar = String(account?.avatar ?? account?.picture ?? "");
     const email = String(account?.email ?? "");
 
     if (!casdoorId) {
@@ -290,9 +296,10 @@ export const casdoorAuthPlugin = new Elysia({ prefix: "/api/auth" })
     const isBrowserRedirect = acceptHeader.includes("text/html");
 
     if (isBrowserRedirect) {
-      const redirectUrl = new URL(FRONTEND_URL);
+      const redirectUrl = new URL(`${FRONTEND_URL}/me`);
+      redirectUrl.searchParams.set("auth", "success");
       const requested = oauthCookie.returnTo || "/";
-      if (requested.startsWith("/")) redirectUrl.pathname = requested;
+      if (requested.startsWith("/")) redirectUrl.searchParams.set("returnTo", requested);
       set.status = 302;
       setSessionCookie(set, jwt);
       set.redirect = redirectUrl.toString();
@@ -358,8 +365,10 @@ export const casdoorAuthPlugin = new Elysia({ prefix: "/api/auth" })
         name: user.name,
         role: user.role,
         avatar_url: user.avatar_url,
+        avatar_source: user.avatar_source,
         email: user.email,
         stcn_user_id: user.stcn_user_id,
+        stcn_username: user.stcn_username,
         sectl_user_id: user.sectl_user_id,
         lincube_user_id: user.lincube_user_id,
       },

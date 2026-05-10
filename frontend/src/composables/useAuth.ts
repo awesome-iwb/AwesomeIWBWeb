@@ -2,11 +2,20 @@ import { computed, ref } from 'vue';
 
 type AuthRole = 'user' | 'dev' | 'ops';
 
+function inferRoleFromCapabilities(capabilities: string[] | undefined, isSuperadmin: boolean | undefined): AuthRole {
+  if (isSuperadmin) return 'ops';
+  if (!capabilities) return 'user';
+  if (capabilities.includes('admin_panel_access')) return 'ops';
+  if (capabilities.includes('dev_panel_access')) return 'dev';
+  return 'user';
+}
+
 export type AuthUser = {
   id?: string;
   name: string;
   avatarUrl: string;
   avatar_source?: 'casdoor' | 'upload' | 'default';
+  /** Display label only - not used for permission checks. Use hasCapability() instead. */
   role: AuthRole;
   stcn_user_id: string;
   stcn_username?: string;
@@ -18,17 +27,38 @@ export type AuthUser = {
   capabilities?: string[];
 };
 
+const STORAGE_KEY = 'awesome_iwb_auth';
+
 const user = ref<AuthUser | null>(null);
 const token = ref<string | null>(null);
 const ready = ref(false);
+
+const loadFromStorage = () => {
+  if (typeof window === 'undefined') return;
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      user.value = JSON.parse(raw);
+    }
+  } catch {}
+};
 
 const loadOnce = () => {
   if (ready.value) return;
   ready.value = true;
   if (typeof window === 'undefined') return;
+  loadFromStorage();
 };
 
 const persist = () => {
+  if (typeof window === 'undefined') return;
+  if (!user.value) {
+    localStorage.removeItem(STORAGE_KEY);
+    return;
+  }
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(user.value));
+  } catch {}
 };
 
 export const useAuth = () => {
@@ -119,6 +149,7 @@ export const useAuth = () => {
               ...user.value,
               is_superadmin: capJson.is_superadmin ?? false,
               capabilities: capJson.capabilities ?? [],
+              role: inferRoleFromCapabilities(capJson.capabilities ?? [], capJson.is_superadmin ?? false),
             };
           }
         } catch {}
@@ -131,8 +162,11 @@ export const useAuth = () => {
     }
   };
 
-  const loginWithCasdoor = async () => {
-    const res = await fetch('/api/auth/login');
+  const loginWithCasdoor = async (returnTo?: string) => {
+    const params = new URLSearchParams();
+    if (returnTo) params.set('returnTo', returnTo);
+    const url = `/api/auth/login${params.toString() ? '?' + params.toString() : ''}`;
+    const res = await fetch(url);
     const text = await res.text();
     if (!res.ok) {
       throw new Error(text || `登录服务不可用 (${res.status})`);

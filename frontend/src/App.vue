@@ -1,11 +1,20 @@
 <script setup lang="ts">
+import { onMounted } from 'vue'
 import { RouterView, useRoute } from 'vue-router'
 import NavBar from './components/NavBar.vue'
 import CommandPalette from './components/CommandPalette.vue'
 import SiteFooter from './components/SiteFooter.vue'
 import { globalState } from './store'
+import { useAuth } from './composables/useAuth'
 
 const route = useRoute()
+
+onMounted(async () => {
+  const { isAuthenticated, fetchUser } = useAuth()
+  if (!isAuthenticated.value) {
+    await fetchUser()
+  }
+})
 </script>
 
 <template>

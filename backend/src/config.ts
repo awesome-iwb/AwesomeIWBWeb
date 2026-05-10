@@ -97,12 +97,12 @@ export const appConfig = {
   oauthEnabled,
   superadminOnlyLocal,
   casdoor: {
-    endpoint: process.env.CASDOOR_ENDPOINT?.trim() || "",
+    endpoint: process.env.CASDOOR_ENDPOINT?.trim() || "https://auth.smart-teach.cn",
     clientId: process.env.CASDOOR_CLIENT_ID?.trim() || "",
     clientSecret: process.env.CASDOOR_CLIENT_SECRET?.trim() || "",
     organization: process.env.CASDOOR_ORGANIZATION_NAME?.trim() || "stcn",
     application: process.env.CASDOOR_APPLICATION_NAME?.trim() || "awesome-iwb",
-    redirectUri: process.env.CASDOOR_REDIRECT_URI?.trim() || "http://localhost:8080/api/auth/callback",
+    redirectUri: process.env.CASDOOR_REDIRECT_URI?.trim() || "http://localhost:5173/api/auth/callback",
     allowedRedirectOrigins: parseList(process.env.AUTH_REDIRECT_ALLOWLIST || process.env.ALLOWED_ORIGINS)
   },
   cookieSecure: resolveCookieSecure()

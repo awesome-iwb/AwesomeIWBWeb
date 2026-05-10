@@ -14,7 +14,7 @@ describe('Auth routes', () => {
       expect(dev).toBeTruthy();
       expect(dev?.name).toBe('dev');
       expect((dev as any)?.meta?.requiresAuth).toBe(true);
-      expect((dev as any)?.meta?.requiresRole).toBe('dev');
+      expect((dev as any)?.meta?.requiresCapability).toBe('dev_panel_access');
     } else {
       expect(dev).toBeUndefined();
     }

@@ -15,7 +15,7 @@ useHead({
 
 const router = useRouter();
 const route = useRoute();
-const { user, isAuthenticated, logout, loginWithCasdoor, handleCallback, uploadAvatar } = useAuth();
+const { user, isAuthenticated, logout, loginWithCasdoor, handleCallback, uploadAvatar, hasCapability } = useAuth();
 
 const redirectTo = computed(() => {
   const q = route.query.redirect;
@@ -24,8 +24,8 @@ const redirectTo = computed(() => {
 
 const roleLabel = computed(() => {
   if (!user.value) return '';
-  if (user.value.role === 'ops') return '运维';
-  if (user.value.role === 'dev') return '开发者';
+  if (hasCapability('admin_panel_access')) return '运维';
+  if (hasCapability('dev_panel_access')) return '开发者';
   return '用户';
 });
 
@@ -42,25 +42,23 @@ const showCropper = ref(false);
 const cropperImageSrc = ref('');
 
 onMounted(async () => {
-  const token = route.query.token as string | undefined;
-  const userId = route.query.user_id as string | undefined;
-  const userName = route.query.user_name as string | undefined;
-  const userRole = route.query.user_role as string | undefined;
+  const authSuccess = route.query.auth as string | undefined;
+  const returnTo = route.query.returnTo as string | undefined;
 
-  if (token && userId) {
+  if (authSuccess === 'success') {
     isLoggingIn.value = true;
     loginError.value = '';
     try {
-      const { setToken, fetchUser } = useAuth();
-      setToken(token, {
-        id: userId,
-        name: userName || '',
-        role: (userRole as any) || 'user',
-      });
-      await fetchUser();
-      await router.replace({ path: '/me', query: {} });
-      goNext();
-      return;
+      const { fetchUser } = useAuth();
+      const ok = await fetchUser();
+      if (ok) {
+        await router.replace({ path: '/me', query: {} });
+        if (returnTo && returnTo.startsWith('/')) {
+          router.push(returnTo);
+        }
+        return;
+      }
+      loginError.value = '登录状态获取失败，请重试';
     } catch (e: any) {
       loginError.value = e?.message || '登录过程中发生错误';
     } finally {
@@ -94,7 +92,7 @@ const startStcnLogin = async () => {
   isLoggingIn.value = true;
   loginError.value = '';
   try {
-    await loginWithCasdoor();
+    await loginWithCasdoor(redirectTo.value || undefined);
   } catch (e: any) {
     loginError.value = e?.message || '无法启动登录流程，请检查网络连接';
     isLoggingIn.value = false;
@@ -135,6 +133,9 @@ const handleCropConfirm = async (blob: Blob) => {
     const url = await uploadAvatar(file);
     if (!url) {
       avatarUploadError.value = '头像上传失败，请重试';
+    } else {
+      const { fetchUser } = useAuth();
+      await fetchUser();
     }
   } catch (e: any) {
     avatarUploadError.value = e?.message || '头像上传失败';
@@ -271,7 +272,7 @@ const handleCropCancel = () => {
 
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <button
-              v-if="user?.role === 'ops'"
+              v-if="hasCapability('admin_panel_access')"
               @click="router.push('/admin')"
               class="inline-flex items-center justify-center gap-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-6 py-3.5 rounded-2xl font-extrabold transition-colors"
             >
@@ -279,7 +280,7 @@ const handleCropCancel = () => {
               运维后台
             </button>
             <button
-              v-if="user?.role === 'dev'"
+              v-if="hasCapability('dev_panel_access')"
               @click="router.push('/dev')"
               class="inline-flex items-center justify-center gap-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-6 py-3.5 rounded-2xl font-extrabold transition-colors"
             >

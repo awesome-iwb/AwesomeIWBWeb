@@ -826,31 +826,12 @@
                 <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                   <div>
                     <div class="text-sm font-bold text-slate-700 dark:text-slate-300">当前角色</div>
-                    <div class="text-xs text-slate-500 dark:text-slate-400">决定用户可以访问的功能</div>
+                    <div class="text-xs text-slate-500 dark:text-slate-400">根据能力自动推断</div>
                   </div>
-                  <div class="flex gap-2">
-                    <button 
-                      @click="updateUserRole('user')"
-                      class="flex-1 lg:flex-none px-4 py-3 lg:py-2 rounded-xl font-bold transition-colors"
-                      :class="userDraft.role === 'user' ? 'bg-emerald-500 text-white' : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'"
-                    >
-                      普通用户
-                    </button>
-                    <button 
-                      @click="updateUserRole('dev')"
-                      class="flex-1 lg:flex-none px-4 py-3 lg:py-2 rounded-xl font-bold transition-colors"
-                      :class="userDraft.role === 'dev' ? 'bg-blue-500 text-white' : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'"
-                    >
-                      开发者
-                    </button>
-                    <button 
-                      @click="updateUserRole('ops')"
-                      class="flex-1 lg:flex-none px-4 py-3 lg:py-2 rounded-xl font-bold transition-colors"
-                      :class="userDraft.role === 'ops' ? 'bg-purple-500 text-white' : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'"
-                    >
-                      运维
-                    </button>
-                  </div>
+                  <span
+                    class="inline-flex items-center px-4 py-2 rounded-xl text-sm font-bold"
+                    :class="inferredRoleTagClass"
+                  >{{ inferredRoleLabel }}</span>
                 </div>
 
                 <div class="h-px bg-slate-200 dark:bg-slate-700"></div>
@@ -1931,7 +1912,7 @@ const nextUserPage = async () => {
   await fetchUsers();
 };
 
-const updateUserRole = async (role: string) => {
+const _updateUserRole = async (role: string) => {
   if (!userDraft.value?.id) return;
   const res = await adminFetch(`/api/admin/users/${userDraft.value.id}/role`, {
     method: 'PATCH',
@@ -1946,6 +1927,7 @@ const updateUserRole = async (role: string) => {
   await fetchUsers();
   alert('角色更新成功');
 };
+void _updateUserRole;
 
 const updateUserActive = async (isActive: boolean) => {
   if (!userDraft.value?.id) return;
@@ -1970,6 +1952,7 @@ const savingCapabilities = ref(false);
 const allCapabilitiesList = ref<Array<{ id: string; name: string; category: string; description: string }>>([]);
 
 const capabilityCategoryLabels: Record<string, string> = {
+  panel: '后台入口',
   project: '项目管理',
   category: '分类管理',
   submission: '提交审核',
@@ -1978,6 +1961,7 @@ const capabilityCategoryLabels: Record<string, string> = {
   audit: '审计日志',
   story: '故事管理',
   feedback: '反馈管理',
+  comment: '评论管理',
 };
 
 const capabilityGroups = computed(() => {
@@ -1993,6 +1977,20 @@ const capabilityGroups = computed(() => {
     groups[cap.category].items.push(cap);
   }
   return Object.values(groups).sort((a, b) => a.items[0]?.id?.localeCompare(b.items[0]?.id ?? '') ?? 0);
+});
+
+const inferredRoleLabel = computed(() => {
+  if (userDraftIsSuperadmin.value) return '超级管理员';
+  if (userDraftCapabilities.value.includes('admin_panel_access')) return '运维';
+  if (userDraftCapabilities.value.includes('dev_panel_access')) return '开发者';
+  return '用户';
+});
+
+const inferredRoleTagClass = computed(() => {
+  if (userDraftIsSuperadmin.value) return 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-500/40';
+  if (userDraftCapabilities.value.includes('admin_panel_access')) return 'bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-500/40';
+  if (userDraftCapabilities.value.includes('dev_panel_access')) return 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 border border-blue-300 dark:border-blue-500/40';
+  return 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-600';
 });
 
 const fetchCapabilities = async () => {

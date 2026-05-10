@@ -95,6 +95,7 @@ export function requireAuth() {
   };
 }
 
+/** @deprecated Use requireCapability() instead. Role-based checks are being phased out. */
 export function requireRole(allowedRoles: Array<"user" | "dev" | "ops">) {
   return ({ user, set }: { user: AuthUser | null; set: any }) => {
     if (!dbEnabled) return;
@@ -109,6 +110,7 @@ export function requireRole(allowedRoles: Array<"user" | "dev" | "ops">) {
   };
 }
 
+/** @deprecated Use requireCapability() instead. */
 export function requireAuthOrDev() {
   return ({ user, set }: { user: AuthUser | null; set: any }) => {
     if (!dbEnabled) return;

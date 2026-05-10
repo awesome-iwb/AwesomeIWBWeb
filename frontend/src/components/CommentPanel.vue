@@ -58,7 +58,7 @@ const props = defineProps<{
 
 const router = useRouter();
 const route = useRoute();
-const { user, isAuthenticated } = useAuth();
+const { user, isAuthenticated, hasCapability } = useAuth();
 
 const tab = ref<CommentKind>(props.initialTab ?? 'comment');
 watch(() => props.initialTab, (v) => { if (v) tab.value = v; });
@@ -132,8 +132,7 @@ watch(() => props.projectName, () => { void fetchEntries(); });
 const canManageIssue = (issue: IssueEntry) => {
   if (props.variant === 'ops') return true;
   if (!isAuthenticated.value) return false;
-  const role = user.value?.role;
-  if (role === 'dev' || role === 'ops') return true;
+  if (hasCapability('comment:manage')) return true;
   return user.value?.name === issue.author;
 };
 
