@@ -10,7 +10,7 @@ const CASDOOR_ENDPOINT = process.env.CASDOOR_ENDPOINT ?? "https://auth.smart-tea
 const CASDOOR_CLIENT_ID = process.env.CASDOOR_CLIENT_ID ?? "";
 const CASDOOR_CLIENT_SECRET = process.env.CASDOOR_CLIENT_SECRET ?? "";
 const CASDOOR_ORGANIZATION = process.env.CASDOOR_ORGANIZATION_NAME ?? "stcn";
-const CASDOOR_APPLICATION = process.env.CASDOOR_APPLICATION_NAME ?? "awesome-iwb";
+const CASDOOR_APPLICATION = process.env.CASDOOR_APPLICATION_NAME ?? "AIWB";
 const CASDOOR_REDIRECT_URI = process.env.CASDOOR_REDIRECT_URI ?? "http://localhost:5173/api/auth/callback";
 const FRONTEND_URL = process.env.FRONTEND_URL ?? "http://localhost:5173";
 

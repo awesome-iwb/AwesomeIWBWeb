@@ -101,7 +101,7 @@ export const appConfig = {
     clientId: process.env.CASDOOR_CLIENT_ID?.trim() || "",
     clientSecret: process.env.CASDOOR_CLIENT_SECRET?.trim() || "",
     organization: process.env.CASDOOR_ORGANIZATION_NAME?.trim() || "stcn",
-    application: process.env.CASDOOR_APPLICATION_NAME?.trim() || "awesome-iwb",
+    application: process.env.CASDOOR_APPLICATION_NAME?.trim() || "AIWB",
     redirectUri: process.env.CASDOOR_REDIRECT_URI?.trim() || "http://localhost:5173/api/auth/callback",
     allowedRedirectOrigins: parseList(process.env.AUTH_REDIRECT_ALLOWLIST || process.env.ALLOWED_ORIGINS)
   },
