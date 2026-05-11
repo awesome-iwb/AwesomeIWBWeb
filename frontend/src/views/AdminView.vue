@@ -5,21 +5,27 @@
     <div v-if="!isAuthenticated" class="min-h-screen flex items-center justify-center">
       <div class="bg-white dark:bg-slate-800 p-10 rounded-3xl shadow-2xl max-w-md w-full">
         <h1 class="text-3xl font-bold mb-6 text-center text-emerald-500">管理后台</h1>
-        <p class="text-slate-500 mb-8 text-center">请输入管理员 API Token 进入运维后台</p>
-        <input 
-          type="password" 
-          v-model="apiTokenInput"
-          @keyup.enter="loginWithToken"
-          placeholder="输入 API Token" 
-          class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 mb-6 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-        />
+        <p class="text-slate-500 mb-8 text-center">请先登录以访问运维后台</p>
         <button 
-          @click="loginWithToken" 
+          @click="router.push('/me')" 
           class="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl transition-colors shadow-lg shadow-emerald-500/30"
         >
-          进入
+          去登录
         </button>
-        <p class="text-xs text-slate-400 mt-4 text-center">Token 由后端环境变量配置，请联系管理员获取</p>
+      </div>
+    </div>
+
+    <!-- Permission Denied Screen -->
+    <div v-else-if="!hasCapability('admin_panel_access')" class="min-h-screen flex items-center justify-center">
+      <div class="bg-white dark:bg-slate-800 p-10 rounded-3xl shadow-2xl max-w-md w-full">
+        <h1 class="text-3xl font-bold mb-6 text-center text-rose-500">权限不足</h1>
+        <p class="text-slate-500 mb-8 text-center">您没有访问运维后台的权限</p>
+        <button 
+          @click="router.push('/')" 
+          class="w-full py-3 bg-slate-500 hover:bg-slate-600 text-white font-bold rounded-xl transition-colors"
+        >
+          返回首页
+        </button>
       </div>
     </div>
 
@@ -1045,9 +1051,11 @@ import { Save, Plus, Bold, Italic, Heading, Quote, List, Image as ImageIcon, Fil
 import MarkdownIt from 'markdown-it';
 import DOMPurify from 'dompurify';
 import CommentPanel from '../components/CommentPanel.vue';
+import { useAuth } from '../composables/useAuth';
 
 const router = useRouter();
 const md = new MarkdownIt({ html: true, breaks: true });
+const { isAuthenticated, hasCapability, fetchUser } = useAuth();
 
 // Mobile responsive detection
 const isMobile = ref(false);
@@ -1089,21 +1097,10 @@ const bottomTabs = [
   { key: 'users' as const, label: '用户', icon: Users },
 ];
 
-const isAuthenticated = ref(false);
-const apiTokenInput = ref('');
-
-const loginWithToken = () => {
-  if (!apiTokenInput.value.trim()) {
-    alert('请输入 API Token');
-    return;
-  }
-  isAuthenticated.value = true;
-  fetchData();
-};
-
 const logoutAdmin = () => {
-  isAuthenticated.value = false;
-  apiTokenInput.value = '';
+  const { logout } = useAuth();
+  logout();
+  router.push('/');
 };
 
 const adminFetch = async (url: string, options: RequestInit = {}) => {
@@ -1111,15 +1108,15 @@ const adminFetch = async (url: string, options: RequestInit = {}) => {
   if (!headers.has('Content-Type') && !(options.body instanceof FormData)) {
     headers.set('Content-Type', 'application/json');
   }
-  if (apiTokenInput.value.trim()) {
-    headers.set('Authorization', `Bearer ${apiTokenInput.value.trim()}`);
-  }
   return fetch(url, { ...options, headers, credentials: 'include' });
 };
 
-// Check for saved token on mount — fetchData is defined below, call it after script init
-const maybeRestoreSession = () => {
-  return;
+// Restore session on mount
+const maybeRestoreSession = async () => {
+  await fetchUser();
+  if (isAuthenticated.value && hasCapability('admin_panel_access')) {
+    fetchData();
+  }
 };
 
 interface FeaturedStory {
@@ -2176,7 +2173,9 @@ const saveCapabilities = async () => {
 };
 
 // Restore session on mount
-maybeRestoreSession();
+onMounted(() => {
+  maybeRestoreSession();
+});
 fetchCapabilities();
 </script>
 

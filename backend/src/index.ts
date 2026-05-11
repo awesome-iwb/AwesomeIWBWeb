@@ -251,6 +251,7 @@ const app = new Elysia()
     return { error: { code: "INTERNAL", message: error.message, traceId, path: request.url } };
   })
   .get("/", () => "Welcome to Awesome-IWB API")
+  .get("/api/health", () => ({ status: "ok", db: dbEnabled, timestamp: new Date().toISOString() }))
   .get("/api/categories", async () => {
     if (!dbEnabled) {
       return data.categories.map((c: any) => ({ id: c.id ?? c.name, name: c.name, description: c.description ?? "" }));
@@ -1820,7 +1821,7 @@ const app = new Elysia()
     await logAuditCompat({ action: "update_capabilities", entity_type: "user", entity_id: id, diff: { capabilities: capabilityIds } }, user?.name);
     return { success: true };
   })
-  .listen(Number(process.env.PORT ?? 8081));
+  .listen(Number(process.env.PORT ?? 8080));
 
 /**
  * Normalize a CSV row into the internal project payload shape.

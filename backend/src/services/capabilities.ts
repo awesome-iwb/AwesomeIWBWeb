@@ -49,7 +49,7 @@ export function getAllCapabilityIds(): string[] {
 }
 
 export function isSuperadmin(username: string): boolean {
-  return username === SUPERADMIN_INITIAL_USERNAME;
+  return username.trim().toLowerCase() === SUPERADMIN_INITIAL_USERNAME.toLowerCase();
 }
 
 export async function listCapabilities(): Promise<Capability[]> {

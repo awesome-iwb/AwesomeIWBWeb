@@ -9,6 +9,7 @@ User=awesomeiwb
 Group=awesomeiwb
 WorkingDirectory=/opt/awesomeiwb/backend
 EnvironmentFile=/etc/awesomeiwb/backend.env
+Environment="PORT=8080"
 ExecStart=/usr/local/bin/bun run src/index.ts
 Restart=always
 RestartSec=3
