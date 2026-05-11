@@ -126,10 +126,12 @@ export const useAuth = () => {
       if (!text) return false;
       const json = JSON.parse(text);
       if (json.user) {
+        const caps = json.capabilities ?? [];
+        const isSuper = json.is_superadmin ?? false;
         user.value = {
           id: json.user.id,
           name: json.user.name,
-          role: json.user.role,
+          role: inferRoleFromCapabilities(caps, isSuper),
           avatarUrl: json.user.avatar_url || '/assets/people/placeholder.svg',
           avatar_url: json.user.avatar_url,
           avatar_source: json.user.avatar_source || 'default',
@@ -137,19 +139,9 @@ export const useAuth = () => {
           stcn_user_id: json.user.stcn_user_id,
           stcn_username: json.user.stcn_username,
           hzzc_user_id: json.user.hzzc_user_id,
+          is_superadmin: isSuper,
+          capabilities: caps,
         };
-        try {
-          const capRes = await fetch('/api/user/capabilities', { credentials: 'include' });
-          if (capRes.ok) {
-            const capJson = await capRes.json();
-            user.value = {
-              ...user.value,
-              is_superadmin: capJson.is_superadmin ?? false,
-              capabilities: capJson.capabilities ?? [],
-              role: inferRoleFromCapabilities(capJson.capabilities ?? [], capJson.is_superadmin ?? false),
-            };
-          }
-        } catch {}
         persist();
         return true;
       }
@@ -188,13 +180,8 @@ export const useAuth = () => {
     if (!res.ok) return false;
     const json = await res.json();
     if (!json?.token) return false;
-    setToken(json.token, {
-      id: json.user?.id,
-      name: json.user?.name,
-      role: json.user?.role,
-      avatar_url: json.user?.avatar_url
-    });
-    return true;
+    setToken(json.token);
+    return await fetchUser();
   };
 
   const handleCallback = async (code: string, state: string): Promise<boolean> => {
@@ -207,13 +194,8 @@ export const useAuth = () => {
       if (text) {
         const json = JSON.parse(text);
         if (json.token) {
-          setToken(json.token, {
-            id: json.user?.id,
-            name: json.user?.name,
-            role: json.user?.role,
-            avatar_url: json.user?.avatar_url,
-          });
-          return true;
+          setToken(json.token);
+          return await fetchUser();
         }
       }
       return await fetchUser();

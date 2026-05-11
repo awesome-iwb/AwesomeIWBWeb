@@ -2,6 +2,7 @@ import { Elysia } from "elysia";
 import { createHash, createHmac, randomBytes, randomUUID } from "crypto";
 import { signJwt } from "../utils/jwt";
 import { bumpUserTokenVersion, createUser, findUserByCasdoorId, findUserById, findUserByName, updateUserLogin } from "../services/users";
+import { getUserCapabilitiesWithInfo } from "../services/capabilities";
 import { appConfig } from "../config";
 import { clearSessionCookie, parseCookieHeader, setSessionCookie } from "../utils/cookies";
 import { checkRateLimit } from "./rateLimit";
@@ -354,6 +355,8 @@ export const casdoorAuthPlugin = new Elysia({ prefix: "/api/auth" })
       return { error: "User not found or inactive" };
     }
 
+    const capInfo = await getUserCapabilitiesWithInfo(user.id, user.name);
+
     return {
       user: {
         id: user.id,
@@ -366,6 +369,8 @@ export const casdoorAuthPlugin = new Elysia({ prefix: "/api/auth" })
         stcn_username: user.stcn_username,
         hzzc_user_id: user.hzzc_user_id,
       },
+      is_superadmin: capInfo.is_superadmin,
+      capabilities: capInfo.capabilities,
     };
   })
   .post("/logout", async ({ user, set }) => {
