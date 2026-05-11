@@ -798,8 +798,8 @@
                 <div class="text-sm text-slate-900 dark:text-white font-mono">{{ userDraft.stcn_user_id || '-' }}</div>
               </div>
               <div class="p-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
-                <div class="text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">SECTL 用户 ID</div>
-                <div class="text-sm text-slate-900 dark:text-white font-mono">{{ userDraft.sectl_user_id || '-' }}</div>
+                <div class="text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">HZZC 用户 ID</div>
+                <div class="text-sm text-slate-900 dark:text-white font-mono">{{ userDraft.hzzc_user_id || '-' }}</div>
               </div>
               <div class="p-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
                 <div class="text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">注册时间</div>
@@ -1379,8 +1379,7 @@ const normalizeProjectDraft = (p: any) => {
     return {
       username: typeof d?.username === 'string' ? d.username : '',
       stcn_user_id: stcn,
-      sectl_user_id: typeof d?.sectl_user_id === 'string' ? d.sectl_user_id : '',
-      lincube_user_id: typeof d?.lincube_user_id === 'string' ? d.lincube_user_id : ''
+      hzzc_user_id: typeof d?.hzzc_user_id === 'string' ? d.hzzc_user_id : ''
     };
   });
   if (clone.ai_usage_state !== 'unknown' && clone.ai_usage_state !== 'over50' && clone.ai_usage_state !== 'under50') {
@@ -1392,7 +1391,7 @@ const normalizeProjectDraft = (p: any) => {
 const addPlatformDeveloper = () => {
   if (!projectDraft.value) return;
   if (!Array.isArray(projectDraft.value.platform_developers)) projectDraft.value.platform_developers = [];
-  projectDraft.value.platform_developers.push({ username: '', stcn_user_id: '', sectl_user_id: '', lincube_user_id: '' });
+  projectDraft.value.platform_developers.push({ username: '', stcn_user_id: '', hzzc_user_id: '' });
 };
 
 const removePlatformDeveloper = (idx: number) => {

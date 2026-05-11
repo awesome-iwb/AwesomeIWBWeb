@@ -81,12 +81,6 @@ export const friendLinks: FriendLink[] = [
     description: '希沃一体机折腾手册，整理了许多一体机折腾的教程。'
   },
   {
-    key: 'sectl',
-    name: '思拓创联',
-    href: 'https://sectl.cn/',
-    description: '专注教育场景的开源软件组织，提供统一身份认证、活动管理、云服务、论坛等一站式平台能力。'
-  },
-  {
     key: 'houlang-cloud',
     name: '厚浪云',
     href: 'https://houlang.cloud/',

@@ -19,8 +19,7 @@ export type AuthUser = {
   role: AuthRole;
   stcn_user_id: string;
   stcn_username?: string;
-  sectl_user_id: string;
-  lincube_user_id: string;
+  hzzc_user_id: string;
   email?: string;
   avatar_url?: string;
   is_superadmin?: boolean;
@@ -86,8 +85,7 @@ export const useAuth = () => {
         role: newUser.role ?? user.value?.role ?? 'user',
         stcn_user_id: newUser.stcn_user_id ?? user.value?.stcn_user_id ?? '',
         stcn_username: newUser.stcn_username ?? user.value?.stcn_username ?? '',
-        sectl_user_id: newUser.sectl_user_id ?? user.value?.sectl_user_id ?? '',
-        lincube_user_id: newUser.lincube_user_id ?? user.value?.lincube_user_id ?? '',
+        hzzc_user_id: newUser.hzzc_user_id ?? user.value?.hzzc_user_id ?? '',
         id: newUser.id ?? user.value?.id,
         email: newUser.email ?? user.value?.email,
         is_superadmin: newUser.is_superadmin ?? user.value?.is_superadmin ?? false,
@@ -138,8 +136,7 @@ export const useAuth = () => {
           email: json.user.email,
           stcn_user_id: json.user.stcn_user_id,
           stcn_username: json.user.stcn_username,
-          sectl_user_id: json.user.sectl_user_id,
-          lincube_user_id: json.user.lincube_user_id,
+          hzzc_user_id: json.user.hzzc_user_id,
         };
         try {
           const capRes = await fetch('/api/user/capabilities', { credentials: 'include' });

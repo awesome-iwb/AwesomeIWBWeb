@@ -27,17 +27,7 @@ function isAllowedLocalSubjectId(raw: string): boolean {
   return !PG_ENABLED && /^[\w.-]+$/.test(raw) && raw.length <= 160;
 }
 
-const stateStore = new Map<string, { createdAt: number }>();
 const OAUTH_STATE_COOKIE = "awesomeiwb_oauth_state";
-
-function cleanOldStates() {
-  const now = Date.now();
-  for (const [key, val] of stateStore.entries()) {
-    if (now - val.createdAt > 10 * 60 * 1000) {
-      stateStore.delete(key);
-    }
-  }
-}
 
 function base64Url(input: Buffer | string) {
   return Buffer.from(input).toString("base64url");
@@ -47,7 +37,7 @@ function signState(value: string): string {
   return createHmac("sha256", appConfig.jwtSecret).update(value).digest("hex");
 }
 
-function encodeStateCookie(payload: { state: string; codeVerifier: string; returnTo: string }) {
+function encodeStateCookie(payload: { state: string; codeVerifier: string; returnTo: string; createdAt: number }) {
   const raw = JSON.stringify(payload);
   const b64 = base64Url(raw);
   return `${b64}.${signState(b64)}`;
@@ -59,13 +49,15 @@ function decodeStateCookie(cookieValue?: string) {
   if (!b64 || !sig) return null;
   if (signState(b64) !== sig) return null;
   try {
-    return JSON.parse(Buffer.from(b64, "base64url").toString("utf-8")) as { state: string; codeVerifier: string; returnTo: string };
+    const payload = JSON.parse(Buffer.from(b64, "base64url").toString("utf-8")) as { state: string; codeVerifier: string; returnTo: string; createdAt: number };
+    if (Date.now() - payload.createdAt > 10 * 60 * 1000) return null;
+    return payload;
   } catch {
     return null;
   }
 }
 
-function setOauthStateCookie(set: any, payload: { state: string; codeVerifier: string; returnTo: string }) {
+function setOauthStateCookie(set: any, payload: { state: string; codeVerifier: string; returnTo: string; createdAt: number }) {
   const value = encodeStateCookie(payload);
   const parts = [`${OAUTH_STATE_COOKIE}=${value}`, "Path=/", "HttpOnly", "SameSite=Lax", "Max-Age=600"];
   if (appConfig.cookieSecure) parts.push("Secure");
@@ -152,7 +144,6 @@ export const casdoorAuthPlugin = new Elysia({ prefix: "/api/auth" })
       if (DEMO_LOGIN) {
         // Simulate Casdoor login by redirecting directly to callback with a demo code
         const state = randomUUID();
-        stateStore.set(state, { createdAt: Date.now() });
         const demoCallbackUrl = new URL(`${FRONTEND_URL}/me`);
         demoCallbackUrl.searchParams.set("code", "demo-auth-code");
         demoCallbackUrl.searchParams.set("state", state);
@@ -161,14 +152,12 @@ export const casdoorAuthPlugin = new Elysia({ prefix: "/api/auth" })
       set.status = 503;
       return { error: "Casdoor not configured" };
     }
-    cleanOldStates();
     const state = randomUUID();
     const codeVerifier = base64Url(randomBytes(32));
     const codeChallenge = base64Url(createHash("sha256").update(codeVerifier).digest());
     const returnToRaw = typeof (query as any)?.returnTo === "string" ? String((query as any).returnTo) : "/";
     const returnTo = pickSafeReturnTo(returnToRaw);
-    stateStore.set(state, { createdAt: Date.now() });
-    setOauthStateCookie(set, { state, codeVerifier, returnTo });
+    setOauthStateCookie(set, { state, codeVerifier, returnTo, createdAt: Date.now() });
     return { authorizeUrl: buildAuthorizeUrl(state, codeChallenge) };
   })
   .get("/callback", async ({ query, set, headers }) => {
@@ -184,13 +173,11 @@ export const casdoorAuthPlugin = new Elysia({ prefix: "/api/auth" })
       set.status = 400;
       return { error: "Missing code or state" };
     }
-    const stateEntry = stateStore.get(state);
     const oauthCookie = decodeStateCookie(parseCookieHeader(headers["cookie"])[OAUTH_STATE_COOKIE]);
-    if (!stateEntry || !oauthCookie || oauthCookie.state !== state) {
+    if (!oauthCookie || oauthCookie.state !== state) {
       set.status = 400;
       return { error: "Invalid or expired state" };
     }
-    stateStore.delete(state);
     clearOauthStateCookie(set);
 
     // Demo mode: bypass Casdoor and create a demo user directly
@@ -208,6 +195,8 @@ export const casdoorAuthPlugin = new Elysia({ prefix: "/api/auth" })
           avatar_url: demoAvatar,
           email: demoEmail,
           role: "user",
+          stcn_user_id: demoCasdoorId,
+          stcn_username: demoName,
         });
       }
 
@@ -256,6 +245,8 @@ export const casdoorAuthPlugin = new Elysia({ prefix: "/api/auth" })
     const name = String(account?.displayName ?? account?.name ?? account?.username ?? account?.preferred_username ?? "User");
     const avatar = String(account?.avatar ?? account?.picture ?? "");
     const email = String(account?.email ?? "");
+    const stcnUserId = String(account?.id ?? account?.sub ?? "");
+    const stcnUsername = String(account?.name ?? account?.username ?? account?.preferred_username ?? "");
 
     if (!casdoorId) {
       set.status = 400;
@@ -268,6 +259,8 @@ export const casdoorAuthPlugin = new Elysia({ prefix: "/api/auth" })
         name,
         avatar_url: avatar,
         email,
+        stcn_user_id: stcnUserId,
+        stcn_username: stcnUsername,
       });
     } else {
       user = await createUser({
@@ -276,6 +269,8 @@ export const casdoorAuthPlugin = new Elysia({ prefix: "/api/auth" })
         avatar_url: avatar,
         email,
         role: "user",
+        stcn_user_id: stcnUserId,
+        stcn_username: stcnUsername,
       });
     }
 
@@ -369,8 +364,7 @@ export const casdoorAuthPlugin = new Elysia({ prefix: "/api/auth" })
         email: user.email,
         stcn_user_id: user.stcn_user_id,
         stcn_username: user.stcn_username,
-        sectl_user_id: user.sectl_user_id,
-        lincube_user_id: user.lincube_user_id,
+        hzzc_user_id: user.hzzc_user_id,
       },
     };
   })

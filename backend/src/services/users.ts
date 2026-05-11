@@ -16,8 +16,7 @@ export type User = {
   role: "user" | "dev" | "ops";
   stcn_user_id: string | null;
   stcn_username: string | null;
-  sectl_user_id: string | null;
-  lincube_user_id: string | null;
+  hzzc_user_id: string | null;
   is_active: boolean;
   token_version: number;
   last_login_at: string | null;
@@ -34,8 +33,7 @@ function createMemoryUser(input: {
   role?: "user" | "dev" | "ops";
   stcn_user_id?: string;
   stcn_username?: string;
-  sectl_user_id?: string;
-  lincube_user_id?: string;
+  hzzc_user_id?: string;
 }): User {
   const now = new Date().toISOString();
   const user: User = {
@@ -48,8 +46,7 @@ function createMemoryUser(input: {
     role: input.role ?? "user",
     stcn_user_id: input.stcn_user_id ?? null,
     stcn_username: input.stcn_username ?? null,
-    sectl_user_id: input.sectl_user_id ?? null,
-    lincube_user_id: input.lincube_user_id ?? null,
+    hzzc_user_id: input.hzzc_user_id ?? null,
     is_active: true,
     token_version: 0,
     last_login_at: now,
@@ -65,7 +62,7 @@ export async function findUserById(id: string): Promise<User | null> {
     return memoryUsers.get(id) ?? null;
   }
   const rows = await sql()<User[]>`
-    select id, casdoor_id, name, avatar_url, avatar_source, email, role, stcn_user_id, stcn_username, sectl_user_id, lincube_user_id, is_active, token_version, last_login_at, created_at, updated_at
+    select id, casdoor_id, name, avatar_url, avatar_source, email, role, stcn_user_id, stcn_username, hzzc_user_id, is_active, token_version, last_login_at, created_at, updated_at
     from users where id = ${id} limit 1
   `;
   return rows[0] ?? null;
@@ -79,7 +76,7 @@ export async function findUserByCasdoorId(casdoorId: string): Promise<User | nul
     return null;
   }
   const rows = await sql()<User[]>`
-    select id, casdoor_id, name, avatar_url, avatar_source, email, role, stcn_user_id, stcn_username, sectl_user_id, lincube_user_id, is_active, token_version, last_login_at, created_at, updated_at
+    select id, casdoor_id, name, avatar_url, avatar_source, email, role, stcn_user_id, stcn_username, hzzc_user_id, is_active, token_version, last_login_at, created_at, updated_at
     from users where casdoor_id = ${casdoorId} limit 1
   `;
   return rows[0] ?? null;
@@ -93,7 +90,7 @@ export async function findUserByName(name: string): Promise<User | null> {
     return null;
   }
   const rows = await sql()<User[]>`
-    select id, casdoor_id, name, avatar_url, avatar_source, email, role, stcn_user_id, stcn_username, sectl_user_id, lincube_user_id, is_active, token_version, last_login_at, created_at, updated_at
+    select id, casdoor_id, name, avatar_url, avatar_source, email, role, stcn_user_id, stcn_username, hzzc_user_id, is_active, token_version, last_login_at, created_at, updated_at
     from users where name = ${name} limit 1
   `;
   return rows[0] ?? null;
@@ -108,21 +105,20 @@ export async function createUser(input: {
   role?: "user" | "dev" | "ops";
   stcn_user_id?: string;
   stcn_username?: string;
-  sectl_user_id?: string;
-  lincube_user_id?: string;
+  hzzc_user_id?: string;
 }): Promise<User> {
   if (!dbEnabled) {
     return createMemoryUser(input);
   }
   const [row] = await sql()<User[]>`
-    insert into users (casdoor_id, name, avatar_url, avatar_source, email, role, stcn_user_id, stcn_username, sectl_user_id, lincube_user_id)
-    values (${input.casdoor_id ?? null}, ${input.name}, ${input.avatar_url ?? ""}, ${input.avatar_source ?? "default"}, ${input.email ?? null}, ${input.role ?? "user"}, ${input.stcn_user_id ?? null}, ${input.stcn_username ?? null}, ${input.sectl_user_id ?? null}, ${input.lincube_user_id ?? null})
-    returning id, casdoor_id, name, avatar_url, avatar_source, email, role, stcn_user_id, stcn_username, sectl_user_id, lincube_user_id, is_active, token_version, last_login_at, created_at, updated_at
+    insert into users (casdoor_id, name, avatar_url, avatar_source, email, role, stcn_user_id, stcn_username, hzzc_user_id)
+    values (${input.casdoor_id ?? null}, ${input.name}, ${input.avatar_url ?? ""}, ${input.avatar_source ?? "default"}, ${input.email ?? null}, ${input.role ?? "user"}, ${input.stcn_user_id ?? null}, ${input.stcn_username ?? null}, ${input.hzzc_user_id ?? null})
+    returning id, casdoor_id, name, avatar_url, avatar_source, email, role, stcn_user_id, stcn_username, hzzc_user_id, is_active, token_version, last_login_at, created_at, updated_at
   `;
   return row;
 }
 
-export async function updateUserLogin(id: string, updates?: Partial<Pick<User, "name" | "avatar_url" | "avatar_source" | "email" | "stcn_user_id" | "stcn_username" | "sectl_user_id" | "lincube_user_id">>): Promise<User | null> {
+export async function updateUserLogin(id: string, updates?: Partial<Pick<User, "name" | "avatar_url" | "avatar_source" | "email" | "stcn_user_id" | "stcn_username" | "hzzc_user_id">>): Promise<User | null> {
   if (!dbEnabled) {
     const user = memoryUsers.get(id);
     if (!user) return null;
@@ -137,8 +133,7 @@ export async function updateUserLogin(id: string, updates?: Partial<Pick<User, "
       ...(updates?.email !== undefined && { email: updates.email }),
       ...(updates?.stcn_user_id !== undefined && { stcn_user_id: updates.stcn_user_id }),
       ...(updates?.stcn_username !== undefined && { stcn_username: updates.stcn_username }),
-      ...(updates?.sectl_user_id !== undefined && { sectl_user_id: updates.sectl_user_id }),
-      ...(updates?.lincube_user_id !== undefined && { lincube_user_id: updates.lincube_user_id }),
+      ...(updates?.hzzc_user_id !== undefined && { hzzc_user_id: updates.hzzc_user_id }),
     };
     memoryUsers.set(id, updated);
     return updated;
@@ -171,20 +166,16 @@ export async function updateUserLogin(id: string, updates?: Partial<Pick<User, "
     params.push(updates.stcn_username);
     sets.push(`stcn_username = $${params.length}`);
   }
-  if (updates?.sectl_user_id !== undefined) {
-    params.push(updates.sectl_user_id);
-    sets.push(`sectl_user_id = $${params.length}`);
-  }
-  if (updates?.lincube_user_id !== undefined) {
-    params.push(updates.lincube_user_id);
-    sets.push(`lincube_user_id = $${params.length}`);
+  if (updates?.hzzc_user_id !== undefined) {
+    params.push(updates.hzzc_user_id);
+    sets.push(`hzzc_user_id = $${params.length}`);
   }
 
   params.push(id);
   const query = `
     update users set ${sets.join(", ")}
     where id = $${params.length}
-    returning id, casdoor_id, name, avatar_url, avatar_source, email, role, stcn_user_id, stcn_username, sectl_user_id, lincube_user_id, is_active, token_version, last_login_at, created_at, updated_at
+    returning id, casdoor_id, name, avatar_url, avatar_source, email, role, stcn_user_id, stcn_username, hzzc_user_id, is_active, token_version, last_login_at, created_at, updated_at
   `;
   const rows = await sql().unsafe(query, params);
   return (rows as User[])[0] ?? null;
@@ -210,7 +201,7 @@ export async function setUserRole(id: string, role: "user" | "dev" | "ops"): Pro
     throw new Error("SUPERADMIN_ROLE_IMMUTABLE");
   }
   const rows = await sql().unsafe(
-    `update users set role = $1 where id = $2 returning id, casdoor_id, name, avatar_url, avatar_source, email, role, stcn_user_id, stcn_username, sectl_user_id, lincube_user_id, is_active, token_version, last_login_at, created_at, updated_at`,
+    `update users set role = $1 where id = $2 returning id, casdoor_id, name, avatar_url, avatar_source, email, role, stcn_user_id, stcn_username, hzzc_user_id, is_active, token_version, last_login_at, created_at, updated_at`,
     [role, id]
   );
   return (rows as User[])[0] ?? null;
@@ -225,7 +216,7 @@ export async function setUserActive(id: string, isActive: boolean): Promise<User
     return updated;
   }
   const rows = await sql().unsafe(
-    `update users set is_active = $1 where id = $2 returning id, casdoor_id, name, avatar_url, avatar_source, email, role, stcn_user_id, stcn_username, sectl_user_id, lincube_user_id, is_active, token_version, last_login_at, created_at, updated_at`,
+    `update users set is_active = $1 where id = $2 returning id, casdoor_id, name, avatar_url, avatar_source, email, role, stcn_user_id, stcn_username, hzzc_user_id, is_active, token_version, last_login_at, created_at, updated_at`,
     [isActive, id]
   );
   return (rows as User[])[0] ?? null;
@@ -270,7 +261,7 @@ export async function listUsers(params: { q?: string; role?: string; page?: numb
 
   const countQuery = `select count(*)::text as count from users ${whereClause}`;
   const itemsQuery = `
-    select id, casdoor_id, name, avatar_url, avatar_source, email, role, stcn_user_id, stcn_username, sectl_user_id, lincube_user_id, is_active, token_version, last_login_at, created_at, updated_at
+    select id, casdoor_id, name, avatar_url, avatar_source, email, role, stcn_user_id, stcn_username, hzzc_user_id, is_active, token_version, last_login_at, created_at, updated_at
     from users
     ${whereClause}
     order by created_at desc

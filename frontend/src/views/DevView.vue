@@ -6,7 +6,7 @@ import { useAuth } from '../composables/useAuth';
 import CommentPanel from '../components/CommentPanel.vue';
 
 
-type DevLink = { username: string; stcn_user_id?: string; sectl_user_id?: string; lincube_user_id?: string };
+type DevLink = { username: string; stcn_user_id?: string; hzzc_user_id?: string };
 
 type Project = {
   name: string;
@@ -72,8 +72,7 @@ const submitUpdate = async () => {
       actor: {
         username: user.value?.name ?? '',
         stcn_user_id: user.value?.stcn_user_id ?? '',
-        sectl_user_id: user.value?.sectl_user_id ?? '',
-        lincube_user_id: user.value?.lincube_user_id ?? ''
+        hzzc_user_id: user.value?.hzzc_user_id ?? ''
       }
     };
     const res = await fetch('/api/dev/submissions', {

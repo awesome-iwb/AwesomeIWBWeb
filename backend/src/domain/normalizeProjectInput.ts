@@ -24,11 +24,10 @@ export function normalizeProjectInput(p: any) {
         return {
           username: typeof x?.username === "string" ? x.username : "",
           stcn_user_id: stcn,
-          sectl_user_id: typeof x?.sectl_user_id === "string" ? x.sectl_user_id : "",
-          lincube_user_id: typeof x?.lincube_user_id === "string" ? x.lincube_user_id : ""
+          hzzc_user_id: typeof x?.hzzc_user_id === "string" ? x.hzzc_user_id : ""
         };
       })
-      .filter((x) => x.username.trim() || x.stcn_user_id.trim() || x.sectl_user_id.trim() || x.lincube_user_id.trim());
+      .filter((x) => x.username.trim() || x.stcn_user_id.trim() || x.hzzc_user_id.trim());
   };
 
   const readDevelopersField = (obj: any) => {

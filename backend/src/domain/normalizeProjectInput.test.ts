@@ -7,7 +7,7 @@ describe('normalizeProjectInput', () => {
       name: 'X',
       platform_developers: [{ username: 'u', user_id: 'legacy' }]
     });
-    expect(out.platform_developers).toEqual([{ username: 'u', stcn_user_id: 'legacy', sectl_user_id: '', lincube_user_id: '' }]);
+    expect(out.platform_developers).toEqual([{ username: 'u', stcn_user_id: 'legacy', hzzc_user_id: '' }]);
   });
 });
 
