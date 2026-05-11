@@ -55,8 +55,8 @@ import {
 import { authPlugin, requireAuth, requireRole, requireCapability } from "./plugins/auth";
 import { casdoorAuthPlugin } from "./plugins/casdoorAuth";
 import { localAuthPlugin } from "./plugins/localAuth";
-import { listUsers, setUserRole, setUserActive, updateUserLogin } from "./services/users";
-import { ensureSuperadminInitialized, SUPERADMIN_INITIAL_USERNAME } from "./services/localAccounts";
+import { listUsers, setUserRole, setUserActive, updateUserLogin, findUserByName, deleteUser, findUserById, bumpUserTokenVersion, createUser } from "./services/users";
+import { ensureSuperadminInitialized, SUPERADMIN_INITIAL_USERNAME, setLocalAccountPassword, validateSuperadminPassword } from "./services/localAccounts";
 import { listCapabilities, getUserCapabilitiesWithInfo, setUserCapabilities, isSuperadmin as isSuperadminUser } from "./services/capabilities";
 import { appConfig } from "./config";
 import { checkRateLimit } from "./plugins/rateLimit";
@@ -1584,6 +1584,71 @@ const app = new Elysia()
     }
     await logAuditCompat({ action: isActive ? "activate" : "deactivate", entity_type: "user", entity_id: id });
     return updated;
+  })
+  .post("/api/admin/users", async ({ body, set, user }) => {
+    if (await checkCap(user, set, "user:manage")) return { error: "Forbidden" };
+    const name = String((body as any)?.name ?? "").trim();
+    const password = String((body as any)?.password ?? "").trim();
+    const email = String((body as any)?.email ?? "").trim() || undefined;
+    if (!name) {
+      set.status = 400;
+      return { error: "Username is required" };
+    }
+    const existing = await findUserByName(name);
+    if (existing) {
+      set.status = 409;
+      return { error: "Username already exists" };
+    }
+    if (password && !validateSuperadminPassword(password)) {
+      set.status = 400;
+      return { error: "Password does not meet requirements" };
+    }
+    const created = await createUser({ name, email });
+    if (password) {
+      await setLocalAccountPassword(name, password, true);
+    }
+    await logAuditCompat({ action: "create_user", entity_type: "user", entity_id: created.id, diff: { name, email, has_password: !!password } }, user?.name);
+    return created;
+  })
+  .delete("/api/admin/users/:id", async ({ params: { id }, set, user }) => {
+    if (await checkCap(user, set, "user:delete")) return { error: "Forbidden" };
+    const target = await findUserById(id);
+    if (!target) {
+      set.status = 404;
+      return { error: "User not found" };
+    }
+    if (isSuperadminUser(target.name)) {
+      set.status = 403;
+      return { error: "Cannot delete superadmin" };
+    }
+    if (user?.id === id) {
+      set.status = 403;
+      return { error: "Cannot delete yourself" };
+    }
+    const deleted = await deleteUser(id);
+    if (!deleted) {
+      set.status = 404;
+      return { error: "User not found" };
+    }
+    await logAuditCompat({ action: "delete_user", entity_type: "user", entity_id: id, diff: { name: target.name } }, user?.name);
+    return { success: true };
+  })
+  .patch("/api/admin/users/:id/password", async ({ params: { id }, body, set, user }) => {
+    if (await checkCap(user, set, "user:manage")) return { error: "Forbidden" };
+    const password = String((body as any)?.password ?? "");
+    if (!password || !validateSuperadminPassword(password)) {
+      set.status = 400;
+      return { error: "Password does not meet requirements" };
+    }
+    const target = await findUserById(id);
+    if (!target) {
+      set.status = 404;
+      return { error: "User not found" };
+    }
+    await setLocalAccountPassword(target.name, password, true);
+    await bumpUserTokenVersion(id);
+    await logAuditCompat({ action: "reset_password", entity_type: "user", entity_id: id }, user?.name);
+    return { success: true };
   })
   .get("/api/admin/moderation/comments", async ({ query, set, user }) => {
     if (await checkCap(user, set, "moderation:read")) return { error: "Forbidden" };

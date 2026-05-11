@@ -729,8 +729,9 @@
       <!-- Users Tab -->
       <div v-else-if="activeTab === 'users'" class="grid grid-cols-1 lg:grid-cols-4 gap-4 lg:gap-8">
         <div class="lg:col-span-1 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col" :class="{ 'hidden lg:flex': isMobile && mobileView === 'detail' }" style="height: auto; min-height: 400px; max-height: 700px;">
-          <div class="p-4 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
+          <div class="p-4 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 flex justify-between items-center">
             <h2 class="font-bold text-lg">用户列表</h2>
+            <button @click="showCreateUserForm = !showCreateUserForm" class="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold transition-colors">创建用户</button>
           </div>
           <div class="p-4 border-b border-slate-100 dark:border-slate-700 space-y-3">
             <input v-model="userQuery.q" @keyup.enter="fetchUsers" type="text" class="w-full px-3 py-3 lg:py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-emerald-500 text-base lg:text-sm" placeholder="搜索（用户名/邮箱/STCN ID）" />
@@ -741,6 +742,15 @@
               <option value="ops">运维</option>
             </select>
             <button @click="userQuery.page = 1; fetchUsers()" class="w-full px-3 py-3 lg:py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-base lg:text-sm font-bold transition-colors">刷新</button>
+          </div>
+          <div v-if="showCreateUserForm" class="p-4 border-b border-slate-100 dark:border-slate-700 bg-slate-100 dark:bg-slate-900/80 space-y-3">
+            <input v-model="newUserName" type="text" class="w-full px-3 py-3 lg:py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-emerald-500 text-base lg:text-sm" placeholder="用户名（必填）" />
+            <input v-model="newUserPassword" type="password" class="w-full px-3 py-3 lg:py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-emerald-500 text-base lg:text-sm" placeholder="留空则仅支持第三方登录" />
+            <input v-model="newUserEmail" type="email" class="w-full px-3 py-3 lg:py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-emerald-500 text-base lg:text-sm" placeholder="邮箱（选填）" />
+            <div class="flex gap-2">
+              <button @click="createUser" :disabled="creatingUser || !newUserName.trim()" class="flex-1 px-3 py-3 lg:py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed text-white text-base lg:text-sm font-bold transition-colors">{{ creatingUser ? '创建中...' : '创建' }}</button>
+              <button @click="showCreateUserForm = false; newUserName = ''; newUserPassword = ''; newUserEmail = ''" class="px-3 py-3 lg:py-2 rounded-xl bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-base lg:text-sm font-bold hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors">取消</button>
+            </div>
           </div>
           <div class="flex-1 overflow-y-auto p-4 space-y-2">
             <div
@@ -888,12 +898,44 @@
                   <div class="text-sm font-bold text-slate-700 dark:text-slate-300">账号状态</div>
                   <div class="text-xs text-slate-500 dark:text-slate-400">禁用后用户将无法登录</div>
                 </div>
+                <div class="flex gap-2">
+                  <button 
+                    @click="updateUserActive(!userDraft.is_active)"
+                    class="px-4 py-3 lg:py-2 rounded-xl font-bold transition-colors"
+                    :class="userDraft.is_active ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300' : 'bg-rose-100 dark:bg-rose-500/20 text-rose-700 dark:text-rose-300'"
+                  >
+                    {{ userDraft.is_active ? '已启用' : '已禁用' }}
+                  </button>
+                  <button 
+                    @click="showResetPassword = !showResetPassword"
+                    class="px-4 py-3 lg:py-2 rounded-xl bg-blue-500 hover:bg-blue-600 text-white font-bold transition-colors"
+                  >
+                    重置密码
+                  </button>
+                </div>
+              </div>
+
+              <div v-if="showResetPassword" class="space-y-3">
+                <input v-model="resetPasswordValue" type="password" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-blue-500 text-base" placeholder="输入新密码" />
+                <div class="flex gap-2">
+                  <button @click="resetPassword" :disabled="resettingPassword || !resetPasswordValue" class="flex-1 px-4 py-3 rounded-xl bg-blue-500 hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold transition-colors">{{ resettingPassword ? '重置中...' : '确认重置' }}</button>
+                  <button @click="showResetPassword = false; resetPasswordValue = ''" class="px-4 py-3 rounded-xl bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors">取消</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="p-4 lg:p-6 rounded-2xl border border-rose-200 dark:border-rose-500/30 bg-rose-50 dark:bg-rose-500/10 space-y-4">
+              <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                <div>
+                  <div class="text-sm font-extrabold text-rose-700 dark:text-rose-300">危险操作</div>
+                  <div class="text-xs text-rose-500 dark:text-rose-400">删除用户后数据不可恢复</div>
+                </div>
                 <button 
-                  @click="updateUserActive(!userDraft.is_active)"
-                  class="px-4 py-3 lg:py-2 rounded-xl font-bold transition-colors"
-                  :class="userDraft.is_active ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300' : 'bg-rose-100 dark:bg-rose-500/20 text-rose-700 dark:text-rose-300'"
+                  @click="deleteUser"
+                  :disabled="deletingUser"
+                  class="px-4 py-3 lg:py-2 rounded-xl bg-rose-500 hover:bg-rose-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold transition-colors"
                 >
-                  {{ userDraft.is_active ? '已启用' : '已禁用' }}
+                  {{ deletingUser ? '删除中...' : '删除用户' }}
                 </button>
               </div>
             </div>
@@ -1172,6 +1214,18 @@ const usersPage = ref<{ items: any[]; page: number; pageSize: number; total: num
 const userQuery = ref<{ q: string; role: string; page: number; pageSize: number }>({ q: '', role: '', page: 1, pageSize: 20 });
 const selectedUserId = ref<string | null>(null);
 const userDraft = ref<any | null>(null);
+
+const showCreateUserForm = ref(false);
+const newUserName = ref('');
+const newUserPassword = ref('');
+const newUserEmail = ref('');
+const creatingUser = ref(false);
+
+const showResetPassword = ref(false);
+const resetPasswordValue = ref('');
+const resettingPassword = ref(false);
+
+const deletingUser = ref(false);
 
 const currentStory = computed(() => {
   if (selectedIndex.value === null) return null;
@@ -1942,6 +1996,87 @@ const updateUserActive = async (isActive: boolean) => {
   userDraft.value = { ...userDraft.value, is_active: isActive };
   await fetchUsers();
   alert(isActive ? '账号已启用' : '账号已禁用');
+};
+
+const createUser = async () => {
+  if (!newUserName.value.trim()) return;
+  creatingUser.value = true;
+  try {
+    const res = await adminFetch('/api/admin/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: newUserName.value.trim(),
+        password: newUserPassword.value || undefined,
+        email: newUserEmail.value || undefined,
+      }),
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      alert(json?.error ?? '创建失败');
+      return;
+    }
+    showCreateUserForm.value = false;
+    newUserName.value = '';
+    newUserPassword.value = '';
+    newUserEmail.value = '';
+    await fetchUsers();
+    if (json.id) {
+      selectUser(json);
+    }
+  } catch (e) {
+    alert('创建失败');
+  } finally {
+    creatingUser.value = false;
+  }
+};
+
+const resetPassword = async () => {
+  if (!userDraft.value?.id || !resetPasswordValue.value) return;
+  resettingPassword.value = true;
+  try {
+    const res = await adminFetch(`/api/admin/users/${userDraft.value.id}/password`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: resetPasswordValue.value }),
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      alert(json?.error ?? '重置失败');
+      return;
+    }
+    alert('密码已重置');
+    showResetPassword.value = false;
+    resetPasswordValue.value = '';
+  } catch (e) {
+    alert('重置失败');
+  } finally {
+    resettingPassword.value = false;
+  }
+};
+
+const deleteUser = async () => {
+  if (!userDraft.value?.id) return;
+  const ok = confirm(`确认删除用户 ${userDraft.value.name}？此操作不可撤销！`);
+  if (!ok) return;
+  deletingUser.value = true;
+  try {
+    const res = await adminFetch(`/api/admin/users/${userDraft.value.id}`, {
+      method: 'DELETE',
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      alert(json?.error ?? '删除失败');
+      return;
+    }
+    userDraft.value = null;
+    selectedUserId.value = null;
+    await fetchUsers();
+  } catch (e) {
+    alert('删除失败');
+  } finally {
+    deletingUser.value = false;
+  }
 };
 
 const userDraftCapabilities = ref<string[]>([]);

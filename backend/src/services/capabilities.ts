@@ -31,6 +31,7 @@ const ALL_CAPABILITIES: Capability[] = [
   { id: "moderation:reject", name: "驳回内容", category: "moderation", description: "驳回评论或 Bug 反馈", sort_index: 1400 },
   { id: "user:read", name: "查看用户", category: "user", description: "查看用户列表", sort_index: 1500 },
   { id: "user:manage", name: "管理用户", category: "user", description: "修改用户角色、状态、权限", sort_index: 1600 },
+  { id: "user:delete", name: "删除用户", category: "user", description: "删除用户账号", sort_index: 1650 },
   { id: "audit:read", name: "查看审计日志", category: "audit", description: "查看系统审计日志", sort_index: 1700 },
   { id: "story:manage", name: "故事管理", category: "story", description: "管理首页故事", sort_index: 1800 },
   { id: "feedback:manage", name: "反馈管理", category: "feedback", description: "管理反馈状态和标签", sort_index: 1900 },

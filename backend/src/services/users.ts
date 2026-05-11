@@ -284,3 +284,11 @@ export async function bumpUserTokenVersion(id: string): Promise<void> {
   }
   await sql()`update users set token_version = token_version + 1 where id = ${id}`;
 }
+
+export async function deleteUser(id: string): Promise<boolean> {
+  if (!dbEnabled) {
+    return memoryUsers.delete(id);
+  }
+  const result = await sql()`delete from users where id = ${id}`;
+  return (result as any).rowCount > 0;
+}
