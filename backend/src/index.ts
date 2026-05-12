@@ -58,6 +58,7 @@ import { localAuthPlugin } from "./plugins/localAuth";
 import { listUsers, setUserRole, setUserActive, updateUserLogin, findUserByName, deleteUser, findUserById, bumpUserTokenVersion, createUser } from "./services/users";
 import { ensureSuperadminInitialized, SUPERADMIN_INITIAL_USERNAME, setLocalAccountPassword, validateSuperadminPassword } from "./services/localAccounts";
 import { listCapabilities, getUserCapabilitiesWithInfo, setUserCapabilities, isSuperadmin as isSuperadminUser } from "./services/capabilities";
+import { createOrGetMediaAssetFromUpload, getMediaReferences, listMediaAssets, restoreMedia, softDeleteMedia } from "./services/media";
 import { appConfig } from "./config";
 import { checkRateLimit } from "./plugins/rateLimit";
 
@@ -186,7 +187,6 @@ async function checkCap(user: any, set: any, capabilityId: string): Promise<bool
     return true;
   }
   if (isSuperadminUser(user.name)) return false;
-  if (user.id?.startsWith("token:")) return false;
   const { userHasCapability } = await import("./services/capabilities");
   const has = await userHasCapability(user.id, user.name, capabilityId);
   if (!has) {
@@ -224,6 +224,31 @@ function extFromMime(mime: string) {
   if (mime === "image/jpeg") return "jpg";
   if (mime === "image/webp") return "webp";
   return null;
+}
+
+function uploadError(set: any, status: number, code: string, message: string) {
+  set.status = status;
+  return { error: message, code, message };
+}
+
+async function registerUploadedMedia(input: {
+  sha256: string;
+  filename: string;
+  url: string;
+  mime: string;
+  size: number;
+  source?: string;
+  uploaderId?: string | null;
+}) {
+  return await createOrGetMediaAssetFromUpload({
+    sha256: input.sha256,
+    storageKey: input.filename,
+    url: input.url,
+    mime: input.mime,
+    size: input.size,
+    source: input.source,
+    uploaderId: input.uploaderId,
+  });
 }
 
 const allowedOrigins = appConfig.allowedOrigins;
@@ -1113,11 +1138,7 @@ const app = new Elysia()
   })
   .post("/api/dev/submissions", async ({ body, set, user, headers }) => {
     if (checkRateLimit({ headers, path: "/api/dev/submissions", set })) return { error: "Too Many Requests" };
-    if (checkAuth(user, set)) return { error: "Unauthorized" };
-    if (!user || (user.role !== "dev" && user.role !== "ops")) {
-      set.status = 403;
-      return { error: "Forbidden" };
-    }
+    if (await checkCap(user, set, "dev_panel_access")) return { error: "Forbidden" };
     const payload: any = body as any;
     if (payload?.kind !== "project_update") {
       set.status = 400;
@@ -1469,70 +1490,87 @@ const app = new Elysia()
     }
   })
   .post("/api/upload", async ({ body: { image }, set, user, headers }) => {
-    if (checkRateLimit({ headers, path: "/api/upload", set })) return { error: "Too Many Requests" };
-    if (checkAuth(user, set)) return { error: "Unauthorized" };
-    if (!image) throw new Error("No image provided");
+    if (checkRateLimit({ headers, path: "/api/upload", set })) {
+      return uploadError(set, 429, "UPLOAD_RATE_LIMITED", "请求过于频繁，请稍后重试");
+    }
+    if (checkAuth(user, set)) return uploadError(set, 401, "UPLOAD_UNAUTHORIZED", "请先登录后再上传");
+    if (!image) return uploadError(set, 400, "UPLOAD_MISSING_FILE", "未检测到上传文件");
     if (image.size > appConfig.uploadMaxBytes) {
-      set.status = 400;
-      return { error: "File too large" };
+      return uploadError(set, 400, "UPLOAD_FILE_TOO_LARGE", `图片大小超过限制（最大 ${Math.round(appConfig.uploadMaxBytes / (1024 * 1024))}MB）`);
     }
     const mime = String(image.type || "");
     if (!["image/png", "image/jpeg", "image/webp"].includes(mime)) {
-      set.status = 400;
-      return { error: "Unsupported image type" };
+      return uploadError(set, 400, "UPLOAD_UNSUPPORTED_TYPE", "仅支持 PNG、JPG、WEBP 格式");
     }
     const ext = extFromMime(mime);
     if (!ext) {
-      set.status = 400;
-      return { error: "Unsupported image type" };
+      return uploadError(set, 400, "UPLOAD_UNSUPPORTED_TYPE", "仅支持 PNG、JPG、WEBP 格式");
     }
     const buffer = Buffer.from(await image.arrayBuffer());
     const isPng = buffer.length > 8 && buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47;
     const isJpeg = buffer.length > 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
     const isWebp = buffer.length > 12 && buffer.toString("ascii", 0, 4) === "RIFF" && buffer.toString("ascii", 8, 12) === "WEBP";
     if (!(isPng || isJpeg || isWebp)) {
-      set.status = 400;
-      return { error: "Invalid file signature" };
+      return uploadError(set, 400, "UPLOAD_INVALID_SIGNATURE", "文件内容与图片格式不匹配");
     }
-    const filename = `${crypto.createHash("sha256").update(buffer).digest("hex")}.${ext}`;
+    const hash = crypto.createHash("sha256").update(buffer).digest("hex");
+    const filename = `${hash}.${ext}`;
     const uploadPath = path.join(UPLOADS_DIR, filename);
     await Bun.write(uploadPath, buffer);
-    return { url: `/api/uploads/${filename}` };
+    const url = `/api/uploads/${filename}`;
+    const media = await registerUploadedMedia({
+      sha256: hash,
+      filename,
+      url,
+      mime,
+      size: buffer.length,
+      source: "upload",
+      uploaderId: user?.id,
+    });
+    return { url, media_id: media?.id };
   }, {
     body: t.Object({
       image: t.File()
     })
   })
   .post("/api/user/avatar", async ({ body: { image }, set, user, headers }) => {
-    if (checkRateLimit({ headers, path: "/api/user/avatar", set })) return { error: "Too Many Requests" };
-    if (checkAuth(user, set)) return { error: "Unauthorized" };
-    if (!image) throw new Error("No image provided");
+    if (checkRateLimit({ headers, path: "/api/user/avatar", set })) {
+      return uploadError(set, 429, "UPLOAD_RATE_LIMITED", "请求过于频繁，请稍后重试");
+    }
+    if (checkAuth(user, set)) return uploadError(set, 401, "UPLOAD_UNAUTHORIZED", "请先登录后再上传");
+    if (!image) return uploadError(set, 400, "UPLOAD_MISSING_FILE", "未检测到上传文件");
     if (image.size > appConfig.uploadMaxBytes) {
-      set.status = 400;
-      return { error: "File too large" };
+      return uploadError(set, 400, "UPLOAD_FILE_TOO_LARGE", `图片大小超过限制（最大 ${Math.round(appConfig.uploadMaxBytes / (1024 * 1024))}MB）`);
     }
     const mime = String(image.type || "");
     if (!["image/png", "image/jpeg", "image/webp"].includes(mime)) {
-      set.status = 400;
-      return { error: "Unsupported image type" };
+      return uploadError(set, 400, "UPLOAD_UNSUPPORTED_TYPE", "仅支持 PNG、JPG、WEBP 格式");
     }
     const ext = extFromMime(mime);
     if (!ext) {
-      set.status = 400;
-      return { error: "Unsupported image type" };
+      return uploadError(set, 400, "UPLOAD_UNSUPPORTED_TYPE", "仅支持 PNG、JPG、WEBP 格式");
     }
     const buffer = Buffer.from(await image.arrayBuffer());
     const isPng = buffer.length > 8 && buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47;
     const isJpeg = buffer.length > 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
     const isWebp = buffer.length > 12 && buffer.toString("ascii", 0, 4) === "RIFF" && buffer.toString("ascii", 8, 12) === "WEBP";
     if (!(isPng || isJpeg || isWebp)) {
-      set.status = 400;
-      return { error: "Invalid file signature" };
+      return uploadError(set, 400, "UPLOAD_INVALID_SIGNATURE", "文件内容与图片格式不匹配");
     }
-    const filename = `${crypto.createHash("sha256").update(buffer).digest("hex")}.${ext}`;
+    const hash = crypto.createHash("sha256").update(buffer).digest("hex");
+    const filename = `${hash}.${ext}`;
     const uploadPath = path.join(UPLOADS_DIR, filename);
     await Bun.write(uploadPath, buffer);
     const avatarUrl = `/api/uploads/${filename}`;
+    const media = await registerUploadedMedia({
+      sha256: hash,
+      filename,
+      url: avatarUrl,
+      mime,
+      size: buffer.length,
+      source: "avatar",
+      uploaderId: user?.id,
+    });
 
     // Update user's avatar in database
     if (user?.id && !String(user.id).startsWith("local:")) {
@@ -1542,11 +1580,45 @@ const app = new Elysia()
       });
     }
 
-    return { url: avatarUrl };
+    return { url: avatarUrl, media_id: media?.id };
   }, {
     body: t.Object({
       image: t.File()
     })
+  })
+  .get("/api/admin/media", async ({ query, set, user }) => {
+    if (await checkCap(user, set, "media:read")) return { error: "Forbidden" };
+    const q = typeof query.q === "string" ? query.q : undefined;
+    const status = typeof query.status === "string" ? query.status : undefined;
+    const mime = typeof query.mime === "string" ? query.mime : undefined;
+    const source = typeof query.source === "string" ? query.source : undefined;
+    const page = typeof query.page === "string" ? Number(query.page) : undefined;
+    const pageSize = typeof query.pageSize === "string" ? Number(query.pageSize) : undefined;
+    return await listMediaAssets({ q, status, mime, source }, { page, pageSize });
+  })
+  .get("/api/admin/media/:id/references", async ({ params: { id }, set, user }) => {
+    if (await checkCap(user, set, "media:read")) return { error: "Forbidden" };
+    return { items: await getMediaReferences(id) };
+  })
+  .delete("/api/admin/media/:id", async ({ params: { id }, set, user }) => {
+    if (await checkCap(user, set, "media:manage")) return { error: "Forbidden" };
+    const updated = await softDeleteMedia(id);
+    if (!updated) {
+      set.status = 404;
+      return { error: "Media not found" };
+    }
+    await logAuditCompat({ action: "soft_delete_media", entity_type: "media", entity_id: id }, user?.name);
+    return updated;
+  })
+  .post("/api/admin/media/:id/restore", async ({ params: { id }, set, user }) => {
+    if (await checkCap(user, set, "media:manage")) return { error: "Forbidden" };
+    const updated = await restoreMedia(id);
+    if (!updated) {
+      set.status = 404;
+      return { error: "Media not found" };
+    }
+    await logAuditCompat({ action: "restore_media", entity_type: "media", entity_id: id }, user?.name);
+    return updated;
   })
   .get("/api/admin/users", async ({ query, set, user }) => {
     if (await checkCap(user, set, "user:read")) return { error: "Forbidden" };
@@ -1821,7 +1893,7 @@ const app = new Elysia()
     await logAuditCompat({ action: "update_capabilities", entity_type: "user", entity_id: id, diff: { capabilities: capabilityIds } }, user?.name);
     return { success: true };
   })
-  .listen(Number(process.env.PORT ?? 8080));
+  .listen(Number(process.env.PORT ?? 8081));
 
 /**
  * Normalize a CSV row into the internal project payload shape.

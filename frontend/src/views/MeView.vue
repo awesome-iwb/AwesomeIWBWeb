@@ -15,7 +15,7 @@ useHead({
 
 const router = useRouter();
 const route = useRoute();
-const { user, isAuthenticated, logout, loginWithCasdoor, handleCallback, uploadAvatar, hasCapability } = useAuth();
+const { user, isAuthenticated, logout, getCasdoorAuthorizeUrl, handleCallback, uploadAvatar, hasCapability, fetchUser } = useAuth();
 
 const redirectTo = computed(() => {
   const q = route.query.redirect;
@@ -33,10 +33,13 @@ const goNext = () => router.push(redirectTo.value);
 
 const isLoggingIn = ref(false);
 const loginError = ref('');
+const popupStatus = ref('');
 
 const isUploadingAvatar = ref(false);
 const avatarUploadError = ref('');
 const fileInputRef = ref<HTMLInputElement | null>(null);
+
+const showEmergencyLocalLogin = computed(() => !import.meta.env.PROD);
 
 const showCropper = ref(false);
 const cropperImageSrc = ref('');
@@ -49,18 +52,23 @@ onMounted(async () => {
     isLoggingIn.value = true;
     loginError.value = '';
     try {
-      const { fetchUser } = useAuth();
+      const { fetchUser, user } = useAuth();
       const ok = await fetchUser();
       if (ok) {
         await router.replace({ path: '/me', query: {} });
-        if (returnTo && returnTo.startsWith('/')) {
-          router.push(returnTo);
+        const nextPath = returnTo && returnTo.startsWith('/') ? returnTo : '/';
+        if (user.value?.profileConfirmed) {
+          await router.push(nextPath);
+        } else {
+          await router.push({ path: '/auth/result', query: { returnTo: nextPath } });
         }
         return;
       }
       loginError.value = '登录状态获取失败，请重试';
+      await router.replace({ path: '/me', query: {} });
     } catch (e: any) {
       loginError.value = e?.message || '登录过程中发生错误';
+      await router.replace({ path: '/me', query: {} });
     } finally {
       isLoggingIn.value = false;
     }
@@ -74,14 +82,16 @@ onMounted(async () => {
     loginError.value = '';
     try {
       const success = await handleCallback(code, state);
+      await router.replace({ path: '/me', query: {} });
       if (success) {
-        await router.replace({ path: '/me', query: {} });
+        await fetchUser();
         goNext();
         return;
       }
       loginError.value = '登录回调处理失败，请重试';
     } catch (e: any) {
       loginError.value = e?.message || '登录过程中发生错误';
+      await router.replace({ path: '/me', query: {} });
     } finally {
       isLoggingIn.value = false;
     }
@@ -91,11 +101,87 @@ onMounted(async () => {
 const startStcnLogin = async () => {
   isLoggingIn.value = true;
   loginError.value = '';
-  try {
-    await loginWithCasdoor(redirectTo.value || undefined);
-  } catch (e: any) {
-    loginError.value = e?.message || '无法启动登录流程，请检查网络连接';
+  popupStatus.value = '正在打开登录窗口...';
+
+  let popup: Window | null = null;
+  let pollTimer: number | null = null;
+
+  const stopPoll = () => {
+    if (pollTimer !== null) {
+      window.clearInterval(pollTimer);
+      pollTimer = null;
+    }
+  };
+
+  const finishError = (message: string) => {
+    stopPoll();
+    popupStatus.value = '';
+    loginError.value = message;
     isLoggingIn.value = false;
+  };
+
+  const finishSuccess = async () => {
+    stopPoll();
+    popupStatus.value = '';
+    const ok = await fetchUser();
+    if (!ok) {
+      finishError('登录完成，但读取用户信息失败，请刷新后重试');
+      return;
+    }
+    isLoggingIn.value = false;
+    const nextPath = redirectTo.value && redirectTo.value.startsWith('/') ? redirectTo.value : '/';
+    if (user.value?.profileConfirmed) {
+      await router.push(nextPath);
+    } else {
+      await router.push({ path: '/auth/result', query: { returnTo: nextPath } });
+    }
+  };
+
+  const onMessage = async (event: MessageEvent) => {
+    if (event.origin !== window.location.origin) return;
+    const data = event.data as { type?: string; success?: boolean; message?: string };
+    if (data?.type !== 'aiwb-oauth-popup-result') return;
+
+    window.removeEventListener('message', onMessage);
+    try {
+      popup?.close();
+    } catch {}
+
+    if (data.success) {
+      popupStatus.value = '正在同步登录状态...';
+      await finishSuccess();
+      return;
+    }
+    finishError(data.message || '登录失败，请重试');
+  };
+
+  try {
+    const authorizeUrl = await getCasdoorAuthorizeUrl(redirectTo.value || undefined, true);
+    popup = window.open(authorizeUrl, 'aiwb-auth-popup', 'width=560,height=760,menubar=no,toolbar=no,location=yes,status=no,noopener=no');
+    if (!popup) {
+      finishError('浏览器拦截了登录弹窗，请允许弹窗后重试');
+      return;
+    }
+
+    window.addEventListener('message', onMessage);
+    popupStatus.value = '请在弹窗中完成登录...';
+
+    pollTimer = window.setInterval(async () => {
+      if (!popup || popup.closed) {
+        stopPoll();
+        window.removeEventListener('message', onMessage);
+        popupStatus.value = '正在检测登录状态...';
+        const ok = await fetchUser();
+        if (ok) {
+          await finishSuccess();
+        } else {
+          finishError('登录窗口已关闭，未完成登录');
+        }
+      }
+    }, 500);
+  } catch (e: any) {
+    window.removeEventListener('message', onMessage);
+    finishError(e?.message || '无法启动登录流程，请检查网络连接');
   }
 };
 
@@ -147,6 +233,11 @@ const handleCropConfirm = async (blob: Blob) => {
 const handleCropCancel = () => {
   showCropper.value = false;
   cropperImageSrc.value = '';
+};
+
+const handleLogout = async () => {
+  await logout();
+  await router.replace('/me');
 };
 </script>
 
@@ -213,9 +304,14 @@ const handleCropCancel = () => {
             <div class="text-sm text-rose-700 dark:text-rose-300">{{ loginError }}</div>
           </div>
 
+          <div v-if="popupStatus" class="p-4 rounded-2xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-500/10 text-sm text-emerald-700 dark:text-emerald-300">
+            {{ popupStatus }}
+          </div>
+
           <div class="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/40">
             <div class="text-sm font-extrabold text-slate-800 dark:text-slate-200">智教联盟登录系统</div>
-            <div class="text-sm text-slate-600 dark:text-slate-300 mt-1">使用智教联盟（STCN）统一身份认证登录，无需额外注册。</div>
+            <div class="text-sm text-slate-600 dark:text-slate-300 mt-1">普通用户使用智教联盟（STCN）统一身份认证登录，无需额外注册。</div>
+            <div class="text-xs text-slate-500 dark:text-slate-400 mt-2">员工请使用专用 staff 通道登录。</div>
           </div>
 
           <button
@@ -240,12 +336,12 @@ const handleCropCancel = () => {
           </div>
 
           <!-- Emergency admin login -->
-          <div class="pt-2">
+          <div v-if="showEmergencyLocalLogin" class="pt-2">
             <button
-              @click="router.push('/admin-login')"
+              @click="router.push('/dontusejy')"
               class="w-full text-xs text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 transition-colors py-2"
             >
-              超级管理员登录（应急通道）
+              本地登录入口
             </button>
           </div>
         </div>
@@ -267,6 +363,14 @@ const handleCropCancel = () => {
             <div v-if="user?.stcn_username" class="flex items-center justify-between">
               <span class="text-sm text-slate-500 dark:text-slate-400">STCN 账号</span>
               <span class="text-sm font-medium text-emerald-600 dark:text-emerald-400">@{{ user.stcn_username }}</span>
+            </div>
+            <div class="pt-2">
+              <button
+                @click="router.push('/auth/result')"
+                class="w-full inline-flex items-center justify-center gap-2 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 px-4 py-2.5 rounded-xl font-bold border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+              >
+                查看智教联盟绑定信息
+              </button>
             </div>
           </div>
 
@@ -294,7 +398,7 @@ const handleCropCancel = () => {
               返回
             </button>
             <button
-              @click="logout(); router.replace('/me')"
+              @click="handleLogout"
               class="inline-flex items-center justify-center gap-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 px-6 py-3.5 rounded-2xl font-extrabold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
             >
               <LogOut class="w-5 h-5" />

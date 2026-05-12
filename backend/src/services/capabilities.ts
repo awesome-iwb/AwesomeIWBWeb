@@ -36,6 +36,8 @@ const ALL_CAPABILITIES: Capability[] = [
   { id: "story:manage", name: "故事管理", category: "story", description: "管理首页故事", sort_index: 1800 },
   { id: "feedback:manage", name: "反馈管理", category: "feedback", description: "管理反馈状态和标签", sort_index: 1900 },
   { id: "comment:manage", name: "管理评论", category: "comment", description: "管理自己和他人的评论/Issue状态", sort_index: 1950 },
+  { id: "media:read", name: "查看媒体", category: "media", description: "查看媒体资产和引用关系", sort_index: 2000 },
+  { id: "media:manage", name: "管理媒体", category: "media", description: "软删除和恢复媒体资产", sort_index: 2010 },
 ];
 
 const ALL_CAPABILITY_IDS = new Set(ALL_CAPABILITIES.map(c => c.id));

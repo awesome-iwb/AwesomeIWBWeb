@@ -5,7 +5,7 @@ import { Shield, LogIn, AlertCircle, ArrowLeft, Eye, EyeOff } from 'lucide-vue-n
 import { useAuth } from '../composables/useAuth';
 
 const router = useRouter();
-const { setToken } = useAuth();
+const { loginWithPassword, hasCapability } = useAuth();
 
 const username = ref('');
 const password = ref('');
@@ -32,33 +32,17 @@ const handleLogin = async () => {
 
   isLoading.value = true;
   try {
-    const res = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        username: username.value.trim(),
-        password: password.value,
-      }),
-    });
-
-    const text = await res.text();
-    const json = text ? JSON.parse(text) : {};
-
-    if (!res.ok) {
+    const ok = await loginWithPassword(username.value.trim(), password.value);
+    if (!ok) {
       throw new Error('登录失败');
     }
 
-    if (json.token) {
-      setToken(json.token, {
-        id: json.user?.id,
-        name: json.user?.name,
-        role: json.user?.role,
-        avatar_url: json.user?.avatar_url,
-      });
+    if (hasCapability('admin_panel_access')) {
       router.push('/admin');
-    } else {
-      throw new Error('登录失败');
+      return;
     }
+
+    error.value = '登录成功，但当前账号没有后台访问权限';
   } catch (e: any) {
     error.value = '登录失败';
   } finally {
@@ -88,7 +72,7 @@ const handleLogin = async () => {
           </div>
           <div>
             <h1 class="text-xl font-extrabold text-slate-900 dark:text-white">超级管理员登录</h1>
-            <p class="text-xs text-slate-500 dark:text-slate-400">应急登录通道 · 仅限运维人员</p>
+            <p class="text-xs text-slate-500 dark:text-slate-400">员工/运维入口</p>
           </div>
         </div>
 

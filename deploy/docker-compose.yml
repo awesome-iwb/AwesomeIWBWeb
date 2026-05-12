@@ -30,7 +30,7 @@ services:
       - /etc/awesomeiwb/backend.env
     environment:
       HOST: "0.0.0.0"
-      PORT: "8080"
+      PORT: "8081"
       DATABASE_URL: ${DATABASE_URL:-postgres://awesomeiwb:awesomeiwb@postgres:5432/awesomeiwb}
     ports:
       - "127.0.0.1:8081:8081"

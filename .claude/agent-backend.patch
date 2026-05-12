@@ -1,0 +1,154 @@
+diff --git a/backend/src/index.ts b/backend/src/index.ts
+index 189747c..0411b76 100644
+--- a/backend/src/index.ts
++++ b/backend/src/index.ts
+@@ -58,6 +58,7 @@ import { localAuthPlugin } from "./plugins/localAuth";
+ import { listUsers, setUserRole, setUserActive, updateUserLogin, findUserByName, deleteUser, findUserById, bumpUserTokenVersion, createUser } from "./services/users";
+ import { ensureSuperadminInitialized, SUPERADMIN_INITIAL_USERNAME, setLocalAccountPassword, validateSuperadminPassword } from "./services/localAccounts";
+ import { listCapabilities, getUserCapabilitiesWithInfo, setUserCapabilities, isSuperadmin as isSuperadminUser } from "./services/capabilities";
++import { createOrGetMediaAssetFromUpload, getMediaReferences, listMediaAssets, restoreMedia, softDeleteMedia } from "./services/media";
+ import { appConfig } from "./config";
+ import { checkRateLimit } from "./plugins/rateLimit";
+ 
+@@ -226,6 +227,34 @@ function extFromMime(mime: string) {
+   return null;
+ }
+ 
++async function registerUploadedMedia(input: {
++  sha256: string;
++  filename: string;
++  url: string;
++  mime: string;
++  size: number;
++  source: string;
++  uploaderId?: string | null;
++}) {
++  try {
++    const uploaderId = input.uploaderId && !String(input.uploaderId).startsWith("token:") && !String(input.uploaderId).startsWith("local:")
++      ? input.uploaderId
++      : null;
++    return await createOrGetMediaAssetFromUpload({
++      sha256: input.sha256,
++      storageKey: input.filename,
++      url: input.url,
++      mime: input.mime,
++      size: input.size,
++      source: input.source,
++      uploaderId,
++    });
++  } catch (error) {
++    console.error("failed to register media asset", error);
++    return null;
++  }
++}
++
+ const allowedOrigins = appConfig.allowedOrigins;
+ const app = new Elysia()
+   .use(cors({
+@@ -1494,10 +1523,21 @@ const app = new Elysia()
+       set.status = 400;
+       return { error: "Invalid file signature" };
+     }
+-    const filename = `${crypto.createHash("sha256").update(buffer).digest("hex")}.${ext}`;
++    const hash = crypto.createHash("sha256").update(buffer).digest("hex");
++    const filename = `${hash}.${ext}`;
+     const uploadPath = path.join(UPLOADS_DIR, filename);
+     await Bun.write(uploadPath, buffer);
+-    return { url: `/api/uploads/${filename}` };
++    const url = `/api/uploads/${filename}`;
++    const media = await registerUploadedMedia({
++      sha256: hash,
++      filename,
++      url,
++      mime,
++      size: buffer.length,
++      source: "upload",
++      uploaderId: user?.id,
++    });
++    return { url, media_id: media?.id };
+   }, {
+     body: t.Object({
+       image: t.File()
+@@ -1529,10 +1569,20 @@ const app = new Elysia()
+       set.status = 400;
+       return { error: "Invalid file signature" };
+     }
+-    const filename = `${crypto.createHash("sha256").update(buffer).digest("hex")}.${ext}`;
++    const hash = crypto.createHash("sha256").update(buffer).digest("hex");
++    const filename = `${hash}.${ext}`;
+     const uploadPath = path.join(UPLOADS_DIR, filename);
+     await Bun.write(uploadPath, buffer);
+     const avatarUrl = `/api/uploads/${filename}`;
++    const media = await registerUploadedMedia({
++      sha256: hash,
++      filename,
++      url: avatarUrl,
++      mime,
++      size: buffer.length,
++      source: "avatar",
++      uploaderId: user?.id,
++    });
+ 
+     // Update user's avatar in database
+     if (user?.id && !String(user.id).startsWith("local:")) {
+@@ -1542,12 +1592,46 @@ const app = new Elysia()
+       });
+     }
+ 
+-    return { url: avatarUrl };
++    return { url: avatarUrl, media_id: media?.id };
+   }, {
+     body: t.Object({
+       image: t.File()
+     })
+   })
++  .get("/api/admin/media", async ({ query, set, user }) => {
++    if (await checkCap(user, set, "media:read")) return { error: "Forbidden" };
++    const q = typeof query.q === "string" ? query.q : undefined;
++    const status = typeof query.status === "string" ? query.status : undefined;
++    const mime = typeof query.mime === "string" ? query.mime : undefined;
++    const source = typeof query.source === "string" ? query.source : undefined;
++    const page = typeof query.page === "string" ? Number(query.page) : undefined;
++    const pageSize = typeof query.pageSize === "string" ? Number(query.pageSize) : undefined;
++    return await listMediaAssets({ q, status, mime, source }, { page, pageSize });
++  })
++  .get("/api/admin/media/:id/references", async ({ params: { id }, set, user }) => {
++    if (await checkCap(user, set, "media:read")) return { error: "Forbidden" };
++    return { items: await getMediaReferences(id) };
++  })
++  .delete("/api/admin/media/:id", async ({ params: { id }, set, user }) => {
++    if (await checkCap(user, set, "media:manage")) return { error: "Forbidden" };
++    const updated = await softDeleteMedia(id);
++    if (!updated) {
++      set.status = 404;
++      return { error: "Media not found" };
++    }
++    await logAuditCompat({ action: "soft_delete_media", entity_type: "media", entity_id: id }, user?.name);
++    return updated;
++  })
++  .post("/api/admin/media/:id/restore", async ({ params: { id }, set, user }) => {
++    if (await checkCap(user, set, "media:manage")) return { error: "Forbidden" };
++    const updated = await restoreMedia(id);
++    if (!updated) {
++      set.status = 404;
++      return { error: "Media not found" };
++    }
++    await logAuditCompat({ action: "restore_media", entity_type: "media", entity_id: id }, user?.name);
++    return updated;
++  })
+   .get("/api/admin/users", async ({ query, set, user }) => {
+     if (await checkCap(user, set, "user:read")) return { error: "Forbidden" };
+     const q = typeof query.q === "string" ? query.q : undefined;
+diff --git a/backend/src/services/capabilities.ts b/backend/src/services/capabilities.ts
+index 505e197..d803911 100644
+--- a/backend/src/services/capabilities.ts
++++ b/backend/src/services/capabilities.ts
+@@ -36,6 +36,8 @@ const ALL_CAPABILITIES: Capability[] = [
+   { id: "story:manage", name: "故事管理", category: "story", description: "管理首页故事", sort_index: 1800 },
+   { id: "feedback:manage", name: "反馈管理", category: "feedback", description: "管理反馈状态和标签", sort_index: 1900 },
+   { id: "comment:manage", name: "管理评论", category: "comment", description: "管理自己和他人的评论/Issue状态", sort_index: 1950 },
++  { id: "media:read", name: "查看媒体", category: "media", description: "查看媒体资产和引用关系", sort_index: 2000 },
++  { id: "media:manage", name: "管理媒体", category: "media", description: "软删除和恢复媒体资产", sort_index: 2010 },
+ ];
+ 
+ const ALL_CAPABILITY_IDS = new Set(ALL_CAPABILITIES.map(c => c.id));

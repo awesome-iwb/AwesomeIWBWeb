@@ -13,3 +13,4 @@ backend/src/comments.json
 .env.*
 *.log
 AwesomeIWBWeb.zip
+/.claude/worktrees

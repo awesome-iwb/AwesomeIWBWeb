@@ -60,6 +60,8 @@ export interface Category {
 
 const categories = ref<Category[]>([]);
 const loading = ref(true);
+const PROJECTS_TTL_MS = 120000;
+const lastFetchedAt = ref(0);
 
 export function useProjects() {
   const { apiFetch } = useApi();
@@ -91,7 +93,11 @@ export function useProjects() {
    * Endpoint: GET /api/projects
    * Payload shape: { categories: Category[] }
    */
-  const fetchProjects = async () => {
+  const fetchProjects = async (force = false) => {
+    if (!force && categories.value.length > 0 && Date.now() - lastFetchedAt.value < PROJECTS_TTL_MS) {
+      return;
+    }
+
     loading.value = true;
     try {
       const res = await apiFetch('/api/projects', { method: 'GET' });
@@ -103,6 +109,7 @@ export function useProjects() {
         ...c,
         projects: (c.projects ?? []).map(normalizeProject)
       })) as Category[];
+      lastFetchedAt.value = Date.now();
     } catch (e) {
       console.error(e);
     } finally {

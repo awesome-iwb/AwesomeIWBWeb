@@ -41,10 +41,23 @@ export function buildClearSessionCookie() {
   return segments.join("; ");
 }
 
+export function appendSetCookie(set: any, cookie: string) {
+  const existing = set.headers["set-cookie"];
+  if (!existing) {
+    set.headers["set-cookie"] = cookie;
+    return;
+  }
+  if (Array.isArray(existing)) {
+    set.headers["set-cookie"] = [...existing, cookie];
+    return;
+  }
+  set.headers["set-cookie"] = [existing, cookie];
+}
+
 export function setSessionCookie(set: any, token: string) {
-  set.headers["set-cookie"] = buildSessionCookie(token);
+  appendSetCookie(set, buildSessionCookie(token));
 }
 
 export function clearSessionCookie(set: any) {
-  set.headers["set-cookie"] = buildClearSessionCookie();
+  appendSetCookie(set, buildClearSessionCookie());
 }

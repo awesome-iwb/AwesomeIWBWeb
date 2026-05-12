@@ -24,6 +24,8 @@ export type AuthUser = {
   avatar_url?: string;
   is_superadmin?: boolean;
   capabilities?: string[];
+  profileConfirmed?: boolean;
+  binding_confirmed_at?: string;
 };
 
 const STORAGE_KEY = 'awesome_iwb_auth';
@@ -90,6 +92,8 @@ export const useAuth = () => {
         email: newUser.email ?? user.value?.email,
         is_superadmin: newUser.is_superadmin ?? user.value?.is_superadmin ?? false,
         capabilities: newUser.capabilities ?? user.value?.capabilities ?? [],
+        profileConfirmed: newUser.profileConfirmed ?? user.value?.profileConfirmed ?? false,
+        binding_confirmed_at: newUser.binding_confirmed_at ?? user.value?.binding_confirmed_at,
       };
     }
     persist();
@@ -107,11 +111,32 @@ export const useAuth = () => {
     persist();
   };
 
-  const logout = () => {
+  const clearLocalAuthState = () => {
     user.value = null;
     token.value = null;
     persist();
   };
+
+  const markProfileConfirmed = () => {
+    if (!user.value) return;
+    user.value = {
+      ...user.value,
+      profileConfirmed: true,
+      binding_confirmed_at: user.value.binding_confirmed_at || new Date().toISOString(),
+    };
+    persist();
+  };
+
+  const logout = async () => {
+    try {
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include',
+      });
+    } catch {}
+    clearLocalAuthState();
+  };
+
 
   const fetchUser = async (): Promise<boolean> => {
     try {
@@ -119,7 +144,7 @@ export const useAuth = () => {
         credentials: 'include'
       });
       if (!res.ok) {
-        logout();
+        clearLocalAuthState();
         return false;
       }
       const text = await res.text();
@@ -141,6 +166,8 @@ export const useAuth = () => {
           hzzc_user_id: json.user.hzzc_user_id,
           is_superadmin: isSuper,
           capabilities: caps,
+          profileConfirmed: user.value?.profileConfirmed ?? false,
+          binding_confirmed_at: user.value?.binding_confirmed_at,
         };
         persist();
         return true;
@@ -151,9 +178,10 @@ export const useAuth = () => {
     }
   };
 
-  const loginWithCasdoor = async (returnTo?: string) => {
+  const getCasdoorAuthorizeUrl = async (returnTo?: string, popup = false): Promise<string> => {
     const params = new URLSearchParams();
     if (returnTo) params.set('returnTo', returnTo);
+    if (popup) params.set('popup', '1');
     const url = `/api/auth/login${params.toString() ? '?' + params.toString() : ''}`;
     const res = await fetch(url);
     const text = await res.text();
@@ -167,7 +195,12 @@ export const useAuth = () => {
     if (!json.authorizeUrl) {
       throw new Error('登录服务未返回授权地址');
     }
-    window.location.href = json.authorizeUrl;
+    return String(json.authorizeUrl);
+  };
+
+  const loginWithCasdoor = async (returnTo?: string) => {
+    const authorizeUrl = await getCasdoorAuthorizeUrl(returnTo, false);
+    window.location.href = authorizeUrl;
   };
 
   const loginWithPassword = async (username: string, password: string): Promise<boolean> => {
@@ -237,6 +270,7 @@ export const useAuth = () => {
     capabilities,
     hasCapability,
     loginWithPassword,
+    getCasdoorAuthorizeUrl,
     loginWithCasdoor,
     handleCallback,
     fetchUser,
@@ -245,5 +279,6 @@ export const useAuth = () => {
     setRole,
     updateUser,
     uploadAvatar,
+    markProfileConfirmed,
   };
 };

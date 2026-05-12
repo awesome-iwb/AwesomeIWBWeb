@@ -5,27 +5,21 @@
     <div v-if="!isAuthenticated" class="min-h-screen flex items-center justify-center">
       <div class="bg-white dark:bg-slate-800 p-10 rounded-3xl shadow-2xl max-w-md w-full">
         <h1 class="text-3xl font-bold mb-6 text-center text-emerald-500">管理后台</h1>
-        <p class="text-slate-500 mb-8 text-center">请先登录以访问运维后台</p>
+        <p class="text-slate-500 mb-8 text-center">请输入管理员 API Token 进入运维后台</p>
+        <input 
+          type="password" 
+          v-model="apiTokenInput"
+          @keyup.enter="loginWithToken"
+          placeholder="输入 API Token" 
+          class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 mb-6 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+        />
         <button 
-          @click="router.push('/me')" 
+          @click="loginWithToken" 
           class="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl transition-colors shadow-lg shadow-emerald-500/30"
         >
-          去登录
+          进入
         </button>
-      </div>
-    </div>
-
-    <!-- Permission Denied Screen -->
-    <div v-else-if="!hasCapability('admin_panel_access')" class="min-h-screen flex items-center justify-center">
-      <div class="bg-white dark:bg-slate-800 p-10 rounded-3xl shadow-2xl max-w-md w-full">
-        <h1 class="text-3xl font-bold mb-6 text-center text-rose-500">权限不足</h1>
-        <p class="text-slate-500 mb-8 text-center">您没有访问运维后台的权限</p>
-        <button 
-          @click="router.push('/')" 
-          class="w-full py-3 bg-slate-500 hover:bg-slate-600 text-white font-bold rounded-xl transition-colors"
-        >
-          返回首页
-        </button>
+        <p class="text-xs text-slate-400 mt-4 text-center">Token 由后端环境变量配置，请联系管理员获取</p>
       </div>
     </div>
 
@@ -74,12 +68,19 @@
             >
               评论与反馈
             </button>
-            <button 
-              @click="activeTab = 'users'" 
+            <button
+              @click="activeTab = 'users'"
               class="px-4 py-2 rounded-full font-bold transition-colors"
               :class="activeTab === 'users' ? 'bg-emerald-500 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-300 dark:hover:bg-slate-700'"
             >
               用户权限
+            </button>
+            <button
+              @click="activeTab = 'media'"
+              class="px-4 py-2 rounded-full font-bold transition-colors"
+              :class="activeTab === 'media' ? 'bg-emerald-500 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-300 dark:hover:bg-slate-700'"
+            >
+              媒体管理
             </button>
           </div>
         </div>
@@ -184,8 +185,15 @@
               </label>
               <div class="flex gap-4 items-center">
                 <img v-if="currentStory.coverImage" :src="currentStory.coverImage" class="h-16 w-32 object-cover rounded-lg border border-slate-200 dark:border-slate-700" />
-                <input type="text" v-model="currentStory.coverImage" class="flex-1 px-4 py-3 lg:py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-emerald-500 text-base" placeholder="图片 URL 或上传" />
+                <input
+                  type="text"
+                  :value="currentStory.coverImage"
+                  @input="currentStory.coverImage = normalizeMediaUrl(($event.target as HTMLInputElement).value)"
+                  class="flex-1 px-4 py-3 lg:py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-emerald-500 text-base"
+                  placeholder="请上传并使用站内地址（/api/uploads/...）"
+                />
               </div>
+              <div v-if="uploadErrorMessage" class="mt-2 text-xs text-rose-500">{{ uploadErrorMessage }}</div>
             </div>
           </div>
 
@@ -413,7 +421,13 @@
                         <img v-if="projectDraft.icon || projectDraft.avatar" :src="projectDraft.icon || projectDraft.avatar" class="w-full h-full object-contain" />
                         <span v-else class="text-slate-400 text-xs">无图</span>
                       </div>
-                      <input type="text" v-model="projectDraft.icon" class="flex-1 px-4 py-3 lg:py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-blue-500 text-base" placeholder="图标 URL" />
+                      <input
+                        type="text"
+                        :value="projectDraft.icon"
+                        @input="projectDraft.icon = normalizeMediaUrl(($event.target as HTMLInputElement).value)"
+                        class="flex-1 px-4 py-3 lg:py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-blue-500 text-base"
+                        placeholder="请上传并使用站内地址（/api/uploads/...）"
+                      />
                     </div>
                   </div>
 
@@ -428,7 +442,13 @@
                         <img v-if="projectDraft.banner" :src="projectDraft.banner" class="w-full h-full object-cover rounded-lg" />
                         <span v-else class="text-slate-400 text-xs">无横幅</span>
                       </div>
-                      <input type="text" v-model="projectDraft.banner" class="w-full px-4 py-3 lg:py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-blue-500 text-base" placeholder="横幅 URL" />
+                      <input
+                        type="text"
+                        :value="projectDraft.banner"
+                        @input="projectDraft.banner = normalizeMediaUrl(($event.target as HTMLInputElement).value)"
+                        class="w-full px-4 py-3 lg:py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-blue-500 text-base"
+                        placeholder="请上传并使用站内地址（/api/uploads/...）"
+                      />
                     </div>
                   </div>
                 </div>
@@ -952,6 +972,93 @@
         </div>
       </div>
 
+      <!-- Media Tab -->
+      <div v-else-if="activeTab === 'media'" class="grid grid-cols-1 lg:grid-cols-4 gap-4 lg:gap-8">
+        <div class="lg:col-span-1 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col" :class="{ 'hidden lg:flex': isMobile && mobileView === 'detail' }" style="height: auto; min-height: 400px; max-height: 700px;">
+          <div class="p-4 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
+            <h2 class="font-bold text-lg">媒体列表</h2>
+          </div>
+          <div class="p-4 border-b border-slate-100 dark:border-slate-700 space-y-3">
+            <input v-model="mediaQuery.q" @keyup.enter="mediaQuery.page = 1; fetchMediaList()" type="text" class="w-full px-3 py-3 lg:py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-emerald-500 text-base lg:text-sm" placeholder="搜索 URL / MIME / 文件名" />
+            <select v-model="mediaQuery.status" @change="mediaQuery.page = 1; fetchMediaList()" class="w-full px-3 py-3 lg:py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-emerald-500 text-base lg:text-sm">
+              <option value="all">全部状态</option>
+              <option value="active">正常</option>
+              <option value="deleted">已删除</option>
+            </select>
+            <div class="flex gap-2">
+              <button @click="mediaQuery.page = 1; fetchMediaList()" class="flex-1 px-3 py-3 lg:py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-base lg:text-sm font-bold transition-colors">搜索</button>
+              <button @click="resetMediaQuery" class="px-3 py-3 lg:py-2 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-base lg:text-sm font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">重置</button>
+            </div>
+          </div>
+          <div class="flex-1 overflow-y-auto p-4 space-y-2">
+            <div v-if="mediaLoading" class="text-sm text-slate-400 text-center py-10">加载中...</div>
+            <div v-else v-for="m in mediaPage.items" :key="m.id" @click="selectMedia(m); if (isMobile) openDetail()" class="p-3 rounded-xl border cursor-pointer transition-all duration-200 flex items-center gap-3" :class="selectedMediaId === m.id ? 'bg-emerald-500 text-white border-emerald-500 shadow-md shadow-emerald-500/20' : 'bg-slate-50 dark:bg-slate-900/50 border-transparent hover:border-emerald-300'">
+              <img v-if="m.url" :src="m.url" class="w-10 h-10 lg:w-8 lg:h-8 rounded bg-white object-cover" />
+              <div v-else class="w-10 h-10 lg:w-8 lg:h-8 rounded bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-xs font-bold text-slate-500">图</div>
+              <div class="flex-1 min-w-0">
+                <div class="font-medium truncate text-sm">{{ m.mime || '未知类型' }}</div>
+                <div class="text-xs opacity-80 truncate">{{ m.url || '-' }}</div>
+              </div>
+            </div>
+            <div v-if="!mediaLoading && mediaPage.items.length === 0" class="text-sm text-slate-400 text-center py-10">暂无数据</div>
+          </div>
+          <div class="p-4 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between text-sm">
+            <button @click="prevMediaPage" :disabled="mediaPage.page <= 1 || mediaLoading" class="px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed">上一页</button>
+            <div class="text-slate-500 dark:text-slate-300">{{ mediaPage.page }} / {{ Math.max(1, Math.ceil(mediaPage.total / mediaPage.pageSize)) }}</div>
+            <button @click="nextMediaPage" :disabled="mediaPage.page >= Math.ceil(mediaPage.total / mediaPage.pageSize) || mediaLoading" class="px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed">下一页</button>
+          </div>
+        </div>
+
+        <div class="lg:col-span-3 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden" :class="{ 'hidden': isMobile && mobileView === 'list' }" v-if="mediaDraft">
+          <div class="p-4 lg:p-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50">
+            <h2 class="text-lg lg:text-xl font-bold text-slate-800 dark:text-white">媒体详情</h2>
+            <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">{{ mediaDraft.id }}</p>
+          </div>
+          <div class="p-4 lg:p-6 space-y-4">
+            <div v-if="mediaError" class="p-3 rounded-xl bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-300 text-sm">{{ mediaError }}</div>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div class="rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 p-4">
+                <img v-if="mediaDraft.url" :src="mediaDraft.url" class="w-full h-56 object-contain rounded-xl bg-white dark:bg-slate-800" />
+                <div v-else class="w-full h-56 rounded-xl bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-slate-500">无预览</div>
+              </div>
+              <div class="space-y-3">
+                <div class="text-sm"><span class="font-bold text-slate-700 dark:text-slate-300">URL：</span><a :href="mediaDraft.url" target="_blank" class="text-emerald-500 break-all hover:underline">{{ mediaDraft.url || '-' }}</a></div>
+                <div class="text-sm"><span class="font-bold text-slate-700 dark:text-slate-300">MIME：</span>{{ mediaDraft.mime || '-' }}</div>
+                <div class="text-sm"><span class="font-bold text-slate-700 dark:text-slate-300">大小：</span>{{ formatBytes(mediaDraft.size) }}</div>
+                <div class="text-sm"><span class="font-bold text-slate-700 dark:text-slate-300">状态：</span>{{ mediaDraft.deleted_at ? '已删除' : '正常' }}</div>
+                <div class="text-sm"><span class="font-bold text-slate-700 dark:text-slate-300">创建时间：</span>{{ formatDateTime(mediaDraft.created_at) }}</div>
+                <div class="flex flex-wrap gap-2 pt-2">
+                  <button @click="openMediaReferences(mediaDraft.id)" :disabled="mediaRefLoading" class="px-4 py-2 rounded-xl bg-blue-500 hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-bold transition-colors">{{ mediaRefLoading ? '加载中...' : '查看引用' }}</button>
+                  <button v-if="!mediaDraft.deleted_at" @click="softDeleteMedia(mediaDraft.id)" :disabled="mediaActionLoading" class="px-4 py-2 rounded-xl bg-rose-500 hover:bg-rose-600 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-bold transition-colors">{{ mediaActionLoading ? '处理中...' : '软删除' }}</button>
+                  <button v-else @click="restoreMedia(mediaDraft.id)" :disabled="mediaActionLoading" class="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-bold transition-colors">{{ mediaActionLoading ? '处理中...' : '恢复' }}</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div v-else class="lg:col-span-3 flex items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-3xl min-h-[300px] lg:min-h-[700px]" :class="{ 'hidden': isMobile && mobileView === 'list' }">
+          <p class="text-slate-400">请在左侧选择一个媒体文件</p>
+        </div>
+      </div>
+
+      <!-- Media References Modal -->
+      <div v-if="showMediaRefs" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+        <div class="w-full max-w-3xl bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-2xl overflow-hidden">
+          <div class="p-6 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
+            <div class="text-xl font-extrabold text-slate-900 dark:text-white">媒体引用</div>
+            <button @click="showMediaRefs = false" class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold">关闭</button>
+          </div>
+          <div class="p-6 max-h-[70vh] overflow-y-auto space-y-2">
+            <div v-if="mediaRefError" class="p-3 rounded-xl bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-300 text-sm">{{ mediaRefError }}</div>
+            <div v-else-if="mediaRefLoading" class="text-sm text-slate-400 text-center py-10">加载中...</div>
+            <div v-else-if="mediaRefs.length === 0" class="text-sm text-slate-400 text-center py-10">暂无引用</div>
+            <div v-else v-for="(refItem, idx) in mediaRefs" :key="idx" class="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950">
+              <pre class="text-xs whitespace-pre-wrap break-words text-slate-700 dark:text-slate-200">{{ JSON.stringify(refItem, null, 2) }}</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Mobile Bottom Tab Bar -->
       <div v-if="isMobile" class="fixed bottom-0 left-0 right-0 z-50 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-t border-slate-200 dark:border-slate-700 safe-area-pb">
         <div class="flex items-center justify-around h-16">
@@ -1047,15 +1154,13 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
-import { Save, Plus, Bold, Italic, Heading, Quote, List, Image as ImageIcon, FileText, Package, ClipboardCheck, Shield, MessageSquare, Users, ArrowLeft } from 'lucide-vue-next';
+import { Save, Plus, Bold, Italic, Heading, Quote, List, Image as ImageIcon, FileText, Package, ClipboardCheck, Shield, MessageSquare, Users, Image, ArrowLeft } from 'lucide-vue-next';
 import MarkdownIt from 'markdown-it';
 import DOMPurify from 'dompurify';
 import CommentPanel from '../components/CommentPanel.vue';
-import { useAuth } from '../composables/useAuth';
 
 const router = useRouter();
 const md = new MarkdownIt({ html: true, breaks: true });
-const { isAuthenticated, hasCapability, fetchUser } = useAuth();
 
 // Mobile responsive detection
 const isMobile = ref(false);
@@ -1085,6 +1190,7 @@ const backToList = () => {
   if (activeTab.value === 'submissions') { selectedSubmissionId.value = null; submissionDraft.value = null; }
   if (activeTab.value === 'moderation') { selectedModerationId.value = null; moderationDraft.value = null; }
   if (activeTab.value === 'users') { selectedUserId.value = null; userDraft.value = null; }
+  if (activeTab.value === 'media') { selectedMediaId.value = null; mediaDraft.value = null; }
 };
 
 // Bottom tabs configuration
@@ -1095,12 +1201,24 @@ const bottomTabs = [
   { key: 'moderation' as const, label: '内容', icon: Shield },
   { key: 'feedback' as const, label: '反馈', icon: MessageSquare },
   { key: 'users' as const, label: '用户', icon: Users },
+  { key: 'media' as const, label: '媒体', icon: Image },
 ];
 
+const isAuthenticated = ref(false);
+const apiTokenInput = ref('');
+
+const loginWithToken = () => {
+  if (!apiTokenInput.value.trim()) {
+    alert('请输入 API Token');
+    return;
+  }
+  isAuthenticated.value = true;
+  fetchData();
+};
+
 const logoutAdmin = () => {
-  const { logout } = useAuth();
-  logout();
-  router.push('/');
+  isAuthenticated.value = false;
+  apiTokenInput.value = '';
 };
 
 const adminFetch = async (url: string, options: RequestInit = {}) => {
@@ -1108,15 +1226,15 @@ const adminFetch = async (url: string, options: RequestInit = {}) => {
   if (!headers.has('Content-Type') && !(options.body instanceof FormData)) {
     headers.set('Content-Type', 'application/json');
   }
+  if (apiTokenInput.value.trim()) {
+    headers.set('Authorization', `Bearer ${apiTokenInput.value.trim()}`);
+  }
   return fetch(url, { ...options, headers, credentials: 'include' });
 };
 
-// Restore session on mount
-const maybeRestoreSession = async () => {
-  await fetchUser();
-  if (isAuthenticated.value && hasCapability('admin_panel_access')) {
-    fetchData();
-  }
+// Check for saved token on mount — fetchData is defined below, call it after script init
+const maybeRestoreSession = () => {
+  return;
 };
 
 interface FeaturedStory {
@@ -1135,8 +1253,9 @@ const stories = ref<FeaturedStory[]>([]);
 const selectedIndex = ref<number | null>(null);
 const viewMode = ref<'edit' | 'split' | 'preview'>('split');
 const isSaving = ref(false);
+const uploadErrorMessage = ref('');
 
-const activeTab = ref<'stories' | 'projects' | 'submissions' | 'moderation' | 'feedback' | 'users'>('stories');
+const activeTab = ref<'stories' | 'projects' | 'submissions' | 'moderation' | 'feedback' | 'users' | 'media'>('stories');
 
 // Watch activeTab changes to reset mobile view
 watch(activeTab, () => {
@@ -1224,6 +1343,29 @@ const resettingPassword = ref(false);
 
 const deletingUser = ref(false);
 
+// Media tab
+const mediaPage = ref<{ items: any[]; page: number; pageSize: number; total: number }>({
+  items: [],
+  page: 1,
+  pageSize: 20,
+  total: 0
+});
+const mediaQuery = ref<{ status: 'all' | 'active' | 'deleted'; q: string; page: number; pageSize: number }>({
+  status: 'all',
+  q: '',
+  page: 1,
+  pageSize: 20
+});
+const mediaLoading = ref(false);
+const mediaError = ref('');
+const selectedMediaId = ref<string | null>(null);
+const mediaDraft = ref<any | null>(null);
+const mediaActionLoading = ref(false);
+const showMediaRefs = ref(false);
+const mediaRefs = ref<any[]>([]);
+const mediaRefLoading = ref(false);
+const mediaRefError = ref('');
+
 const currentStory = computed(() => {
   if (selectedIndex.value === null) return null;
   return stories.value[selectedIndex.value];
@@ -1244,6 +1386,7 @@ const fetchData = async () => {
 
     await fetchAdminCategories();
     await fetchAdminProjects();
+    await fetchMediaList();
     await fetchSubmissions();
     await fetchModeration();
     await fetchUsers();
@@ -1260,6 +1403,9 @@ const saveProjects = async () => {
       return;
     }
     const p: any = { ...projectDraft.value };
+    p.icon = normalizeMediaUrl(p.icon);
+    p.banner = normalizeMediaUrl(p.banner);
+    if (uploadErrorMessage.value) return;
     const toList = (v: any) => {
       if (Array.isArray(v)) return v;
       if (typeof v !== 'string') return [];
@@ -1371,17 +1517,48 @@ const triggerImageUpload = () => imageInput.value?.click();
 const triggerProjectIconUpload = () => projectIconInput.value?.click();
 const triggerProjectBannerUpload = () => projectBannerInput.value?.click();
 
+const uploadErrorTextByCode: Record<string, string> = {
+  UPLOAD_UNAUTHORIZED: '你还没有登录或会话已过期，请重新登录后再上传。',
+  UPLOAD_RATE_LIMITED: '上传过于频繁，请稍后再试。',
+  UPLOAD_MISSING_FILE: '未检测到上传文件，请重新选择图片。',
+  UPLOAD_FILE_TOO_LARGE: '图片文件过大，请压缩后重试。',
+  UPLOAD_UNSUPPORTED_TYPE: '仅支持 PNG、JPG、WEBP 图片格式。',
+  UPLOAD_INVALID_SIGNATURE: '图片文件内容异常，请更换文件后重试。',
+};
+
+const normalizeUploadError = (payload: any, status: number) => {
+  const code = typeof payload?.code === 'string' ? payload.code : '';
+  if (code && uploadErrorTextByCode[code]) return uploadErrorTextByCode[code];
+  if (typeof payload?.message === 'string' && payload.message.trim()) return payload.message.trim();
+  if (status === 429) return uploadErrorTextByCode.UPLOAD_RATE_LIMITED;
+  if (status === 401) return uploadErrorTextByCode.UPLOAD_UNAUTHORIZED;
+  return '上传失败，请稍后重试。';
+};
+
+const isInternalUploadUrl = (value: string) => value.startsWith('/api/uploads/');
+
+const normalizeMediaUrl = (value: unknown): string => {
+  const text = String(value ?? '').trim();
+  if (!text) return '';
+  if (isInternalUploadUrl(text)) return text;
+  uploadErrorMessage.value = '为统一管理，请先上传图片并使用站内地址（/api/uploads/...）。';
+  return '';
+};
+
 const uploadFile = async (file: File): Promise<string | null> => {
+  uploadErrorMessage.value = '';
   const formData = new FormData();
   formData.append('image', file);
   try {
     const res = await adminFetch('/api/upload', { method: 'POST', body: formData });
-    if (res.ok) {
-      const data = await res.json();
-      return data.url;
+    const payload = await res.json().catch(() => ({}));
+    if (res.ok && typeof payload?.url === 'string') {
+      return payload.url;
     }
+    uploadErrorMessage.value = normalizeUploadError(payload, res.status);
   } catch (e) {
     console.error('上传失败', e);
+    uploadErrorMessage.value = '上传失败，请检查网络后重试。';
   }
   return null;
 };
@@ -1392,8 +1569,6 @@ const uploadBanner = async (e: Event) => {
   const url = await uploadFile(file);
   if (url) {
     currentStory.value.coverImage = url;
-  } else {
-    alert('封面上传失败');
   }
 };
 
@@ -1403,8 +1578,6 @@ const uploadProjectIcon = async (e: Event) => {
   const url = await uploadFile(file);
   if (url) {
     projectDraft.value.icon = url;
-  } else {
-    alert('图标上传失败');
   }
 };
 
@@ -1414,8 +1587,6 @@ const uploadProjectBanner = async (e: Event) => {
   const url = await uploadFile(file);
   if (url) {
     projectDraft.value.banner = url;
-  } else {
-    alert('横幅上传失败');
   }
 };
 
@@ -1893,8 +2064,6 @@ const uploadImageToMarkdown = async (e: Event) => {
   const url = await uploadFile(file);
   if (url) {
     insertText(`\n![图片描述](${url})\n`);
-  } else {
-    alert('图片上传失败');
   }
 };
 
@@ -1917,6 +2086,159 @@ const insertText = (text: string) => {
       markdownTextarea.value.selectionEnd = start + text.length;
     }
   }, 10);
+};
+
+const formatBytes = (size: unknown) => {
+  const bytes = typeof size === 'number' ? size : Number(size ?? 0);
+  if (!Number.isFinite(bytes) || bytes <= 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let value = bytes;
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+  return `${value >= 100 ? value.toFixed(0) : value.toFixed(1)} ${units[unitIndex]}`;
+};
+
+const formatDateTime = (value: unknown) => {
+  if (!value) return '-';
+  const dt = new Date(String(value));
+  if (Number.isNaN(dt.getTime())) return String(value);
+  return dt.toLocaleString();
+};
+
+const normalizeMediaPage = (json: any) => {
+  const items = Array.isArray(json?.items)
+    ? json.items
+    : Array.isArray(json)
+      ? json
+      : [];
+  const page = Number(json?.page ?? mediaQuery.value.page ?? 1);
+  const pageSize = Number(json?.pageSize ?? mediaQuery.value.pageSize ?? 20);
+  const total = Number(json?.total ?? items.length ?? 0);
+  return {
+    items,
+    page: Number.isFinite(page) && page > 0 ? page : 1,
+    pageSize: Number.isFinite(pageSize) && pageSize > 0 ? pageSize : 20,
+    total: Number.isFinite(total) && total >= 0 ? total : items.length
+  };
+};
+
+const fetchMediaList = async () => {
+  mediaLoading.value = true;
+  mediaError.value = '';
+  try {
+    const qs = new URLSearchParams();
+    if (mediaQuery.value.status && mediaQuery.value.status !== 'all') qs.set('status', mediaQuery.value.status);
+    if (mediaQuery.value.q.trim()) qs.set('q', mediaQuery.value.q.trim());
+    qs.set('page', String(mediaQuery.value.page));
+    qs.set('pageSize', String(mediaQuery.value.pageSize));
+    const res = await adminFetch(`/api/admin/media?${qs.toString()}`);
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(json?.error ?? `获取媒体列表失败（${res.status}）`);
+    }
+    mediaPage.value = normalizeMediaPage(json);
+  } catch (err: any) {
+    mediaPage.value = { items: [], page: mediaQuery.value.page, pageSize: mediaQuery.value.pageSize, total: 0 };
+    mediaError.value = err?.message ?? '获取媒体列表失败';
+  } finally {
+    mediaLoading.value = false;
+  }
+};
+
+const selectMedia = (media: any) => {
+  selectedMediaId.value = media?.id ?? null;
+  mediaDraft.value = media ? { ...media } : null;
+  mediaError.value = '';
+};
+
+const prevMediaPage = async () => {
+  if (mediaPage.value.page <= 1 || mediaLoading.value) return;
+  mediaQuery.value.page -= 1;
+  await fetchMediaList();
+};
+
+const nextMediaPage = async () => {
+  if (mediaLoading.value) return;
+  const maxPage = Math.max(1, Math.ceil(mediaPage.value.total / mediaPage.value.pageSize));
+  if (mediaPage.value.page >= maxPage) return;
+  mediaQuery.value.page += 1;
+  await fetchMediaList();
+};
+
+const resetMediaQuery = async () => {
+  mediaQuery.value = { status: 'all', q: '', page: 1, pageSize: 20 };
+  await fetchMediaList();
+};
+
+const openMediaReferences = async (id: string) => {
+  if (!id) return;
+  showMediaRefs.value = true;
+  mediaRefLoading.value = true;
+  mediaRefError.value = '';
+  mediaRefs.value = [];
+  try {
+    const res = await adminFetch(`/api/admin/media/${id}/references`);
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(json?.error ?? `获取引用失败（${res.status}）`);
+    }
+    mediaRefs.value = Array.isArray(json?.items) ? json.items : Array.isArray(json) ? json : [];
+  } catch (err: any) {
+    mediaRefError.value = err?.message ?? '获取引用失败';
+  } finally {
+    mediaRefLoading.value = false;
+  }
+};
+
+const softDeleteMedia = async (id: string) => {
+  if (!id) return;
+  const ok = confirm('确认软删除该媒体文件？');
+  if (!ok) return;
+  mediaActionLoading.value = true;
+  mediaError.value = '';
+  try {
+    const res = await adminFetch(`/api/admin/media/${id}`, { method: 'DELETE' });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(json?.error ?? `软删除失败（${res.status}）`);
+    }
+    if (mediaDraft.value?.id === id) {
+      mediaDraft.value = { ...mediaDraft.value, deleted_at: json?.deleted_at ?? new Date().toISOString() };
+    }
+    await fetchMediaList();
+    alert('软删除成功');
+  } catch (err: any) {
+    mediaError.value = err?.message ?? '软删除失败';
+    alert(mediaError.value);
+  } finally {
+    mediaActionLoading.value = false;
+  }
+};
+
+const restoreMedia = async (id: string) => {
+  if (!id) return;
+  mediaActionLoading.value = true;
+  mediaError.value = '';
+  try {
+    const res = await adminFetch(`/api/admin/media/${id}/restore`, { method: 'POST' });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(json?.error ?? `恢复失败（${res.status}）`);
+    }
+    if (mediaDraft.value?.id === id) {
+      mediaDraft.value = { ...mediaDraft.value, deleted_at: null };
+    }
+    await fetchMediaList();
+    alert('恢复成功');
+  } catch (err: any) {
+    mediaError.value = err?.message ?? '恢复失败';
+    alert(mediaError.value);
+  } finally {
+    mediaActionLoading.value = false;
+  }
 };
 
 // Users management
@@ -2173,9 +2495,7 @@ const saveCapabilities = async () => {
 };
 
 // Restore session on mount
-onMounted(() => {
-  maybeRestoreSession();
-});
+maybeRestoreSession();
 fetchCapabilities();
 </script>
 

@@ -1,4 +1,5 @@
 import type { RouteRecordRaw, Router } from 'vue-router'
+import { isNavigationFailure, NavigationFailureType } from 'vue-router'
 import HomeView from '../views/HomeView.vue'
 import ProjectDetailView from '../views/ProjectDetailView.vue'
 import SubmitProjectView from '../views/SubmitProjectView.vue'
@@ -8,6 +9,9 @@ import AdminView from '../views/AdminView.vue'
 import AboutView from '../views/AboutView.vue'
 import MeView from '../views/MeView.vue'
 import AdminLoginView from '../views/AdminLoginView.vue'
+import AuthResultView from '../views/AuthResultView.vue'
+import AuthPopupCallbackView from '../views/AuthPopupCallbackView.vue'
+import NotFoundView from '../views/NotFoundView.vue'
 import { useAuth } from '../composables/useAuth'
 const isDev = import.meta.env.DEV
 
@@ -25,10 +29,18 @@ export const routes: RouteRecordRaw[] = [
     meta: { showNavBar: false, requiresAuth: true, requiresCapability: 'admin_panel_access' }
   },
   {
-    path: '/admin-login',
+    path: '/dontusejy',
     name: 'admin-login',
     component: AdminLoginView,
     meta: { showNavBar: false }
+  },
+  {
+    path: '/admin-login',
+    redirect: '/dontusejy'
+  },
+  {
+    path: '/hzzc',
+    redirect: '/dontusejy'
   },
   {
     path: '/today',
@@ -64,6 +76,18 @@ export const routes: RouteRecordRaw[] = [
     component: MeView,
     meta: { showNavBar: true, showBack: true, title: '个人中心' }
   },
+  {
+    path: '/auth/popup-callback',
+    name: 'auth-popup-callback',
+    component: AuthPopupCallbackView,
+    meta: { showNavBar: false }
+  },
+  {
+    path: '/auth/result',
+    name: 'auth-result',
+    component: AuthResultView,
+    meta: { showNavBar: true, showBack: true, title: '账号信息确认', requiresAuth: true }
+  },
   ...(isDev
     ? [{
         path: '/dev',
@@ -77,11 +101,25 @@ export const routes: RouteRecordRaw[] = [
     name: 'project-detail',
     component: ProjectDetailView,
     meta: { showNavBar: true, showBack: true }
+  },
+  {
+    path: '/:pathMatch(.*)*',
+    name: 'not-found',
+    component: NotFoundView,
+    meta: { showNavBar: true, showBack: true, title: '页面未找到' }
   }
 ]
 
 export function setupRouterGuard(router: Router) {
   let initPromise: Promise<void> | null = null
+
+  const isNonFatalNavigationFailure = (error: unknown): boolean => {
+    return (
+      isNavigationFailure(error, NavigationFailureType.aborted) ||
+      isNavigationFailure(error, NavigationFailureType.cancelled) ||
+      isNavigationFailure(error, NavigationFailureType.duplicated)
+    )
+  }
 
   const ensureAuthInitialized = (): Promise<void> => {
     if (initPromise) return initPromise
@@ -89,6 +127,14 @@ export function setupRouterGuard(router: Router) {
     if (isAuthenticated.value) return Promise.resolve()
     initPromise = fetchUser().then(() => {})
     return initPromise
+  }
+
+  const ensureCapabilityLoaded = async (requiredCapability: string): Promise<boolean> => {
+    const auth = useAuth()
+    if (!auth.isAuthenticated.value) return false
+    if (auth.hasCapability(requiredCapability)) return true
+    await auth.fetchUser()
+    return auth.hasCapability(requiredCapability)
   }
 
   router.beforeEach(async (to) => {
@@ -100,9 +146,17 @@ export function setupRouterGuard(router: Router) {
     }
     const capability = (to.meta as any)?.requiresCapability;
     if (capability) {
-      const { hasCapability } = useAuth();
-      if (!hasCapability(capability)) return { path: '/me', query: { redirect: to.fullPath } };
+      const allowed = await ensureCapabilityLoaded(capability);
+      if (!allowed) return { path: '/me', query: { redirect: to.fullPath } };
     }
     return true;
   });
+
+  router.onError((error, to) => {
+    if (isNonFatalNavigationFailure(error)) return
+    if ((to?.path ?? '') === '/auth/popup-callback') return
+    if ((to?.path ?? '') === '/me') return
+    if ((to?.path ?? '') === '/auth/result') return
+    void router.replace({ path: '/not-found', query: { reason: 'navigation-error' } })
+  })
 }

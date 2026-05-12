@@ -1,18 +1,10 @@
-- [ ] 后端默认监听端口为 8080（index.ts 和 docker-compose.yml）
-- [ ] 后端健康检查端点 `/api/health` 正常工作
-- [ ] 超级管理员判断函数 `isSuperadmin` 使用大小写不敏感比较
-- [ ] `checkCap` 中间件正确识别超级管理员并跳过权限检查
-- [ ] AdminView.vue 使用 `useAuth` 的 `isAuthenticated` 而非独立的 API Token 认证
-- [ ] AdminView.vue 的 `adminFetch` 不发送 `Authorization: Bearer` 头
-- [ ] AdminView.vue 在未登录时显示登录提示
-- [ ] AdminView.vue 在权限不足时显示权限不足提示
-- [ ] AdminView.vue 在 onMounted 中同步用户状态
-- [ ] 前端路由守卫正确检查 `admin_panel_access` 能力
-- [ ] systemd 服务配置包含 `PORT=8080`
-- [ ] 前端构建通过无错误
-- [ ] 服务器上 nginx 代理到 8080 端口
-- [ ] 服务器上后端服务运行在 8080 端口
-- [ ] 网站可以正常访问
-- [ ] 用户可以正常登录
-- [ ] 登录后可以进入后台管理页面
-- [ ] 后台可以正常创建/删除/管理用户
+- [x] 后端默认监听端口恢复为 8081
+- [x] docker-compose.yml PORT 恢复为 "8081"
+- [x] systemd 服务配置移除 PORT=8080
+- [x] AdminView.vue 恢复 API Token 认证方式
+- [x] OpenResty 80 端口访问首页显示 Awesome IWB 页面（非 OpenResty 默认页）
+- [x] OpenResty /api/ 请求正确代理到 8081
+- [x] 标准 nginx 8080 端口代理到 8081
+- [x] 前端构建产物正确部署到服务器
+- [x] /api/health 端点正常工作
+- [ ] 后台管理页面可以正常进入（需用户测试）

@@ -11,7 +11,13 @@ export function useApi() {
     const headers = new Headers(options.headers ?? {});
     headers.set('Content-Type', headers.get('Content-Type') ?? 'application/json');
 
-    return fetch(resolveApiUrl(url), { ...options, headers, credentials: 'include' });
+    const method = (options.method ?? 'GET').toUpperCase();
+    const requestOptions: RequestInit = { ...options, headers, credentials: 'include' };
+    if (method === 'GET' && requestOptions.cache === undefined) {
+      requestOptions.cache = 'no-store';
+    }
+
+    return fetch(resolveApiUrl(url), requestOptions);
   };
 
   const apiGet = (url: string) => apiFetch(url, { method: 'GET' });

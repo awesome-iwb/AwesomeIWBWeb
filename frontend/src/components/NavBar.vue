@@ -47,6 +47,12 @@ const closeUserMenuNow = () => {
   isUserMenuOpen.value = false;
 };
 
+const handleLogout = async () => {
+  await logout();
+  closeUserMenuNow();
+  router.push('/');
+};
+
 const navLinks = [
   { path: '/', name: '应用商场' },
   { path: '/today', name: 'Today 精选' },
@@ -244,7 +250,7 @@ onMounted(() => {
                   {{ user?.name || '未登录' }}
                 </div>
                 <div class="text-xs text-slate-500 dark:text-slate-400 truncate">
-                  {{ isAuthenticated ? '已登录（演示）' : '登录后可提交项目' }}
+                  {{ isAuthenticated ? '已登录' : '登录后可提交项目' }}
                 </div>
               </div>
             </div>
@@ -283,7 +289,7 @@ onMounted(() => {
                   开发者后台
                 </button>
                 <button
-                  @click="logout(); closeUserMenuNow(); router.push('/')"
+                  @click="handleLogout"
                   class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 font-extrabold hover:bg-rose-100 dark:hover:bg-rose-500/20 transition-colors"
                 >
                   <LogOut class="w-4 h-4" />

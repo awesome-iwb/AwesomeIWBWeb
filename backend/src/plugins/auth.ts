@@ -129,7 +129,6 @@ export function requireCapability(capabilityId: string) {
       return { error: "Unauthorized" };
     }
     if (isSuperadmin(user.name)) return;
-    if (user.id.startsWith("token:")) return;
     const has = await userHasCapability(user.id, user.name, capabilityId);
     if (!has) {
       set.status = 403;

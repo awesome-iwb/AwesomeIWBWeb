@@ -25,6 +25,8 @@ const allowedOrigins = parseList(process.env.ALLOWED_ORIGINS);
 const dbEnabled = Boolean(process.env.DATABASE_URL);
 const oauthEnabled = process.env.OAUTH_ENABLED !== "false";
 const superadminOnlyLocal = process.env.SUPERADMIN_ONLY_LOCAL !== "false";
+const allowExternalImageUrl = process.env.ALLOW_EXTERNAL_IMAGE_URL === "true";
+const externalImageAllowlist = parseList(process.env.EXTERNAL_IMAGE_ALLOWLIST);
 
 requiredInProduction("JWT_SECRET", process.env.JWT_SECRET);
 requiredInProduction("DATABASE_URL", process.env.DATABASE_URL);
@@ -92,6 +94,8 @@ export const appConfig = {
   cookieDomain: process.env.COOKIE_DOMAIN?.trim() || "",
   sessionCookieName: process.env.SESSION_COOKIE_NAME?.trim() || "session",
   uploadMaxBytes: Number(process.env.UPLOAD_MAX_BYTES ?? 5 * 1024 * 1024),
+  allowExternalImageUrl,
+  externalImageAllowlist,
   rateLimitWindowMs: Number(process.env.RATE_LIMIT_WINDOW_MS ?? 60_000),
   rateLimitMax: Number(process.env.RATE_LIMIT_MAX ?? 30),
   oauthEnabled,

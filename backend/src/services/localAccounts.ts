@@ -128,7 +128,7 @@ export async function recordLoginFailure(id: string): Promise<void> {
   await sql()`
     update local_accounts
     set failed_attempts = failed_attempts + 1,
-        locked_until = case when failed_attempts + 1 >= ${MAX_FAILED_ATTEMPTS} then now() + interval '${LOCKOUT_DURATION_MINUTES} minutes' else locked_until end,
+        locked_until = case when failed_attempts + 1 >= ${MAX_FAILED_ATTEMPTS} then now() + (${LOCKOUT_DURATION_MINUTES} * interval '1 minute') else locked_until end,
         role = 'ops'
     where id = ${id}
   `;

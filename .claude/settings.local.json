@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "defaultMode": "dontAsk",
+    "allow": [
+      "Bash(bun run *)",
+      "Bash(ssh -V)",
+      "Bash(ls d:/)",
+      "Read(//d//**)",
+      "Bash(winget --version)",
+      "Bash(mkdir -p d:/tools/putty)",
+      "Bash(curl -L \"https://the.earth.li/~sgtatham/putty/latest/w64/plink.exe\" -o \"d:/tools/putty/plink.exe\")",
+      "Bash(\"d:/tools/putty/plink.exe\" -V)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(bun --cwd d:/github/AwesomeIWBWeb/*)",
+      "Bash(\"d:/tools/putty/plink.exe\" -ssh *)",
+      "Bash(cat package.json)",
+      "Bash(which *)",
+      "Bash(where *)",
+      "Bash(node *)",
+      "Bash(docker *)",
+      "Bash(curl *)"
+    ]
+  }
+}
