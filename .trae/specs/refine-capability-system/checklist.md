@@ -1,0 +1,14 @@
+- [x] capabilities.ts 中 ALL_CAPABILITIES 包含 admin_panel_access、dev_panel_access、comment:manage
+- [x] 数据库迁移文件正确插入新能力到 capabilities 表
+- [x] 现有 ops 用户自动获得所有能力的数据迁移已执行
+- [x] requireRole 函数标记为 @deprecated
+- [x] 后端所有 API 路由使用 checkCap/requireCapability 而非 requireRole
+- [x] 前端路由守卫使用 requiresCapability 替代 requiresRole
+- [x] NavBar.vue 中后台入口使用 hasCapability 判断
+- [x] MeView.vue 中后台入口使用 hasCapability 判断，roleLabel 基于能力推断
+- [x] CommentPanel.vue 中 canManageIssue 使用 hasCapability 判断
+- [x] AdminView.vue 中角色切换按钮已移除，仅保留能力勾选器
+- [x] AdminView.vue 中用户角色显示标签根据能力自动推断
+- [x] useAuth.ts 中 inferRoleFromCapabilities 函数正确实现
+- [x] 前端 npm run build 通过，无类型错误
+- [x] 前端代码中不再存在 role === 'ops' 或 role === 'dev' 的权限判断

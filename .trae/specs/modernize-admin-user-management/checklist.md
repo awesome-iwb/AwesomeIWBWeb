@@ -1,0 +1,10 @@
+- [x] capabilities.ts ALL_CAPABILITIES 包含 user:delete 能力
+- [x] 数据库迁移文件正确插入 user:delete 到 capabilities 表
+- [x] POST /api/admin/users 创建用户 API 正常工作（仅用户名、带密码、重复用户名、弱密码）
+- [x] DELETE /api/admin/users/:id 删除用户 API 正常工作（普通用户、超级管理员保护、自己保护）
+- [x] PATCH /api/admin/users/:id/password 重置密码 API 正常工作（已有本地账号、新建本地账号、弱密码）
+- [x] AdminView 用户列表区域有"创建用户"按钮和表单
+- [x] AdminView 用户详情区域有"重置密码"按钮和输入框
+- [x] AdminView 用户详情区域有"删除用户"按钮（红色，二次确认）
+- [x] 所有新增 API 有审计日志记录
+- [x] 所有新增 API 有能力检查（user:manage 或 user:delete）

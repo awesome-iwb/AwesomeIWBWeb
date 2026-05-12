@@ -1,0 +1,12 @@
+- [x] OAuth state 验证不再依赖进程内存，后端重启后回调仍可成功
+- [x] HMAC 签名验证正确拒绝篡改的 state cookie
+- [x] Casdoor 登录回调时 stcn_user_id 和 stcn_username 被正确提取并持久化到数据库
+- [x] 数据库中 sectl_user_id 和 lincube_user_id 列已删除
+- [x] 数据库中 hzzc_user_id 列已添加并有索引
+- [x] 后端 User 类型和所有 SQL 查询中不再包含 sectl_user_id 和 lincube_user_id
+- [x] 后端 User 类型和 SQL 查询中包含 hzzc_user_id
+- [x] 前端 AuthUser 类型不再包含 sectl_user_id 和 lincube_user_id
+- [x] 前端 AuthUser 类型包含 hzzc_user_id
+- [x] AdminView 和 DevView 中 sectl/lincube 相关 UI 已替换为 hzzc
+- [x] friendLinks.ts 中 sectl 条目已删除，stcn 和 hzzc 保留
+- [x] STCN 登录端到端流程正常工作（登录 → 回调 → 用户创建/更新 → 前端显示）
