@@ -73,6 +73,43 @@ let cardsObserver: IntersectionObserver | null = null;
 
 const comparisonList = ref<Project[]>([]);
 
+const activeHeroSlide = ref(0);
+let touchStartX = 0;
+let touchStartY = 0;
+let touchDeltaX = 0;
+let isSwiping = false;
+
+const onTouchStart = (e: TouchEvent) => {
+  touchStartX = e.touches[0].clientX;
+  touchStartY = e.touches[0].clientY;
+  touchDeltaX = 0;
+  isSwiping = false;
+};
+
+const onTouchMove = (e: TouchEvent) => {
+  const dx = e.touches[0].clientX - touchStartX;
+  const dy = e.touches[0].clientY - touchStartY;
+  if (!isSwiping && Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 10) {
+    isSwiping = true;
+  }
+  if (isSwiping) {
+    touchDeltaX = dx;
+    e.preventDefault();
+  }
+};
+
+const onTouchEnd = () => {
+  if (!isSwiping) return;
+  const threshold = 50;
+  if (touchDeltaX < -threshold && activeHeroSlide.value < heroCards.value.length - 1) {
+    activeHeroSlide.value++;
+  } else if (touchDeltaX > threshold && activeHeroSlide.value > 0) {
+    activeHeroSlide.value--;
+  }
+  touchDeltaX = 0;
+  isSwiping = false;
+};
+
 const onCardClick = (project: Project) => {
   router.push({ name: 'project-detail', params: { name: project.name } });
 };
@@ -164,57 +201,10 @@ onMounted(async () => {
   window.addEventListener('scroll', handleScroll, { passive: true });
   handleScroll();
 
-  const isMobile = () => window.innerWidth < 1024;
-
-  if (isMobile() && fanCardsRef.value) {
-    cardsObserver = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting && entry.intersectionRatio > 0.75) {
-            isCardsExpanded.value = true;
-          } else if (!entry.isIntersecting || entry.intersectionRatio < 0.25) {
-            isCardsExpanded.value = false;
-          }
-        }
-      },
-      { threshold: [0, 0.25, 0.75, 1] }
-    );
-    cardsObserver.observe(fanCardsRef.value);
-  }
-
-  const handleResize = () => {
-    if (!isMobile()) {
-      isCardsExpanded.value = false;
-      if (cardsObserver) {
-        cardsObserver.disconnect();
-        cardsObserver = null;
-      }
-    } else if (!cardsObserver && fanCardsRef.value) {
-      cardsObserver = new IntersectionObserver(
-        (entries) => {
-          for (const entry of entries) {
-            if (entry.isIntersecting && entry.intersectionRatio > 0.75) {
-              isCardsExpanded.value = true;
-            } else if (!entry.isIntersecting || entry.intersectionRatio < 0.25) {
-              isCardsExpanded.value = false;
-            }
-          }
-        },
-        { threshold: [0, 0.25, 0.75, 1] }
-      );
-      cardsObserver.observe(fanCardsRef.value);
-    }
-  };
-  window.addEventListener('resize', handleResize, { passive: true });
-  
   onUnmounted(() => {
     window.removeEventListener('scroll', handleScroll);
-    window.removeEventListener('resize', handleResize);
     if (typeWriterTimer) {
       clearTimeout(typeWriterTimer);
-    }
-    if (cardsObserver) {
-      cardsObserver.disconnect();
     }
   });
 });
@@ -402,11 +392,11 @@ watch(heroCards, (cards) => {
           </div>
         </div>
 
-        <!-- Right: Interface Craft Style Fan Cards -->
-        <div ref="fanCardsRef" class="relative z-10 flex-1 w-full flex justify-center lg:justify-end lg:pr-32 h-[480px] sm:h-[520px] mt-12 lg:mt-0 perspective-1000 group/fan" v-if="heroCards.length >= 4">
+        <!-- Right: Interface Craft Style Fan Cards (Desktop) -->
+        <div ref="fanCardsRef" class="relative z-10 hidden lg:flex flex-1 w-full justify-end lg:pr-32 h-[520px] perspective-1000 group/fan" v-if="heroCards.length >= 4">
           
           <!-- Stack Container -->
-          <div class="relative w-[280px] sm:w-[320px] h-[360px] sm:h-[400px] top-1/2 -translate-y-1/2 transition-transform duration-500">
+          <div class="relative w-[320px] h-[400px] top-1/2 -translate-y-1/2 transition-transform duration-500">
             
             <!-- Card Iteration (1 to 4) -->
             <div 
@@ -423,10 +413,6 @@ watch(heroCards, (cards) => {
                 index === 1 ? 'group-hover/fan:rotate-[-5deg] group-hover/fan:-translate-x-10 group-hover/fan:translate-y-2 hover:!-translate-y-24 hover:!z-50 hover:!scale-105' : '',
                 index === 2 ? 'group-hover/fan:rotate-[15deg] group-hover/fan:translate-x-10 group-hover/fan:translate-y-2 hover:!-translate-y-24 hover:!z-50 hover:!scale-105' : '',
                 index === 3 ? 'group-hover/fan:rotate-[35deg] group-hover/fan:translate-x-32 group-hover/fan:translate-y-12 hover:!-translate-y-16 hover:!z-50 hover:!scale-105' : '',
-                isCardsExpanded && index === 0 ? '!rotate-[-18deg] !-translate-x-16 !translate-y-6' : '',
-                isCardsExpanded && index === 1 ? '!rotate-[-4deg] !-translate-x-4 !translate-y-1' : '',
-                isCardsExpanded && index === 2 ? '!rotate-[10deg] !translate-x-4 !translate-y-1' : '',
-                isCardsExpanded && index === 3 ? '!rotate-[22deg] !translate-x-20 !translate-y-8' : ''
               ]"
               :style="{
                 boxShadow: cardColors[card.name] ? `0 0 40px -5px rgba(${cardColors[card.name]}, 0.5)` : '0 10px 40px -15px rgba(0,0,0,0.2)',
@@ -435,7 +421,7 @@ watch(heroCards, (cards) => {
               @click="router.push({ name: 'project-detail', params: { name: card.name } })"
             >
               <!-- Top: Banner Image -->
-              <div class="w-full h-[55%] sm:h-[60%] bg-slate-100 dark:bg-slate-800 relative overflow-hidden shrink-0">
+              <div class="w-full h-[60%] bg-slate-100 dark:bg-slate-800 relative overflow-hidden shrink-0">
                 <img v-if="card.banner" :src="card.banner" class="w-full h-full object-cover" alt="Banner" />
                 <div v-else class="w-full h-full flex items-center justify-center transition-colors duration-500" :style="{ backgroundColor: cardColors[card.name] ? `rgba(${cardColors[card.name]}, 0.1)` : 'rgba(16, 185, 129, 0.1)' }">
                   <Sparkles class="w-12 h-12 transition-colors duration-500" :style="{ color: cardColors[card.name] ? `rgba(${cardColors[card.name]}, 0.5)` : 'rgba(16, 185, 129, 0.5)' }" />
@@ -444,17 +430,62 @@ watch(heroCards, (cards) => {
               </div>
 
               <!-- Bottom: Icon + Text -->
-              <div class="p-5 sm:p-6 flex-1 flex flex-col justify-center bg-white dark:bg-slate-900 relative">
+              <div class="p-6 flex-1 flex flex-col justify-center bg-white dark:bg-slate-900 relative">
                 <div class="flex items-center gap-4 mb-2">
-                  <img :src="card.icon || card.avatar" class="w-12 h-12 sm:w-14 sm:h-14 object-contain drop-shadow-sm shrink-0" @error="(e) => { (e.target as HTMLImageElement).src = getFallbackImage(card.name) }" />
+                  <img :src="card.icon || card.avatar" class="w-14 h-14 object-contain drop-shadow-sm shrink-0" @error="(e) => { (e.target as HTMLImageElement).src = getFallbackImage(card.name) }" />
                   <div class="flex-1 min-w-0">
-                    <h2 class="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white truncate">{{ card.name }}</h2>
+                    <h2 class="text-2xl font-bold text-slate-900 dark:text-white truncate">{{ card.name }}</h2>
                     <p class="text-sm text-slate-500 dark:text-slate-400 truncate">{{ card.developer }}</p>
                   </div>
                 </div>
                 <p class="text-sm text-slate-600 dark:text-slate-400 line-clamp-2 leading-relaxed">{{ card.description }}</p>
               </div>
             </div>
+          </div>
+        </div>
+
+        <!-- Mobile: Swipeable Card Carousel -->
+        <div class="lg:hidden w-full mt-8" v-if="heroCards.length >= 4">
+          <div class="relative overflow-hidden" @touchstart="onTouchStart" @touchmove="onTouchMove" @touchend="onTouchEnd">
+            <div 
+              class="flex transition-transform duration-300 ease-out"
+              :style="{ transform: `translateX(-${activeHeroSlide * 100}%)` }"
+            >
+              <div 
+                v-for="card in heroCards" 
+                :key="card.name"
+                class="w-full flex-shrink-0 px-4"
+                @click="router.push({ name: 'project-detail', params: { name: card.name } })"
+              >
+                <div class="bg-white dark:bg-slate-900 rounded-2xl overflow-hidden border border-slate-200/60 dark:border-slate-700/60 shadow-lg active:scale-[0.98] transition-transform"
+                  :style="{ boxShadow: cardColors[card.name] ? `0 8px 30px -8px rgba(${cardColors[card.name]}, 0.4)` : '' }"
+                >
+                  <div class="w-full h-40 bg-slate-100 dark:bg-slate-800 relative overflow-hidden">
+                    <img v-if="card.banner" :src="card.banner" class="w-full h-full object-cover" alt="Banner" loading="lazy" decoding="async" />
+                    <div v-else class="w-full h-full flex items-center justify-center" :style="{ backgroundColor: cardColors[card.name] ? `rgba(${cardColors[card.name]}, 0.1)` : 'rgba(16, 185, 129, 0.1)' }">
+                      <Sparkles class="w-10 h-10" :style="{ color: cardColors[card.name] ? `rgba(${cardColors[card.name]}, 0.5)` : 'rgba(16, 185, 129, 0.5)' }" />
+                    </div>
+                  </div>
+                  <div class="p-4 flex items-center gap-3">
+                    <img :src="card.icon || card.avatar" class="w-11 h-11 object-contain drop-shadow-sm shrink-0" @error="(e) => { (e.target as HTMLImageElement).src = getFallbackImage(card.name) }" />
+                    <div class="flex-1 min-w-0">
+                      <h2 class="text-base font-bold text-slate-900 dark:text-white truncate">{{ card.name }}</h2>
+                      <p class="text-xs text-slate-500 dark:text-slate-400 truncate">{{ card.developer }}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- Dots indicator -->
+          <div class="flex justify-center gap-1.5 mt-3">
+            <button 
+              v-for="(_, i) in heroCards" 
+              :key="i" 
+              @click="activeHeroSlide = i"
+              class="w-2 h-2 rounded-full transition-all duration-200"
+              :class="i === activeHeroSlide ? 'bg-emerald-500 w-5' : 'bg-slate-300 dark:bg-slate-600'"
+            ></button>
           </div>
         </div>
 
