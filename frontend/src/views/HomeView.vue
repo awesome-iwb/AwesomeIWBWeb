@@ -349,159 +349,173 @@ watch(heroCards, (cards) => {
 <template>
   <div class="min-h-screen bg-[#F8FAFC] dark:bg-[#0B1120] text-slate-900 dark:text-slate-50 font-sans selection:bg-emerald-200 dark:selection:bg-emerald-900">
     
-    <!-- Hero Section (Interface Craft Style) -->
-    <header class="relative pt-24 pb-16 md:pt-32 md:pb-24 overflow-hidden">
-      <!-- Minimalist background decoration -->
+    <!-- Hero Section -->
+    <header class="relative overflow-hidden">
       <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-emerald-400/10 dark:bg-emerald-600/10 rounded-full blur-3xl opacity-50 pointer-events-none z-0"></div>
 
-      <div class="max-w-7xl mx-auto px-6 flex flex-col lg:flex-row items-center justify-between gap-12 lg:gap-16 relative z-10">
+      <!-- Desktop Hero -->
+      <div class="hidden lg:block pt-24 pb-16 md:pt-32 md:pb-24">
+        <div class="max-w-7xl mx-auto px-6 flex flex-col lg:flex-row items-center justify-between gap-12 lg:gap-16 relative z-10">
 
-        <!-- Left: Text & Search -->
-        <div class="relative z-20 flex-1 text-center lg:text-left flex flex-col items-center lg:items-start w-full">
-          <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800/30 text-emerald-600 dark:text-emerald-400 text-sm font-bold mb-6 shadow-sm">
-            <Sparkles class="w-4 h-4" />
-            <span>精心挑选的 {{ stats.totalProjects }} 款优质教育软件</span>
+          <div class="relative z-20 flex-1 text-center lg:text-left flex flex-col items-center lg:items-start w-full">
+            <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800/30 text-emerald-600 dark:text-emerald-400 text-sm font-bold mb-6 shadow-sm">
+              <Sparkles class="w-4 h-4" />
+              <span>精心挑选的 {{ stats.totalProjects }} 款优质教育软件</span>
+            </div>
+
+            <h1 class="text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tight mb-6 leading-tight flex flex-col items-center lg:items-start">
+              <span class="mb-2">班级大屏的</span>
+              <span class="inline-flex items-center whitespace-nowrap">
+                <span class="text-transparent bg-clip-text bg-gradient-to-r from-emerald-500 to-teal-500 dark:from-emerald-400 dark:to-teal-400">
+                  {{ typeWriterText }}
+                </span>
+                <span class="w-1.5 h-[1.2em] bg-emerald-500 ml-2 animate-pulse mt-1"></span>
+              </span>
+            </h1>
+
+            <p class="text-lg md:text-xl text-slate-600 dark:text-slate-400 max-w-xl mx-auto lg:mx-0 mb-10 leading-relaxed">
+              专为广大中小学电教打造的一站式软件推荐清单。告别臃肿难用的系统自带软件，用最现代的工具重塑课堂体验。
+            </p>
+
+            <div class="relative w-full max-w-xl" ref="mainSearchInput">
+              <button
+                @click="globalState.isSearchOpen = true"
+                class="w-full flex items-center gap-3 pl-5 pr-6 py-4 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white/60 dark:bg-[#0B1120]/60 backdrop-blur-xl shadow-sm hover:shadow-md hover:border-emerald-300/50 dark:hover:border-emerald-700/50 transition-all duration-300 text-left group cursor-pointer"
+                :class="isScrolledPastSearch ? 'opacity-0 scale-95 pointer-events-none' : 'opacity-100 scale-100'"
+              >
+                <Search class="h-5 w-5 text-slate-400 group-hover:text-emerald-500 transition-colors shrink-0" />
+                <span class="text-slate-400 dark:text-slate-500 text-base">搜索画板、课表、倒计时等工具...</span>
+                <span class="ml-auto hidden sm:flex items-center gap-1 px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 text-xs text-slate-500 font-medium shrink-0">
+                  <span class="text-[10px]">⌘</span> K
+                </span>
+              </button>
+            </div>
           </div>
 
-          <h1 class="text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tight mb-6 leading-tight flex flex-col items-center lg:items-start">
-            <span class="mb-2">班级大屏的</span>
-            <span class="inline-flex items-center whitespace-nowrap">
-              <span class="text-transparent bg-clip-text bg-gradient-to-r from-emerald-500 to-teal-500 dark:from-emerald-400 dark:to-teal-400">
-                {{ typeWriterText }}
-              </span>
-              <span class="w-1.5 h-[1.2em] bg-emerald-500 ml-2 animate-pulse mt-1"></span>
-            </span>
-          </h1>
-
-          <p class="text-lg md:text-xl text-slate-600 dark:text-slate-400 max-w-xl mx-auto lg:mx-0 mb-10 leading-relaxed">
-            专为广大中小学电教打造的一站式软件推荐清单。告别臃肿难用的系统自带软件，用最现代的工具重塑课堂体验。
-          </p>
-
-          <div class="hidden lg:block relative w-full max-w-xl" ref="mainSearchInput">
-            <button
-              @click="globalState.isSearchOpen = true"
-              class="w-full flex items-center gap-3 pl-5 pr-6 py-4 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white/60 dark:bg-[#0B1120]/60 backdrop-blur-xl shadow-sm hover:shadow-md hover:border-emerald-300/50 dark:hover:border-emerald-700/50 transition-all duration-300 text-left group cursor-pointer"
-              :class="isScrolledPastSearch ? 'opacity-0 scale-95 pointer-events-none' : 'opacity-100 scale-100'"
-            >
-              <Search class="h-5 w-5 text-slate-400 group-hover:text-emerald-500 transition-colors shrink-0" />
-              <span class="text-slate-400 dark:text-slate-500 text-base">搜索画板、课表、倒计时等工具...</span>
-              <span class="ml-auto hidden sm:flex items-center gap-1 px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 text-xs text-slate-500 font-medium shrink-0">
-                <span class="text-[10px]">⌘</span> K
-              </span>
-            </button>
-          </div>
-        </div>
-
-        <!-- Right: Interface Craft Style Fan Cards (Desktop) -->
-        <div ref="fanCardsRef" class="relative z-10 hidden lg:flex flex-1 w-full justify-end lg:pr-32 h-[520px] perspective-1000 group/fan" v-if="heroCards.length >= 4">
-          
-          <!-- Stack Container -->
-          <div class="relative w-[320px] h-[400px] top-1/2 -translate-y-1/2 transition-transform duration-500">
-            
-            <!-- Card Iteration (1 to 4) -->
-            <div 
-              v-for="(card, index) in heroCards" 
-              :key="card.name"
-              class="absolute top-0 left-0 w-full h-full bg-white dark:bg-slate-900 rounded-3xl flex flex-col cursor-pointer transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] overflow-hidden border border-slate-200/60 dark:border-slate-700/60 origin-bottom"
-              :class="[
-                index === 0 ? 'z-40' : index === 1 ? 'z-30' : index === 2 ? 'z-20' : 'z-10',
-                index === 0 ? 'rotate-0' : '',
-                index === 1 ? 'rotate-[-3deg] -translate-x-1 translate-y-1' : '',
-                index === 2 ? 'rotate-[3deg] translate-x-1 translate-y-1' : '',
-                index === 3 ? 'rotate-[6deg] translate-x-2 translate-y-2' : '',
-                index === 0 ? 'group-hover/fan:rotate-[-25deg] group-hover/fan:-translate-x-28 group-hover/fan:translate-y-8 hover:!-translate-y-16 hover:!z-50 hover:!scale-105' : '',
-                index === 1 ? 'group-hover/fan:rotate-[-5deg] group-hover/fan:-translate-x-10 group-hover/fan:translate-y-2 hover:!-translate-y-24 hover:!z-50 hover:!scale-105' : '',
-                index === 2 ? 'group-hover/fan:rotate-[15deg] group-hover/fan:translate-x-10 group-hover/fan:translate-y-2 hover:!-translate-y-24 hover:!z-50 hover:!scale-105' : '',
-                index === 3 ? 'group-hover/fan:rotate-[35deg] group-hover/fan:translate-x-32 group-hover/fan:translate-y-12 hover:!-translate-y-16 hover:!z-50 hover:!scale-105' : '',
-              ]"
-              :style="{
-                boxShadow: cardColors[card.name] ? `0 0 40px -5px rgba(${cardColors[card.name]}, 0.5)` : '0 10px 40px -15px rgba(0,0,0,0.2)',
-                borderColor: cardColors[card.name] ? `rgba(${cardColors[card.name]}, 0.3)` : ''
-              }"
-              @click="router.push({ name: 'project-detail', params: { name: card.name } })"
-            >
-              <!-- Top: Banner Image -->
-              <div class="w-full h-[60%] bg-slate-100 dark:bg-slate-800 relative overflow-hidden shrink-0">
-                <img v-if="card.banner" :src="card.banner" class="w-full h-full object-cover" alt="Banner" />
-                <div v-else class="w-full h-full flex items-center justify-center transition-colors duration-500" :style="{ backgroundColor: cardColors[card.name] ? `rgba(${cardColors[card.name]}, 0.1)` : 'rgba(16, 185, 129, 0.1)' }">
-                  <Sparkles class="w-12 h-12 transition-colors duration-500" :style="{ color: cardColors[card.name] ? `rgba(${cardColors[card.name]}, 0.5)` : 'rgba(16, 185, 129, 0.5)' }" />
-                </div>
-                <div class="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent pointer-events-none"></div>
-              </div>
-
-              <!-- Bottom: Icon + Text -->
-              <div class="p-6 flex-1 flex flex-col justify-center bg-white dark:bg-slate-900 relative">
-                <div class="flex items-center gap-4 mb-2">
-                  <img :src="card.icon || card.avatar" class="w-14 h-14 object-contain drop-shadow-sm shrink-0" @error="(e) => { (e.target as HTMLImageElement).src = getFallbackImage(card.name) }" />
-                  <div class="flex-1 min-w-0">
-                    <h2 class="text-2xl font-bold text-slate-900 dark:text-white truncate">{{ card.name }}</h2>
-                    <p class="text-sm text-slate-500 dark:text-slate-400 truncate">{{ card.developer }}</p>
+          <!-- Desktop: Fan Cards -->
+          <div ref="fanCardsRef" class="relative z-10 hidden lg:flex flex-1 w-full justify-end lg:pr-32 h-[520px] perspective-1000 group/fan" v-if="heroCards.length >= 4">
+            <div class="relative w-[320px] h-[400px] top-1/2 -translate-y-1/2 transition-transform duration-500">
+              <div 
+                v-for="(card, index) in heroCards" 
+                :key="card.name"
+                class="absolute top-0 left-0 w-full h-full bg-white dark:bg-slate-900 rounded-3xl flex flex-col cursor-pointer transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] overflow-hidden border border-slate-200/60 dark:border-slate-700/60 origin-bottom"
+                :class="[
+                  index === 0 ? 'z-40' : index === 1 ? 'z-30' : index === 2 ? 'z-20' : 'z-10',
+                  index === 0 ? 'rotate-0' : '',
+                  index === 1 ? 'rotate-[-3deg] -translate-x-1 translate-y-1' : '',
+                  index === 2 ? 'rotate-[3deg] translate-x-1 translate-y-1' : '',
+                  index === 3 ? 'rotate-[6deg] translate-x-2 translate-y-2' : '',
+                  index === 0 ? 'group-hover/fan:rotate-[-25deg] group-hover/fan:-translate-x-28 group-hover/fan:translate-y-8 hover:!-translate-y-16 hover:!z-50 hover:!scale-105' : '',
+                  index === 1 ? 'group-hover/fan:rotate-[-5deg] group-hover/fan:-translate-x-10 group-hover/fan:translate-y-2 hover:!-translate-y-24 hover:!z-50 hover:!scale-105' : '',
+                  index === 2 ? 'group-hover/fan:rotate-[15deg] group-hover/fan:translate-x-10 group-hover/fan:translate-y-2 hover:!-translate-y-24 hover:!z-50 hover:!scale-105' : '',
+                  index === 3 ? 'group-hover/fan:rotate-[35deg] group-hover/fan:translate-x-32 group-hover/fan:translate-y-12 hover:!-translate-y-16 hover:!z-50 hover:!scale-105' : '',
+                ]"
+                :style="{
+                  boxShadow: cardColors[card.name] ? `0 0 40px -5px rgba(${cardColors[card.name]}, 0.5)` : '0 10px 40px -15px rgba(0,0,0,0.2)',
+                  borderColor: cardColors[card.name] ? `rgba(${cardColors[card.name]}, 0.3)` : ''
+                }"
+                @click="router.push({ name: 'project-detail', params: { name: card.name } })"
+              >
+                <div class="w-full h-[60%] bg-slate-100 dark:bg-slate-800 relative overflow-hidden shrink-0">
+                  <img v-if="card.banner" :src="card.banner" class="w-full h-full object-cover" alt="Banner" />
+                  <div v-else class="w-full h-full flex items-center justify-center transition-colors duration-500" :style="{ backgroundColor: cardColors[card.name] ? `rgba(${cardColors[card.name]}, 0.1)` : 'rgba(16, 185, 129, 0.1)' }">
+                    <Sparkles class="w-12 h-12 transition-colors duration-500" :style="{ color: cardColors[card.name] ? `rgba(${cardColors[card.name]}, 0.5)` : 'rgba(16, 185, 129, 0.5)' }" />
                   </div>
+                  <div class="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent pointer-events-none"></div>
                 </div>
-                <p class="text-sm text-slate-600 dark:text-slate-400 line-clamp-2 leading-relaxed">{{ card.description }}</p>
+                <div class="p-6 flex-1 flex flex-col justify-center bg-white dark:bg-slate-900 relative">
+                  <div class="flex items-center gap-4 mb-2">
+                    <img :src="card.icon || card.avatar" class="w-14 h-14 object-contain drop-shadow-sm shrink-0" @error="(e) => { (e.target as HTMLImageElement).src = getFallbackImage(card.name) }" />
+                    <div class="flex-1 min-w-0">
+                      <h2 class="text-2xl font-bold text-slate-900 dark:text-white truncate">{{ card.name }}</h2>
+                      <p class="text-sm text-slate-500 dark:text-slate-400 truncate">{{ card.developer }}</p>
+                    </div>
+                  </div>
+                  <p class="text-sm text-slate-600 dark:text-slate-400 line-clamp-2 leading-relaxed">{{ card.description }}</p>
+                </div>
               </div>
             </div>
           </div>
         </div>
+      </div>
 
-        <!-- Mobile: Swipeable Card Carousel -->
-        <div class="lg:hidden w-full mt-8" v-if="heroCards.length >= 4">
-          <div class="relative overflow-hidden" @touchstart="onTouchStart" @touchmove="onTouchMove" @touchend="onTouchEnd">
+      <!-- Mobile: Full-screen Immersive Card Experience -->
+      <div class="lg:hidden" v-if="heroCards.length >= 4">
+        <div class="relative h-[100dvh] flex flex-col" @touchstart="onTouchStart" @touchmove="onTouchMove" @touchend="onTouchEnd">
+          <div class="flex-1 relative overflow-hidden">
             <div 
-              class="flex transition-transform duration-300 ease-out"
+              class="flex h-full transition-transform duration-300 ease-out"
               :style="{ transform: `translateX(-${activeHeroSlide * 100}%)` }"
             >
               <div 
                 v-for="card in heroCards" 
                 :key="card.name"
-                class="w-full flex-shrink-0 px-4"
+                class="w-full flex-shrink-0 h-full relative"
                 @click="router.push({ name: 'project-detail', params: { name: card.name } })"
               >
-                <div class="bg-white dark:bg-slate-900 rounded-2xl overflow-hidden border border-slate-200/60 dark:border-slate-700/60 shadow-lg active:scale-[0.98] transition-transform"
-                  :style="{ boxShadow: cardColors[card.name] ? `0 8px 30px -8px rgba(${cardColors[card.name]}, 0.4)` : '' }"
-                >
-                  <div class="w-full h-40 bg-slate-100 dark:bg-slate-800 relative overflow-hidden">
-                    <img v-if="card.banner" :src="card.banner" class="w-full h-full object-cover" alt="Banner" loading="lazy" decoding="async" />
-                    <div v-else class="w-full h-full flex items-center justify-center" :style="{ backgroundColor: cardColors[card.name] ? `rgba(${cardColors[card.name]}, 0.1)` : 'rgba(16, 185, 129, 0.1)' }">
-                      <Sparkles class="w-10 h-10" :style="{ color: cardColors[card.name] ? `rgba(${cardColors[card.name]}, 0.5)` : 'rgba(16, 185, 129, 0.5)' }" />
+                <div class="absolute inset-0">
+                  <img v-if="card.banner" :src="card.banner" class="w-full h-full object-cover" alt="Banner" loading="lazy" decoding="async" />
+                  <div v-else class="w-full h-full flex items-center justify-center" :style="{ backgroundColor: cardColors[card.name] ? `rgba(${cardColors[card.name]}, 0.15)` : 'rgba(16, 185, 129, 0.1)' }">
+                    <Sparkles class="w-20 h-20" :style="{ color: cardColors[card.name] ? `rgba(${cardColors[card.name]}, 0.3)` : 'rgba(16, 185, 129, 0.3)' }" />
+                  </div>
+                  <div class="absolute inset-0 bg-gradient-to-b from-black/30 via-black/10 to-black/70"></div>
+                </div>
+
+                <div class="absolute inset-0 flex flex-col justify-between p-5 pb-8">
+                  <div class="flex items-center justify-between">
+                    <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/20 backdrop-blur-sm text-white text-xs font-bold">
+                      <Sparkles class="w-3 h-3" />
+                      精选推荐
+                    </div>
+                    <div class="flex items-center gap-1">
+                      <button
+                        v-for="(_, i) in heroCards" 
+                        :key="i" 
+                        @click.stop="activeHeroSlide = i"
+                        class="h-1 rounded-full transition-all duration-200"
+                        :class="i === activeHeroSlide ? 'bg-white w-5' : 'bg-white/40 w-1.5'"
+                      ></button>
                     </div>
                   </div>
-                  <div class="p-4 flex items-center gap-3">
-                    <img :src="card.icon || card.avatar" class="w-11 h-11 object-contain drop-shadow-sm shrink-0" @error="(e) => { (e.target as HTMLImageElement).src = getFallbackImage(card.name) }" />
-                    <div class="flex-1 min-w-0">
-                      <h2 class="text-base font-bold text-slate-900 dark:text-white truncate">{{ card.name }}</h2>
-                      <p class="text-xs text-slate-500 dark:text-slate-400 truncate">{{ card.developer }}</p>
+
+                  <div>
+                    <div class="flex items-center gap-3 mb-3">
+                      <div class="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur-sm p-2 flex items-center justify-center">
+                        <img :src="card.icon || card.avatar" class="w-full h-full object-contain" @error="(e) => { (e.target as HTMLImageElement).src = getFallbackImage(card.name) }" />
+                      </div>
+                      <div class="flex-1 min-w-0">
+                        <h2 class="text-2xl font-extrabold text-white drop-shadow-lg truncate">{{ card.name }}</h2>
+                        <p class="text-sm text-white/70 truncate">{{ card.developer }}</p>
+                      </div>
+                    </div>
+                    <p class="text-sm text-white/80 leading-relaxed line-clamp-2 mb-4">{{ card.description }}</p>
+                    <div class="flex items-center gap-3">
+                      <span v-if="card.stars" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/15 backdrop-blur-sm text-white text-xs font-bold">
+                        ⭐ {{ card.stars }}
+                      </span>
+                      <span v-if="card.language" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/15 backdrop-blur-sm text-white text-xs font-bold font-mono">
+                        {{ card.language }}
+                      </span>
+                      <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/80 text-white text-xs font-bold">
+                        查看详情 →
+                      </span>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
           </div>
-          <!-- Dots indicator -->
-          <div class="flex justify-center gap-1.5 mt-3">
-            <button 
-              v-for="(_, i) in heroCards" 
-              :key="i" 
-              @click="activeHeroSlide = i"
-              class="w-2 h-2 rounded-full transition-all duration-200"
-              :class="i === activeHeroSlide ? 'bg-emerald-500 w-5' : 'bg-slate-300 dark:bg-slate-600'"
-            ></button>
+
+          <div class="flex-shrink-0 px-5 pb-6 -mt-4 relative z-10">
+            <button
+              @click="globalState.isSearchOpen = true"
+              class="w-full flex items-center gap-3 pl-5 pr-6 py-3.5 rounded-2xl border border-white/20 dark:border-slate-700/50 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm shadow-lg text-left group cursor-pointer active:scale-[0.98] transition-transform"
+            >
+              <Search class="h-4.5 w-4.5 text-slate-400 shrink-0" />
+              <span class="text-slate-400 dark:text-slate-500 text-sm">搜索画板、课表、倒计时等工具...</span>
+            </button>
           </div>
         </div>
-
-        <div class="lg:hidden w-full max-w-xl mx-auto mt-2 mb-2">
-          <button
-            @click="globalState.isSearchOpen = true"
-            class="w-full flex items-center gap-3 pl-5 pr-6 py-4 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white/60 dark:bg-[#0B1120]/60 backdrop-blur-xl shadow-sm hover:shadow-md hover:border-emerald-300/50 dark:hover:border-emerald-700/50 active:scale-[0.98] transition-all duration-300 text-left group cursor-pointer"
-          >
-            <Search class="h-5 w-5 text-slate-400 group-hover:text-emerald-500 transition-colors shrink-0" />
-            <span class="text-slate-400 dark:text-slate-500 text-base">搜索画板、课表、倒计时等工具...</span>
-            <span class="ml-auto flex items-center gap-1 px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 text-xs text-slate-500 font-medium shrink-0">
-              <span class="text-[10px]">⌘</span> K
-            </span>
-          </button>
-        </div>
-
       </div>
     </header>
 
