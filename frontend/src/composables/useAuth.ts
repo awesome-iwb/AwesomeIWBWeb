@@ -10,6 +10,7 @@ type AuthMeResponse = {
     name?: string;
     avatar_url?: string;
     avatar_source?: 'casdoor' | 'upload' | 'default';
+    avatar_media_id?: string;
     email?: string;
     stcn_user_id?: string;
     stcn_username?: string;
@@ -17,6 +18,7 @@ type AuthMeResponse = {
   };
   capabilities?: string[];
   is_superadmin?: boolean;
+  organizations?: AuthUserOrganization[];
 };
 
 type LoginResponse = {
@@ -29,6 +31,8 @@ type AuthorizeUrlResponse = {
 
 type UploadAvatarResponse = {
   url?: string;
+  media_id?: string;
+  storage_key?: string;
 };
 
 function inferRoleFromCapabilities(capabilities: string[] | undefined, isSuperadmin: boolean | undefined): AuthRole {
@@ -39,11 +43,23 @@ function inferRoleFromCapabilities(capabilities: string[] | undefined, isSuperad
   return 'user';
 }
 
+export type AuthUserOrganization = {
+  id: string;
+  name: string;
+  slug: string;
+  avatar_url: string;
+  description: string;
+  website_url: string;
+  status: string;
+  member_role: 'owner' | 'admin' | 'member';
+};
+
 export type AuthUser = {
   id?: string;
   name: string;
   avatarUrl: string;
   avatar_source?: 'casdoor' | 'upload' | 'default';
+  avatar_media_id?: string;
   role: AuthRole;
   stcn_user_id: string;
   stcn_username?: string;
@@ -54,6 +70,7 @@ export type AuthUser = {
   capabilities?: string[];
   profileConfirmed?: boolean;
   binding_confirmed_at?: string;
+  organizations?: AuthUserOrganization[];
 };
 
 const STORAGE_KEY = 'awesome_iwb_auth';
@@ -123,11 +140,31 @@ export const useAuth = () => {
   const isAuthenticated = computed(() => Boolean(user.value));
   const isSuperadmin = computed(() => user.value?.is_superadmin === true);
   const capabilities = computed(() => user.value?.capabilities ?? []);
+  const organizations = computed(() => user.value?.organizations ?? []);
 
   const hasCapability = (cap: string) => {
     if (!user.value) return false;
     if (user.value.is_superadmin) return true;
     return user.value.capabilities?.includes(cap) ?? false;
+  };
+
+  const isProjectMember = (projectId: string): boolean => {
+    if (!user.value) return false;
+    if (user.value.is_superadmin) return true;
+    return false;
+  };
+
+  const isOrgAdmin = (orgId: string): boolean => {
+    if (!user.value) return false;
+    if (user.value.is_superadmin) return true;
+    const org = user.value.organizations?.find(o => o.id === orgId);
+    return org?.member_role === 'owner' || org?.member_role === 'admin' || false;
+  };
+
+  const hasUserCapability = (capId: string): boolean => {
+    if (!user.value) return false;
+    if (user.value.is_superadmin) return true;
+    return user.value.capabilities?.includes(capId) ?? false;
   };
 
   const setToken = (newToken: string, newUser?: Partial<AuthUser>) => {
@@ -137,6 +174,7 @@ export const useAuth = () => {
         name: newUser.name ?? user.value?.name ?? '',
         avatarUrl: newUser.avatarUrl ?? newUser.avatar_url ?? user.value?.avatarUrl ?? '/assets/people/placeholder.svg',
         avatar_source: newUser.avatar_source ?? user.value?.avatar_source ?? 'default',
+        avatar_media_id: newUser.avatar_media_id ?? user.value?.avatar_media_id,
         role: newUser.role ?? user.value?.role ?? 'user',
         stcn_user_id: newUser.stcn_user_id ?? user.value?.stcn_user_id ?? '',
         stcn_username: newUser.stcn_username ?? user.value?.stcn_username ?? '',
@@ -211,6 +249,7 @@ export const useAuth = () => {
         avatarUrl: json.user.avatar_url || '/assets/people/placeholder.svg',
         avatar_url: json.user.avatar_url,
         avatar_source: json.user.avatar_source || 'default',
+        avatar_media_id: json.user.avatar_media_id,
         email: json.user.email,
         stcn_user_id: json.user.stcn_user_id ?? '',
         stcn_username: json.user.stcn_username,
@@ -218,6 +257,7 @@ export const useAuth = () => {
         is_superadmin: isSuper,
         capabilities: caps,
         binding_confirmed_at: user.value?.binding_confirmed_at,
+        organizations: json.organizations ?? [],
       } satisfies Omit<AuthUser, 'profileConfirmed'>;
       user.value = {
         ...nextUser,
@@ -298,6 +338,7 @@ export const useAuth = () => {
           avatarUrl: json.url,
           avatar_url: json.url,
           avatar_source: 'upload',
+          avatar_media_id: json.media_id,
         });
         return json.url;
       }
@@ -313,7 +354,11 @@ export const useAuth = () => {
     isAuthenticated,
     isSuperadmin,
     capabilities,
+    organizations,
     hasCapability,
+    isProjectMember,
+    isOrgAdmin,
+    hasUserCapability,
     loginWithPassword,
     getCasdoorAuthorizeUrl,
     handleCallback,
