@@ -19,6 +19,24 @@ const JWT_SUB_LOCAL_PREFIX = "local:";
 const JWT_SUB_TOKEN_PREFIX = "token:";
 const PG_ENABLED = Boolean(process.env.DATABASE_URL);
 
+function authError(set: any, status: number, code: string, message: string) {
+  const traceId = randomUUID();
+  set.status = status;
+  set.headers["cache-control"] = "private, no-store";
+  set.headers["vary"] = "Cookie, Authorization";
+  return { error: { code, message, traceId } };
+}
+
+function logAuthEvent(event: string, extra: Record<string, unknown> = {}) {
+  try {
+    console.info(`[auth.casdoor] ${event}`, {
+      ...extra,
+      cookieDomain: appConfig.cookieDomain || '',
+      cookieSecure: appConfig.cookieSecure,
+    });
+  } catch {}
+}
+
 /** Postgres `local_accounts.id` is a UUID; JSON/dev mode may use non-UUID ids. */
 const LOCAL_SUBJECT_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -36,6 +54,11 @@ function wantsJsonCallbackResponse(query: any, headers: Record<string, string | 
   if (mode === "json") return true;
   const header = String(headers[CALLBACK_MODE_JSON_HEADER] ?? "").trim().toLowerCase();
   return header === "json";
+}
+
+function shouldPreferHtmlRedirect(headers: Record<string, string | undefined>): boolean {
+  const accept = String(headers["accept"] ?? "").toLowerCase();
+  return accept.includes("text/html");
 }
 
 function base64Url(input: Buffer | string) {
@@ -72,6 +95,16 @@ function setOauthStateCookie(set: any, payload: { state: string; codeVerifier: s
   if (appConfig.cookieSecure) parts.push("Secure");
   if (appConfig.cookieDomain) parts.push(`Domain=${appConfig.cookieDomain}`);
   appendSetCookie(set, parts.join("; "));
+}
+
+function readCookieDebugInfo(headers: Record<string, string | undefined>) {
+  return {
+    hasCookieHeader: Boolean(headers["cookie"]),
+    host: headers["host"] ?? "",
+    forwardedProto: headers["x-forwarded-proto"] ?? "",
+    origin: headers["origin"] ?? "",
+    referer: headers["referer"] ?? "",
+  };
 }
 
 function clearOauthStateCookie(set: any) {
@@ -144,10 +177,9 @@ const DEMO_LOGIN = process.env.DEMO_LOGIN === "true" && process.env.NODE_ENV !==
 
 export const casdoorAuthPlugin = new Elysia({ prefix: "/api/auth" })
   .get("/login", ({ set, query, headers }) => {
-    if (checkRateLimit({ headers, path: "/api/auth/casdoor/login", set })) return { error: "Too Many Requests" };
+    if (checkRateLimit({ headers, path: "/api/auth/casdoor/login", set })) return authError(set, 429, "RATE_LIMITED", "Too Many Requests");
     if (!appConfig.oauthEnabled) {
-      set.status = 503;
-      return { error: "OAuth disabled by OAUTH_ENABLED=false" };
+      return authError(set, 503, "OAUTH_DISABLED", "OAuth disabled by OAUTH_ENABLED=false");
     }
     if (!CASDOOR_ENDPOINT || !CASDOOR_CLIENT_ID) {
       if (DEMO_LOGIN) {
@@ -158,8 +190,7 @@ export const casdoorAuthPlugin = new Elysia({ prefix: "/api/auth" })
         demoCallbackUrl.searchParams.set("state", state);
         return { authorizeUrl: demoCallbackUrl.toString() };
       }
-      set.status = 503;
-      return { error: "Casdoor not configured" };
+      return authError(set, 503, "CASDOOR_NOT_CONFIGURED", "Casdoor not configured");
     }
     const state = randomUUID();
     const codeVerifier = base64Url(randomBytes(32));
@@ -168,36 +199,40 @@ export const casdoorAuthPlugin = new Elysia({ prefix: "/api/auth" })
     const returnTo = pickSafeReturnTo(returnToRaw);
     const popupMode = String((query as any)?.popup ?? "").trim().toLowerCase() === "1";
     setOauthStateCookie(set, { state, codeVerifier, returnTo, createdAt: Date.now(), popup: popupMode });
+    logAuthEvent("oauth_state_issued", {
+      popupMode,
+      returnTo,
+      ...readCookieDebugInfo(headers),
+    });
     return { authorizeUrl: buildAuthorizeUrl(state, codeChallenge) };
   })
   .get("/callback", async ({ query, set, headers }) => {
-    if (checkRateLimit({ headers, path: "/api/auth/casdoor/callback", set })) return { error: "Too Many Requests" };
+    if (checkRateLimit({ headers, path: "/api/auth/casdoor/callback", set })) return authError(set, 429, "RATE_LIMITED", "Too Many Requests");
     if (!appConfig.oauthEnabled) {
-      set.status = 503;
-      return { error: "OAuth disabled by OAUTH_ENABLED=false" };
+      return authError(set, 503, "OAUTH_DISABLED", "OAuth disabled by OAUTH_ENABLED=false");
     }
     const code = String((query as any)?.code ?? "");
     const state = String((query as any)?.state ?? "");
 
     if (!code || !state) {
-      set.status = 400;
-      return { error: "Missing code or state" };
+      return authError(set, 400, "BAD_REQUEST", "Missing code or state");
     }
-    const oauthCookie = decodeStateCookie(parseCookieHeader(headers["cookie"])[OAUTH_STATE_COOKIE]);
+    const oauthStateValue = parseCookieHeader(headers["cookie"])[OAUTH_STATE_COOKIE];
+    const oauthCookie = decodeStateCookie(oauthStateValue);
     if (!oauthCookie || oauthCookie.state !== state) {
-      console.warn("[auth.callback] invalid_state", {
-        hasCookieHeader: Boolean(headers["cookie"]),
-        hasOauthStateCookie: Boolean(parseCookieHeader(headers["cookie"])[OAUTH_STATE_COOKIE]),
+      logAuthEvent("invalid_state", {
         stateLength: state.length,
-        host: headers["host"] ?? "",
-        forwardedProto: headers["x-forwarded-proto"] ?? "",
-        origin: headers["origin"] ?? "",
-        referer: headers["referer"] ?? "",
-        cookieDomain: appConfig.cookieDomain,
-        cookieSecure: appConfig.cookieSecure,
+        hasOauthStateCookie: Boolean(oauthStateValue),
+        ...readCookieDebugInfo(headers),
       });
-      set.status = 400;
-      return { error: "Invalid or expired state" };
+      if (shouldPreferHtmlRedirect(headers)) {
+        const redirectUrl = new URL(`${FRONTEND_URL}/me`);
+        redirectUrl.searchParams.set("auth", "failed");
+        set.status = 302;
+        set.redirect = redirectUrl.toString();
+        return;
+      }
+      return authError(set, 400, "INVALID_STATE", "Invalid or expired state");
     }
     clearOauthStateCookie(set);
 
@@ -222,8 +257,7 @@ export const casdoorAuthPlugin = new Elysia({ prefix: "/api/auth" })
       }
 
       if (!user) {
-        set.status = 500;
-        return { error: "Failed to create demo user" };
+        return authError(set, 500, "DEMO_USER_CREATE_FAILED", "Failed to create demo user");
       }
 
       const jwt = signJwt({
@@ -251,14 +285,12 @@ export const casdoorAuthPlugin = new Elysia({ prefix: "/api/auth" })
 
     const tokenRes = await exchangeCodeForToken(code, oauthCookie.codeVerifier);
     if (!tokenRes) {
-      set.status = 400;
-      return { error: "Failed to exchange code for token" };
+      return authError(set, 400, "TOKEN_EXCHANGE_FAILED", "Failed to exchange code for token");
     }
 
     const casdoorUser = await fetchCasdoorUser(tokenRes.access_token);
     if (!casdoorUser) {
-      set.status = 400;
-      return { error: "Failed to fetch user info" };
+      return authError(set, 400, "USERINFO_FETCH_FAILED", "Failed to fetch user info");
     }
 
     const account = casdoorUser.data ?? casdoorUser;
@@ -279,8 +311,7 @@ export const casdoorAuthPlugin = new Elysia({ prefix: "/api/auth" })
     const stcnUsername = readString(account?.name, account?.username, account?.preferred_username);
 
     if (!casdoorId) {
-      set.status = 400;
-      return { error: "Invalid user info from Casdoor" };
+      return authError(set, 400, "INVALID_USERINFO", "Invalid user info from Casdoor");
     }
 
     let user = await findUserByCasdoorId(casdoorId);
@@ -307,8 +338,7 @@ export const casdoorAuthPlugin = new Elysia({ prefix: "/api/auth" })
     }
 
     if (!user) {
-      set.status = 500;
-      return { error: "Failed to create or update user" };
+      return authError(set, 500, "USER_UPSERT_FAILED", "Failed to create or update user");
     }
 
     const jwt = signJwt({
@@ -340,20 +370,17 @@ export const casdoorAuthPlugin = new Elysia({ prefix: "/api/auth" })
     const bearerMatch = authHeader.match(/^Bearer\s+(.+)$/i);
     const token = cookies[appConfig.sessionCookieName] || bearerMatch?.[1];
     if (!token) {
-      set.status = 401;
-      return { error: "Unauthorized" };
+      return authError(set, 401, "UNAUTHORIZED", "Unauthorized");
     }
 
     const { verifyJwt } = await import("../utils/jwt");
     const { findLocalAccountByUsername } = await import("../services/localAccounts");
     const payload = verifyJwt(token);
     if (!payload) {
-      set.status = 401;
-      return { error: "Invalid token" };
+      return authError(set, 401, "INVALID_TOKEN", "Invalid token");
     }
     if (!payload.name) {
-      set.status = 401;
-      return { error: "Invalid token" };
+      return authError(set, 401, "INVALID_TOKEN", "Invalid token");
     }
 
     const subject = payload.sub;
@@ -381,8 +408,7 @@ export const casdoorAuthPlugin = new Elysia({ prefix: "/api/auth" })
             })();
 
     if (!user || !user.is_active) {
-      set.status = 401;
-      return { error: "User not found or inactive" };
+      return authError(set, 401, "UNAUTHORIZED", "User not found or inactive");
     }
 
     const capInfo = await getUserCapabilitiesWithInfo(user.id, user.name);
@@ -403,10 +429,14 @@ export const casdoorAuthPlugin = new Elysia({ prefix: "/api/auth" })
       capabilities: capInfo.capabilities,
     };
   })
-  .post("/logout", async ({ user, set }) => {
+  .post("/logout", async ({ user, set, headers }) => {
     if (user?.id && !String(user.id).startsWith("local:") && !String(user.id).startsWith("token:")) {
       await bumpUserTokenVersion(user.id).catch(() => {});
     }
     clearSessionCookie(set);
+    logAuthEvent("logout", {
+      userId: user?.id ?? null,
+      ...readCookieDebugInfo(headers),
+    });
     return { success: true };
   });

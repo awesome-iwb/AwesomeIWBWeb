@@ -65,6 +65,7 @@ export async function listMediaAssets(
     status?: string;
     mime?: string;
     source?: string;
+    tag?: string;
   },
   pagination: { page?: number; pageSize?: number },
 ) {
@@ -80,6 +81,9 @@ export async function listMediaAssets(
   if (filters.status) whereParts.push(db`status = ${filters.status}`);
   if (filters.mime) whereParts.push(db`mime = ${filters.mime}`);
   if (filters.source) whereParts.push(db`source = ${filters.source}`);
+  if (filters.tag) {
+    whereParts.push(db`id in (select media_id from media_tags where tag = ${filters.tag})`);
+  }
   const where = whereParts.length ? db.join(whereParts, db` and `) : db`true`;
 
   const items = await db<MediaAsset[]>`
@@ -126,4 +130,44 @@ export async function restoreMedia(mediaId: string): Promise<MediaAsset | null> 
     returning id, sha256, storage_key, url, mime, size, width, height, source, uploader_id, status, created_at, deleted_at, last_referenced_at
   `;
   return row ?? null;
+}
+
+export async function getMediaTags(mediaId: string): Promise<string[]> {
+  if (!dbEnabled) return [];
+  const rows = await sql()<Array<{ tag: string }>>`
+    select tag from media_tags where media_id = ${mediaId} order by tag
+  `;
+  return rows.map(r => r.tag);
+}
+
+export async function setMediaTags(mediaId: string, tags: string[]): Promise<string[]> {
+  if (!dbEnabled) return [];
+  await sql()`delete from media_tags where media_id = ${mediaId}`;
+  if (tags.length === 0) return [];
+  for (const tag of tags) {
+    await sql()`insert into media_tags (media_id, tag) values (${mediaId}, ${tag}) on conflict do nothing`;
+  }
+  return tags;
+}
+
+export async function batchTagMedia(mediaIds: string[], tagsToAdd: string[], tagsToRemove: string[]): Promise<void> {
+  if (!dbEnabled) return;
+  for (const mid of mediaIds) {
+    for (const tag of tagsToRemove) {
+      await sql()`delete from media_tags where media_id = ${mid} and tag = ${tag}`;
+    }
+    for (const tag of tagsToAdd) {
+      await sql()`insert into media_tags (media_id, tag) values (${mid}, ${tag}) on conflict do nothing`;
+    }
+  }
+}
+
+export async function batchSoftDeleteMedia(mediaIds: string[]): Promise<number> {
+  if (!dbEnabled) return 0;
+  let count = 0;
+  for (const mid of mediaIds) {
+    const result = await sql()`update media_assets set status = 'deleted', deleted_at = coalesce(deleted_at, now()) where id = ${mid} and status = 'active'`;
+    count += (result as any).rowCount ?? 0;
+  }
+  return count;
 }

@@ -1,6 +1,5 @@
 {
   "permissions": {
-    "defaultMode": "dontAsk",
     "allow": [
       "Bash(bun run *)",
       "Bash(ssh -V)",
@@ -20,7 +19,9 @@
       "Bash(where *)",
       "Bash(node *)",
       "Bash(docker *)",
-      "Bash(curl *)"
-    ]
+      "Bash(curl *)",
+      "Bash(python -)"
+    ],
+    "defaultMode": "bypassPermissions"
   }
 }

@@ -12,6 +12,8 @@ import {
   X
 } from 'lucide-vue-next';
 import ImageCropper from '../components/ImageCropper.vue';
+import { formatApiError, readJsonOrThrow, useApi } from '../composables/useApi';
+import { API } from '../api/endpoints';
 
 useHead({
   title: '提交新项目 - Awesome IWB',
@@ -28,6 +30,8 @@ useHead({
     { rel: 'canonical', href: 'https://aiwb.stcn.moe/submit' }
   ]
 })
+
+const { apiFetch } = useApi();
 
 const form = ref({
   name: '',
@@ -47,7 +51,7 @@ const isSubmitted = ref(false);
 const categories = ref<string[]>([]);
 onMounted(async () => {
   try {
-    const res = await fetch('/api/categories');
+    const res = await apiFetch(API.catalog.categories);
     if (!res.ok) return;
     const json = await res.json();
     categories.value = (json ?? []).map((c: any) => c.name).filter(Boolean);
@@ -70,7 +74,7 @@ const submissionId = ref('');
 const uploadImage = async (blob: Blob): Promise<string | null> => {
   const fd = new FormData();
   fd.append('image', blob, 'upload.webp');
-  const res = await fetch('/api/upload', { method: 'POST', body: fd, credentials: 'include' });
+  const res = await apiFetch(API.upload.image, { method: 'POST', body: fd });
   const json = await res.json();
   if (!res.ok) throw new Error(json?.error ?? '上传失败');
   return String(json?.url ?? '');
@@ -154,7 +158,7 @@ const handleSubmit = async () => {
     if (iconUrl.value) payload.icon_url = iconUrl.value;
     if (bannerUrl.value) payload.banner_url = bannerUrl.value;
 
-    const response = await fetch('/api/submissions', {
+    const response = await apiFetch(API.submissions.list, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -162,16 +166,15 @@ const handleSubmit = async () => {
       body: JSON.stringify(payload)
     });
     
-    const result = await response.json();
-    
-    if (response.ok && result.success) {
+    const result = await readJsonOrThrow<any>(response);
+    if (result.success) {
       isSubmitted.value = true;
       submissionId.value = result.submissionId || '';
     } else {
-      submitError.value = result.error || '提交失败，请重试。';
+      submitError.value = '提交失败，请重试。';
     }
-  } catch (error: any) {
-    submitError.value = error.message || '网络错误，请检查后端服务。';
+  } catch (error: unknown) {
+    submitError.value = formatApiError(error, '网络错误，请检查后端服务。');
   } finally {
     isSubmitting.value = false;
   }

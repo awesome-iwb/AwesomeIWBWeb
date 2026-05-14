@@ -1,6 +1,35 @@
 import { computed, ref } from 'vue';
+import { API } from '../api/endpoints';
+import { ApiError, readJsonOrThrow, useApi } from './useApi';
 
 type AuthRole = 'user' | 'dev' | 'ops';
+
+type AuthMeResponse = {
+  user?: {
+    id?: string;
+    name?: string;
+    avatar_url?: string;
+    avatar_source?: 'casdoor' | 'upload' | 'default';
+    email?: string;
+    stcn_user_id?: string;
+    stcn_username?: string;
+    hzzc_user_id?: string;
+  };
+  capabilities?: string[];
+  is_superadmin?: boolean;
+};
+
+type LoginResponse = {
+  token?: string;
+};
+
+type AuthorizeUrlResponse = {
+  authorizeUrl?: string;
+};
+
+type UploadAvatarResponse = {
+  url?: string;
+};
 
 function inferRoleFromCapabilities(capabilities: string[] | undefined, isSuperadmin: boolean | undefined): AuthRole {
   if (isSuperadmin) return 'ops';
@@ -15,7 +44,6 @@ export type AuthUser = {
   name: string;
   avatarUrl: string;
   avatar_source?: 'casdoor' | 'upload' | 'default';
-  /** Display label only - not used for permission checks. Use hasCapability() instead. */
   role: AuthRole;
   stcn_user_id: string;
   stcn_username?: string;
@@ -29,6 +57,7 @@ export type AuthUser = {
 };
 
 const STORAGE_KEY = 'awesome_iwb_auth';
+const PROFILE_CONFIRMED_PREFIX = 'awesome_iwb_profile_confirmed:';
 
 const user = ref<AuthUser | null>(null);
 const token = ref<string | null>(null);
@@ -38,9 +67,7 @@ const loadFromStorage = () => {
   if (typeof window === 'undefined') return;
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      user.value = JSON.parse(raw);
-    }
+    if (raw) user.value = JSON.parse(raw);
   } catch {}
 };
 
@@ -49,6 +76,32 @@ const loadOnce = () => {
   ready.value = true;
   if (typeof window === 'undefined') return;
   loadFromStorage();
+};
+
+const getProfileConfirmedKey = (identity: { id?: string; name?: string } | null | undefined): string | null => {
+  const id = String(identity?.id ?? '').trim();
+  if (id) return `${PROFILE_CONFIRMED_PREFIX}${id}`;
+  const name = String(identity?.name ?? '').trim();
+  if (name) return `${PROFILE_CONFIRMED_PREFIX}name:${name.toLowerCase()}`;
+  return null;
+};
+
+const readProfileConfirmed = (identity: { id?: string; name?: string } | null | undefined): boolean => {
+  if (typeof window === 'undefined') return false;
+  const key = getProfileConfirmedKey(identity);
+  if (!key) return false;
+  return localStorage.getItem(key) === '1';
+};
+
+const writeProfileConfirmed = (identity: { id?: string; name?: string } | null | undefined, value: boolean) => {
+  if (typeof window === 'undefined') return;
+  const key = getProfileConfirmedKey(identity);
+  if (!key) return;
+  if (value) {
+    localStorage.setItem(key, '1');
+  } else {
+    localStorage.removeItem(key);
+  }
 };
 
 const persist = () => {
@@ -65,10 +118,10 @@ const persist = () => {
 export const useAuth = () => {
   loadOnce();
 
+  const { apiFetch } = useApi();
+
   const isAuthenticated = computed(() => Boolean(user.value));
-
   const isSuperadmin = computed(() => user.value?.is_superadmin === true);
-
   const capabilities = computed(() => user.value?.capabilities ?? []);
 
   const hasCapability = (cap: string) => {
@@ -80,7 +133,7 @@ export const useAuth = () => {
   const setToken = (newToken: string, newUser?: Partial<AuthUser>) => {
     token.value = newToken;
     if (newUser) {
-      user.value = {
+      const nextUser = {
         name: newUser.name ?? user.value?.name ?? '',
         avatarUrl: newUser.avatarUrl ?? newUser.avatar_url ?? user.value?.avatarUrl ?? '/assets/people/placeholder.svg',
         avatar_source: newUser.avatar_source ?? user.value?.avatar_source ?? 'default',
@@ -92,10 +145,19 @@ export const useAuth = () => {
         email: newUser.email ?? user.value?.email,
         is_superadmin: newUser.is_superadmin ?? user.value?.is_superadmin ?? false,
         capabilities: newUser.capabilities ?? user.value?.capabilities ?? [],
-        profileConfirmed: newUser.profileConfirmed ?? user.value?.profileConfirmed ?? false,
         binding_confirmed_at: newUser.binding_confirmed_at ?? user.value?.binding_confirmed_at,
+      } satisfies Omit<AuthUser, 'profileConfirmed'>;
+      user.value = {
+        ...nextUser,
+        profileConfirmed: readProfileConfirmed(nextUser),
       };
     }
+    persist();
+  };
+
+  const clearLocalAuthState = () => {
+    user.value = null;
+    token.value = null;
     persist();
   };
 
@@ -111,14 +173,9 @@ export const useAuth = () => {
     persist();
   };
 
-  const clearLocalAuthState = () => {
-    user.value = null;
-    token.value = null;
-    persist();
-  };
-
   const markProfileConfirmed = () => {
     if (!user.value) return;
+    writeProfileConfirmed(user.value, true);
     user.value = {
       ...user.value,
       profileConfirmed: true,
@@ -127,110 +184,99 @@ export const useAuth = () => {
     persist();
   };
 
-  const logout = async () => {
+  const logout = async (): Promise<boolean> => {
     try {
-      await fetch('/api/auth/logout', {
-        method: 'POST',
-        credentials: 'include',
-      });
+      await apiFetch(API.auth.logout, { method: 'POST', credentials: 'include' });
     } catch {}
-    clearLocalAuthState();
+    const stillAuthed = await fetchUser();
+    return !stillAuthed;
   };
-
 
   const fetchUser = async (): Promise<boolean> => {
     try {
-      const res = await fetch('/api/auth/me', {
-        credentials: 'include'
-      });
-      if (!res.ok) {
+      const res = await apiFetch(API.auth.me);
+      const json = await readJsonOrThrow<AuthMeResponse>(res);
+      if (!json.user) {
         clearLocalAuthState();
         return false;
       }
-      const text = await res.text();
-      if (!text) return false;
-      const json = JSON.parse(text);
-      if (json.user) {
-        const caps = json.capabilities ?? [];
-        const isSuper = json.is_superadmin ?? false;
-        user.value = {
-          id: json.user.id,
-          name: json.user.name,
-          role: inferRoleFromCapabilities(caps, isSuper),
-          avatarUrl: json.user.avatar_url || '/assets/people/placeholder.svg',
-          avatar_url: json.user.avatar_url,
-          avatar_source: json.user.avatar_source || 'default',
-          email: json.user.email,
-          stcn_user_id: json.user.stcn_user_id,
-          stcn_username: json.user.stcn_username,
-          hzzc_user_id: json.user.hzzc_user_id,
-          is_superadmin: isSuper,
-          capabilities: caps,
-          profileConfirmed: user.value?.profileConfirmed ?? false,
-          binding_confirmed_at: user.value?.binding_confirmed_at,
-        };
-        persist();
-        return true;
-      }
+
+      const caps = Array.isArray(json.capabilities) ? json.capabilities : [];
+      const isSuper = json.is_superadmin === true;
+
+      const nextUser = {
+        id: json.user.id,
+        name: json.user.name ?? '',
+        role: inferRoleFromCapabilities(caps, isSuper),
+        avatarUrl: json.user.avatar_url || '/assets/people/placeholder.svg',
+        avatar_url: json.user.avatar_url,
+        avatar_source: json.user.avatar_source || 'default',
+        email: json.user.email,
+        stcn_user_id: json.user.stcn_user_id ?? '',
+        stcn_username: json.user.stcn_username,
+        hzzc_user_id: json.user.hzzc_user_id ?? '',
+        is_superadmin: isSuper,
+        capabilities: caps,
+        binding_confirmed_at: user.value?.binding_confirmed_at,
+      } satisfies Omit<AuthUser, 'profileConfirmed'>;
+      user.value = {
+        ...nextUser,
+        profileConfirmed: readProfileConfirmed(nextUser),
+      };
+      persist();
+      return true;
+    } catch {
+      clearLocalAuthState();
       return false;
+    }
+  };
+
+  const getCasdoorAuthorizeUrl = async (returnTo?: string): Promise<string> => {
+    const params = new URLSearchParams();
+    if (returnTo) params.set('returnTo', returnTo);
+    // Frontend only supports popup OAuth flow; always request popup callback mode.
+    params.set('popup', '1');
+
+    const url = `${API.auth.login}${params.toString() ? `?${params.toString()}` : ''}`;
+    const res = await apiFetch(url);
+    const json = await readJsonOrThrow<AuthorizeUrlResponse>(res);
+    if (!json.authorizeUrl) {
+      throw new ApiError('登录服务未返回授权地址', 502, 'MISSING_AUTHORIZE_URL');
+    }
+    return String(json.authorizeUrl);
+  };
+
+  const loginWithPassword = async (username: string, password: string): Promise<boolean> => {
+    try {
+      const res = await apiFetch(API.auth.login, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ username, password }),
+      });
+      const json = await readJsonOrThrow<LoginResponse>(res);
+      if (!json.token) return false;
+      setToken(json.token);
+      return await fetchUser();
     } catch {
       return false;
     }
   };
 
-  const getCasdoorAuthorizeUrl = async (returnTo?: string, popup = false): Promise<string> => {
-    const params = new URLSearchParams();
-    if (returnTo) params.set('returnTo', returnTo);
-    if (popup) params.set('popup', '1');
-    const url = `/api/auth/login${params.toString() ? '?' + params.toString() : ''}`;
-    const res = await fetch(url);
-    const text = await res.text();
-    if (!res.ok) {
-      throw new Error(text || `登录服务不可用 (${res.status})`);
-    }
-    if (!text) {
-      throw new Error('登录服务返回空响应');
-    }
-    const json = JSON.parse(text);
-    if (!json.authorizeUrl) {
-      throw new Error('登录服务未返回授权地址');
-    }
-    return String(json.authorizeUrl);
-  };
-
-  const loginWithCasdoor = async (returnTo?: string) => {
-    const authorizeUrl = await getCasdoorAuthorizeUrl(returnTo, false);
-    window.location.href = authorizeUrl;
-  };
-
-  const loginWithPassword = async (username: string, password: string): Promise<boolean> => {
-    const res = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ username, password })
-    });
-    if (!res.ok) return false;
-    const json = await res.json();
-    if (!json?.token) return false;
-    setToken(json.token);
-    return await fetchUser();
-  };
-
   const handleCallback = async (code: string, state: string): Promise<boolean> => {
     try {
-      const res = await fetch(`/api/auth/callback?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}`, {
-        credentials: 'include'
-      });
+      const res = await apiFetch(`${API.auth.callback}?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}`);
       const text = await res.text();
       if (!res.ok) return false;
+
       if (text) {
-        const json = JSON.parse(text);
+        const json = JSON.parse(text) as LoginResponse;
         if (json.token) {
           setToken(json.token);
           return await fetchUser();
         }
       }
+
       return await fetchUser();
     } catch {
       return false;
@@ -241,13 +287,12 @@ export const useAuth = () => {
     try {
       const formData = new FormData();
       formData.append('image', file);
-      const res = await fetch('/api/user/avatar', {
+      const res = await apiFetch(API.auth.userAvatar, {
         method: 'POST',
         credentials: 'include',
         body: formData,
       });
-      if (!res.ok) return null;
-      const json = await res.json();
+      const json = await readJsonOrThrow<UploadAvatarResponse>(res);
       if (json.url) {
         updateUser({
           avatarUrl: json.url,
@@ -271,7 +316,6 @@ export const useAuth = () => {
     hasCapability,
     loginWithPassword,
     getCasdoorAuthorizeUrl,
-    loginWithCasdoor,
     handleCallback,
     fetchUser,
     setToken,

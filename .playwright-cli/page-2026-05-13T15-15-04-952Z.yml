@@ -1,0 +1,41 @@
+- generic [ref=e3]:
+  - generic [ref=e6]:
+    - button "返回登录页" [ref=e7]:
+      - img [ref=e8]
+      - text: 返回登录页
+    - generic [ref=e10]:
+      - generic [ref=e11]:
+        - img [ref=e13]
+        - generic [ref=e15]:
+          - heading "超级管理员登录" [level=1] [ref=e16]
+          - paragraph [ref=e17]: 应急登录通道 · 仅限运维人员
+      - paragraph [ref=e18]: 当智教联盟登录系统不可用时，可使用此应急通道登录运维后台。
+      - generic [ref=e19]:
+        - generic [ref=e20]:
+          - generic [ref=e21]: 用户名
+          - textbox "管理员账号" [ref=e22]
+        - generic [ref=e23]:
+          - generic [ref=e24]: 密码
+          - generic [ref=e25]:
+            - textbox "请输入密码" [ref=e26]
+            - button [ref=e27]:
+              - img [ref=e28]
+        - button "登录运维后台" [ref=e31]:
+          - img [ref=e32]
+          - text: 登录运维后台
+      - paragraph [ref=e36]: 此登录方式仅用于应急场景。正常使用请通过智教联盟账号登录。
+  - contentinfo [ref=e37]:
+    - generic [ref=e38]:
+      - generic [ref=e39]:
+        - link "汇智卓创" [ref=e40] [cursor=pointer]:
+          - /url: "#"
+          - img "汇智卓创" [ref=e42]
+        - link "智教联盟" [ref=e43] [cursor=pointer]:
+          - /url: "#"
+          - img "智教联盟" [ref=e45]
+        - link "Awesome-IWB Icon aiwb-logo" [ref=e46] [cursor=pointer]:
+          - /url: "#"
+          - generic [ref=e48]:
+            - img "Awesome-IWB Icon" [ref=e49]
+            - img "aiwb-logo" [ref=e51]
+      - generic [ref=e52]: © 2026 Awesome IWB

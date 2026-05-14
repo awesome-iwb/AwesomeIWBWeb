@@ -14,7 +14,7 @@ export function normalizeProjectTags<T extends Record<string, any>>(project: T):
     merged.push(t);
   }
 
-  const keywords = merged.length > 0 ? merged : (Array.isArray(project.keywords) ? project.keywords : []);
+  const keywords = merged;
 
   return { ...project, keywords } as T;
 }

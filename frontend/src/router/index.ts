@@ -5,7 +5,7 @@ import ProjectDetailView from '../views/ProjectDetailView.vue'
 import SubmitProjectView from '../views/SubmitProjectView.vue'
 import CompareView from '../views/CompareView.vue'
 import FeaturedView from '../views/FeaturedView.vue'
-import AdminView from '../views/AdminView.vue'
+import AdminLayout from '../views/admin/AdminLayout.vue'
 import AboutView from '../views/AboutView.vue'
 import MeView from '../views/MeView.vue'
 import AdminLoginView from '../views/AdminLoginView.vue'
@@ -24,9 +24,20 @@ export const routes: RouteRecordRaw[] = [
   },
   {
     path: '/admin',
-    name: 'admin',
-    component: AdminView,
-    meta: { showNavBar: false, requiresAuth: true, requiresCapability: 'admin_panel_access' }
+    component: AdminLayout,
+    meta: { requiresAuth: true, requiresCapability: 'admin_panel_access' },
+    children: [
+      { path: '', redirect: '/admin/dashboard' },
+      { path: 'dashboard', name: 'admin-dashboard', component: () => import('../views/admin/DashboardView.vue'), meta: { title: '总览' } },
+      { path: 'stories', name: 'admin-stories', component: () => import('../views/admin/StoriesView.vue'), meta: { title: '文章管理', requiresCapability: 'story:manage' } },
+      { path: 'projects', name: 'admin-projects', component: () => import('../views/admin/ProjectsView.vue'), meta: { title: '项目管理', requiresCapability: 'project:read' } },
+      { path: 'submissions', name: 'admin-submissions', component: () => import('../views/admin/SubmissionsView.vue'), meta: { title: '项目审核', requiresCapability: 'submission:read' } },
+      { path: 'moderation', name: 'admin-moderation', component: () => import('../views/admin/ModerationView.vue'), meta: { title: '内容审核', requiresCapability: 'moderation:read' } },
+      { path: 'feedback', name: 'admin-feedback', component: () => import('../views/admin/FeedbackView.vue'), meta: { title: '评论反馈', requiresCapability: 'feedback:manage' } },
+      { path: 'users', name: 'admin-users', component: () => import('../views/admin/UsersView.vue'), meta: { title: '用户权限', requiresCapability: 'user:read' } },
+      { path: 'media', name: 'admin-media', component: () => import('../views/admin/MediaView.vue'), meta: { title: '图床管理', requiresCapability: 'media:read' } },
+      { path: 'audit', name: 'admin-audit', component: () => import('../views/admin/AuditView.vue'), meta: { title: '审计日志', requiresCapability: 'audit:read' } },
+    ],
   },
   {
     path: '/dontusejy',
@@ -144,7 +155,7 @@ export function setupRouterGuard(router: Router) {
     if ((to.meta as any)?.requiresAuth && !isAuthenticated.value) {
       return { path: '/me', query: { redirect: to.fullPath } };
     }
-    const capability = (to.meta as any)?.requiresCapability;
+    const capability = (to.meta as any)?.requiresCapability || (to.matched.find(r => (r.meta as any)?.requiresCapability)?.meta as any)?.requiresCapability;
     if (capability) {
       const allowed = await ensureCapabilityLoaded(capability);
       if (!allowed) return { path: '/me', query: { redirect: to.fullPath } };

@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { Elysia, t } from "elysia";
 import { signJwt } from "../utils/jwt";
 import {
@@ -16,6 +17,18 @@ import { setSessionCookie } from "../utils/cookies";
 
 const dbEnabled = Boolean(process.env.DATABASE_URL);
 const SUPERADMIN_INITIAL_USERNAME = (process.env.SUPERADMIN_INITIAL_USERNAME ?? "lincube").trim();
+
+function applyAuthNoStore(set: any) {
+  set.headers["cache-control"] = "private, no-store";
+  set.headers["vary"] = "Cookie, Authorization";
+}
+
+function authError(set: any, status: number, code: string, message: string) {
+  const traceId = randomUUID();
+  set.status = status;
+  applyAuthNoStore(set);
+  return { error: { code, message, traceId } };
+}
 
 // Simple in-memory rate limiter per IP
 const ipAttempts = new Map<string, { count: number; resetAt: number }>();
@@ -97,6 +110,7 @@ export const localAuthPlugin = new Elysia({ prefix: "/api/auth" })
   .post(
     "/login",
     async ({ body, set, headers }) => {
+      applyAuthNoStore(set);
       await ensureSuperadminInitialized(String(body.username ?? "").trim());
 
       cleanOldIpAttempts();
@@ -110,14 +124,14 @@ export const localAuthPlugin = new Elysia({ prefix: "/api/auth" })
         set.status = 429;
         set.headers["retry-after"] = String(Math.ceil(IP_WINDOW_MS / 1000));
         await logAttempt({ ip: clientIp, ua, username, status: "locked", reason: "ip_rate_limited" });
-        return { error: { code: "RATE_LIMITED", message: "登录失败" } };
+        return authError(set, 429, "RATE_LIMITED", "登录失败");
       }
 
       if (shouldLockSuperadmin()) {
         set.status = 429;
         set.headers["retry-after"] = "1800";
         await logAttempt({ ip: clientIp, ua, username, status: "locked", reason: "superadmin_global_lock" });
-        return { error: { code: "RATE_LIMITED", message: "登录失败" } };
+        return authError(set, 429, "RATE_LIMITED", "登录失败");
       }
 
       const account = await findLocalAccountByUsername(username);
@@ -127,20 +141,20 @@ export const localAuthPlugin = new Elysia({ prefix: "/api/auth" })
         await dummyVerifyPassword(password);
         await logAttempt({ ip: clientIp, ua, username, status: "failed", reason: "not_found" });
         set.status = 401;
-        return { error: { code: "AUTH_FAILED", message: "登录失败" } };
+        return authError(set, 401, "AUTH_FAILED", "登录失败");
       }
 
       if (!account.is_active) {
         set.status = 403;
         await logAttempt({ ip: clientIp, ua, username, status: "failed", reason: "disabled" });
-        return { error: { code: "AUTH_FAILED", message: "登录失败" } };
+        return authError(set, 401, "AUTH_FAILED", "登录失败");
       }
 
       if (isAccountLocked(account)) {
         set.status = 429;
         set.headers["retry-after"] = "1800";
         await logAttempt({ ip: clientIp, ua, username, status: "locked", reason: "account_locked" });
-        return { error: { code: "RATE_LIMITED", message: "登录失败" } };
+        return authError(set, 429, "RATE_LIMITED", "登录失败");
       }
 
       // Gate: only users whose role is 'ops' (in users table) may use password
@@ -153,7 +167,7 @@ export const localAuthPlugin = new Elysia({ prefix: "/api/auth" })
         await dummyVerifyPassword(password);
         await logAttempt({ ip: clientIp, ua, username, status: "failed", reason: "not_ops_role" });
         set.status = 403;
-        return { error: { code: "LOCAL_LOGIN_NOT_ALLOWED", message: "登录失败" } };
+        return authError(set, 403, "LOCAL_LOGIN_NOT_ALLOWED", "登录失败");
       }
 
       const isValid = await verifyLocalPassword(account, password);
@@ -163,7 +177,7 @@ export const localAuthPlugin = new Elysia({ prefix: "/api/auth" })
         await recordLoginFailure(account.id);
         await logAttempt({ ip: clientIp, ua, username, status: "failed", reason: "wrong_password" });
         set.status = 401;
-        return { error: { code: "AUTH_FAILED", message: "登录失败" } };
+        return authError(set, 401, "AUTH_FAILED", "登录失败");
       }
 
       // Success
@@ -200,9 +214,10 @@ export const localAuthPlugin = new Elysia({ prefix: "/api/auth" })
     }
   )
   .post("/refresh", async ({ user, set }) => {
+    applyAuthNoStore(set);
     if (!user) {
       set.status = 401;
-      return { error: { code: "UNAUTHORIZED", message: "登录失败" } };
+      return authError(set, 401, "UNAUTHORIZED", "登录失败");
     }
     const jwt = signJwt({
       sub: String(user.id),
@@ -216,28 +231,29 @@ export const localAuthPlugin = new Elysia({ prefix: "/api/auth" })
   .post(
     "/superadmin/change-password",
     async ({ body, headers, set }) => {
+      applyAuthNoStore(set);
       const authHeader = headers["authorization"] ?? "";
       const match = authHeader.match(/^Bearer\s+(.+)$/i);
       if (!match) {
         set.status = 401;
-        return { error: { code: "UNAUTHORIZED", message: "登录失败" } };
+        return authError(set, 401, "UNAUTHORIZED", "登录失败");
       }
       const { verifyJwt } = await import("../utils/jwt");
       const payload = verifyJwt(match[1]);
       if (!payload || !payload.name) {
         set.status = 403;
-        return { error: { code: "FORBIDDEN", message: "登录失败" } };
+        return authError(set, 403, "FORBIDDEN", "登录失败");
       }
       const username = payload.name;
       const account = await findLocalAccountByUsername(username);
       if (!account) {
         set.status = 404;
-        return { error: { code: "NOT_FOUND", message: "登录失败" } };
+        return authError(set, 404, "NOT_FOUND", "登录失败");
       }
       const ok = await verifyLocalPassword(account, String(body.currentPassword ?? ""));
       if (!ok) {
         set.status = 401;
-        return { error: { code: "AUTH_FAILED", message: "登录失败" } };
+        return authError(set, 401, "AUTH_FAILED", "登录失败");
       }
       await setLocalAccountPassword(username, String(body.newPassword ?? ""), false);
       await logAudit({
@@ -256,6 +272,7 @@ export const localAuthPlugin = new Elysia({ prefix: "/api/auth" })
     }
   )
   .get("/local/status", async ({ set }) => {
+    applyAuthNoStore(set);
     return {
       enabled: true,
       message: "Local auth is enabled",

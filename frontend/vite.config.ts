@@ -126,6 +126,33 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
+      injectRegister: 'auto',
+      workbox: {
+        cleanupOutdatedCaches: true,
+        clientsClaim: true,
+        skipWaiting: true,
+        navigateFallbackDenylist: [/^\/api\//],
+        runtimeCaching: [
+          {
+            urlPattern: ({ url }) => url.pathname.startsWith('/api/auth/') || url.pathname.startsWith('/api/feedback'),
+            handler: 'NetworkOnly',
+            method: 'GET'
+          },
+          {
+            urlPattern: ({ url }) => url.pathname === '/api/stories' || url.pathname === '/api/projects',
+            handler: 'NetworkFirst',
+            method: 'GET',
+            options: {
+              cacheName: 'api-revalidate-cache',
+              expiration: {
+                maxEntries: 20,
+                maxAgeSeconds: 120
+              },
+              networkTimeoutSeconds: 3
+            }
+          }
+        ]
+      },
       manifest: {
         name: 'Awesome IWB',
         short_name: 'AIWB',

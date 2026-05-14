@@ -15,7 +15,7 @@ useHead({
 
 const router = useRouter();
 const route = useRoute();
-const { user, isAuthenticated, logout, getCasdoorAuthorizeUrl, handleCallback, uploadAvatar, hasCapability, fetchUser } = useAuth();
+const { user, isAuthenticated, logout, getCasdoorAuthorizeUrl, uploadAvatar, hasCapability, fetchUser } = useAuth();
 
 const redirectTo = computed(() => {
   const q = route.query.redirect;
@@ -33,6 +33,7 @@ const goNext = () => router.push(redirectTo.value);
 
 const isLoggingIn = ref(false);
 const loginError = ref('');
+const logoutError = ref('');
 const popupStatus = ref('');
 
 const isUploadingAvatar = ref(false);
@@ -47,55 +48,35 @@ const cropperImageSrc = ref('');
 onMounted(async () => {
   const authSuccess = route.query.auth as string | undefined;
   const returnTo = route.query.returnTo as string | undefined;
+  const nextPath = returnTo && returnTo.startsWith('/') ? returnTo : '/';
+
+  if (authSuccess === 'failed') {
+    loginError.value = '登录未完成，请重试';
+    await router.replace({ path: '/me', query: {} });
+    return;
+  }
 
   if (authSuccess === 'success') {
     isLoggingIn.value = true;
     loginError.value = '';
     try {
-      const { fetchUser, user } = useAuth();
+      const { fetchUser } = useAuth();
       const ok = await fetchUser();
-      if (ok) {
-        await router.replace({ path: '/me', query: {} });
-        const nextPath = returnTo && returnTo.startsWith('/') ? returnTo : '/';
-        if (user.value?.profileConfirmed) {
-          await router.push(nextPath);
-        } else {
-          await router.push({ path: '/auth/result', query: { returnTo: nextPath } });
-        }
+      await router.replace({ path: '/me', query: {} });
+      if (!ok) {
+        loginError.value = '登录状态获取失败，请重试';
         return;
       }
-      loginError.value = '登录状态获取失败，请重试';
-      await router.replace({ path: '/me', query: {} });
-    } catch (e: any) {
-      loginError.value = e?.message || '登录过程中发生错误';
+      await router.push({ path: '/auth/result', query: { returnTo: nextPath } });
+      return;
+    } catch (e: unknown) {
+      loginError.value = e instanceof Error && e.message ? e.message : '登录过程中发生错误';
       await router.replace({ path: '/me', query: {} });
     } finally {
       isLoggingIn.value = false;
     }
   }
 
-  const code = route.query.code as string | undefined;
-  const state = route.query.state as string | undefined;
-
-  if (code && state) {
-    isLoggingIn.value = true;
-    loginError.value = '';
-    try {
-      const success = await handleCallback(code, state);
-      await router.replace({ path: '/me', query: {} });
-      if (success) {
-        await fetchUser();
-        goNext();
-        return;
-      }
-      loginError.value = '登录回调处理失败，请重试';
-    } catch (e: any) {
-      loginError.value = e?.message || '登录过程中发生错误';
-      await router.replace({ path: '/me', query: {} });
-    } finally {
-      isLoggingIn.value = false;
-    }
-  }
 });
 
 const startStcnLogin = async () => {
@@ -113,6 +94,17 @@ const startStcnLogin = async () => {
     }
   };
 
+  const wait = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
+
+  const fetchUserWithRetry = async (attempts = 6, delayMs = 300) => {
+    for (let i = 0; i < attempts; i += 1) {
+      const ok = await fetchUser();
+      if (ok) return true;
+      if (i < attempts - 1) await wait(delayMs);
+    }
+    return false;
+  };
+
   const finishError = (message: string) => {
     stopPoll();
     popupStatus.value = '';
@@ -122,19 +114,21 @@ const startStcnLogin = async () => {
 
   const finishSuccess = async () => {
     stopPoll();
-    popupStatus.value = '';
-    const ok = await fetchUser();
+    popupStatus.value = '正在接收登录数据...';
+    const ok = await fetchUserWithRetry();
     if (!ok) {
-      finishError('登录完成，但读取用户信息失败，请刷新后重试');
+      finishError('登录完成，但接收数据失败，请重试');
       return;
     }
+
+    popupStatus.value = '已成功接收到数据，正在跳转结果页...';
+    await wait(700);
+
     isLoggingIn.value = false;
+    popupStatus.value = '';
+
     const nextPath = redirectTo.value && redirectTo.value.startsWith('/') ? redirectTo.value : '/';
-    if (user.value?.profileConfirmed) {
-      await router.push(nextPath);
-    } else {
-      await router.push({ path: '/auth/result', query: { returnTo: nextPath } });
-    }
+    await router.push({ path: '/auth/result', query: { returnTo: nextPath } });
   };
 
   const onMessage = async (event: MessageEvent) => {
@@ -148,7 +142,6 @@ const startStcnLogin = async () => {
     } catch {}
 
     if (data.success) {
-      popupStatus.value = '正在同步登录状态...';
       await finishSuccess();
       return;
     }
@@ -156,7 +149,7 @@ const startStcnLogin = async () => {
   };
 
   try {
-    const authorizeUrl = await getCasdoorAuthorizeUrl(redirectTo.value || undefined, true);
+    const authorizeUrl = await getCasdoorAuthorizeUrl(redirectTo.value || undefined);
     popup = window.open(authorizeUrl, 'aiwb-auth-popup', 'width=560,height=760,menubar=no,toolbar=no,location=yes,status=no,noopener=no');
     if (!popup) {
       finishError('浏览器拦截了登录弹窗，请允许弹窗后重试');
@@ -171,7 +164,7 @@ const startStcnLogin = async () => {
         stopPoll();
         window.removeEventListener('message', onMessage);
         popupStatus.value = '正在检测登录状态...';
-        const ok = await fetchUser();
+        const ok = await fetchUserWithRetry(2, 250);
         if (ok) {
           await finishSuccess();
         } else {
@@ -236,7 +229,12 @@ const handleCropCancel = () => {
 };
 
 const handleLogout = async () => {
-  await logout();
+  logoutError.value = '';
+  const ok = await logout();
+  if (!ok) {
+    logoutError.value = '退出登录未生效，请稍后重试';
+    return;
+  }
   await router.replace('/me');
 };
 </script>
@@ -321,7 +319,7 @@ const handleLogout = async () => {
           >
             <LogIn v-if="!isLoggingIn" class="w-5 h-5" />
             <span v-if="isLoggingIn" class="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-            {{ isLoggingIn ? '正在跳转登录...' : '使用智教联盟登录' }}
+            {{ isLoggingIn ? '登录处理中...' : '使用智教联盟登录' }}
           </button>
 
           <div class="flex flex-col sm:flex-row gap-3">
@@ -348,6 +346,10 @@ const handleLogout = async () => {
 
         <!-- Logged in -->
         <div v-else class="mt-8 space-y-6">
+          <div v-if="logoutError" class="p-4 rounded-2xl border border-rose-200 dark:border-rose-800 bg-rose-50 dark:bg-rose-500/10 flex items-start gap-3">
+            <AlertCircle class="w-5 h-5 text-rose-500 shrink-0 mt-0.5" />
+            <div class="text-sm text-rose-700 dark:text-rose-300">{{ logoutError }}</div>
+          </div>
           <!-- Profile info card -->
           <div class="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/40 p-4 space-y-3">
             <div class="flex items-center justify-between">

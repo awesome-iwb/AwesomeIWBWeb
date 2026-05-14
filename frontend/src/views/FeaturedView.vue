@@ -4,6 +4,8 @@ import { useRouter } from 'vue-router';
 import { useHead } from '@unhead/vue';
 import { Star, X, Download } from 'lucide-vue-next';
 import DOMPurify from 'dompurify';
+import { useApi } from '../composables/useApi';
+import { API } from '../api/endpoints';
 
 useHead({
   title: '精选推荐 - Awesome IWB',
@@ -42,11 +44,12 @@ const router = useRouter();
 const selectedStory = ref<FeaturedStory | null>(null);
 const isStoryOpen = ref(false);
 
+const { apiFetch } = useApi();
 const stories = ref<FeaturedStory[]>([]);
 
 onMounted(async () => {
   try {
-    const res = await fetch('/api/stories');
+    const res = await apiFetch(API.catalog.stories, { cache: 'no-cache' });
     if (res.ok) {
       stories.value = await res.json();
     }

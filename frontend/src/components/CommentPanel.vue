@@ -7,6 +7,8 @@ import {
   Reply
 } from 'lucide-vue-next';
 import { useAuth } from '../composables/useAuth';
+import { useApi } from '../composables/useApi';
+import { API } from '../api/endpoints';
 import MarkdownIt from 'markdown-it';
 import DOMPurify from 'dompurify';
 
@@ -59,6 +61,7 @@ const props = defineProps<{
 const router = useRouter();
 const route = useRoute();
 const { user, isAuthenticated, hasCapability } = useAuth();
+const { apiFetch } = useApi();
 
 const tab = ref<CommentKind>(props.initialTab ?? 'comment');
 watch(() => props.initialTab, (v) => { if (v) tab.value = v; });
@@ -107,8 +110,8 @@ const fetchEntries = async () => {
   isLoadingEntries.value = true;
   loadError.value = '';
   try {
-    const url = `/api/feedback?project_name=${encodeURIComponent(props.projectName)}`;
-    const res = await fetch(url);
+    const url = `${API.feedback.list}?project_name=${encodeURIComponent(props.projectName)}`;
+    const res = await apiFetch(url);
     const json = await res.json();
     if (!res.ok) throw new Error(json?.error ?? 'load failed');
     const list = Array.isArray(json) ? json : Array.isArray(json?.items) ? json.items : [];
@@ -185,7 +188,7 @@ const toggleIssueLabel = (labelId: string) => {
 const setIssueLabels = async (id: string, labels: string[]) => {
   if (!requireLogin()) return;
   try {
-    const res = await fetch(`/api/feedback/${encodeURIComponent(id)}`, {
+    const res = await apiFetch(API.feedback.detail(id), {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ labels })
@@ -270,7 +273,7 @@ const onImage = (target: 'comment' | 'issue') => {
 const uploadImage = async (file: File) => {
   const fd = new FormData();
   fd.append('image', file);
-  const res = await fetch('/api/upload', { method: 'POST', body: fd });
+  const res = await apiFetch(API.upload.image, { method: 'POST', body: fd });
   const json = await res.json();
   if (!res.ok) throw new Error(json?.error ?? 'upload failed');
   return String(json?.url ?? '');
@@ -316,7 +319,7 @@ const submitComment = async () => {
   const body = commentBody.value.trim();
   if (!body) return;
   try {
-    const res = await fetch('/api/feedback', {
+    const res = await apiFetch(API.feedback.list, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -347,7 +350,7 @@ const submitIssue = async () => {
   const body = issueBody.value.trim();
   if (!title || !body) return;
   try {
-    const res = await fetch('/api/feedback', {
+    const res = await apiFetch(API.feedback.list, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -386,7 +389,7 @@ const openIssue = (id: string) => {
 const setIssueStatus = async (id: string, status: IssueStatus) => {
   if (!requireLogin()) return;
   try {
-    const res = await fetch(`/api/feedback/${encodeURIComponent(id)}`, {
+    const res = await apiFetch(API.feedback.detail(id), {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status })
@@ -450,7 +453,7 @@ const fetchReplies = async (feedbackId: string) => {
   isLoadingReplies.value = true;
   replyError.value = '';
   try {
-    const res = await fetch(`/api/feedback/${encodeURIComponent(feedbackId)}/replies`);
+    const res = await apiFetch(API.feedback.replies(feedbackId));
     const json = await res.json();
     if (!res.ok) throw new Error(json?.error ?? 'load failed');
     replies.value = Array.isArray(json) ? json : [];
@@ -468,7 +471,7 @@ const submitReply = async () => {
   if (!body || !selectedIssueId.value) return;
   replyError.value = '';
   try {
-    const res = await fetch(`/api/feedback/${encodeURIComponent(selectedIssueId.value)}/replies`, {
+    const res = await apiFetch(API.feedback.replies(selectedIssueId.value), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

@@ -1,0 +1,43 @@
+- generic [ref=e3]:
+  - navigation [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]:
+        - button "返回" [ref=e7]:
+          - img [ref=e8]
+          - generic [ref=e10]: 返回
+        - generic [ref=e12] [cursor=pointer]:
+          - img "Awesome-IWB Icon" [ref=e13]
+          - img "aiwb-logo" [ref=e15]
+      - generic [ref=e16]:
+        - button "搜索 ⌘ K" [ref=e18]:
+          - img [ref=e19]
+          - generic [ref=e22]: 搜索
+          - generic [ref=e23]:
+            - generic [ref=e24]: ⌘
+            - text: K
+        - button "提交项目" [ref=e25]:
+          - img [ref=e26]
+          - text: 提交项目
+        - button "Toggle Dark Mode" [ref=e27]:
+          - img [ref=e28]
+        - link [ref=e30] [cursor=pointer]:
+          - /url: https://github.com/awesome-iwb/awesome-iwb
+          - img [ref=e31]
+        - button "User menu" [ref=e35]:
+          - generic [ref=e36]: "?"
+  - main [ref=e39]
+  - contentinfo [ref=e48]:
+    - generic [ref=e49]:
+      - generic [ref=e50]:
+        - link "汇智卓创" [ref=e51] [cursor=pointer]:
+          - /url: "#"
+          - img "汇智卓创" [ref=e53]
+        - link "智教联盟" [ref=e54] [cursor=pointer]:
+          - /url: "#"
+          - img "智教联盟" [ref=e56]
+        - link "Awesome-IWB Icon aiwb-logo" [ref=e57] [cursor=pointer]:
+          - /url: "#"
+          - generic [ref=e59]:
+            - img "Awesome-IWB Icon" [ref=e60]
+            - img "aiwb-logo" [ref=e62]
+      - generic [ref=e63]: © 2026 Awesome IWB

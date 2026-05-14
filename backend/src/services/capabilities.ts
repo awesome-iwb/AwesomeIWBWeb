@@ -111,3 +111,54 @@ export async function getUserCapabilitiesWithInfo(userId: string, username: stri
     all_capabilities: allCaps,
   };
 }
+
+export type RoleTemplate = {
+  name: string;
+  capabilityIds: string[];
+};
+
+export const ROLE_TEMPLATES: Record<string, RoleTemplate> = {
+  superadmin: {
+    name: "超级管理员",
+    capabilityIds: getAllCapabilityIds(),
+  },
+  reviewer: {
+    name: "审核员",
+    capabilityIds: [
+      "admin_panel_access",
+      "submission:read",
+      "submission:approve",
+      "submission:reject",
+      "moderation:read",
+      "moderation:approve",
+      "moderation:reject",
+      "feedback:manage",
+      "comment:manage",
+    ],
+  },
+  editor: {
+    name: "编辑",
+    capabilityIds: [
+      "admin_panel_access",
+      "story:manage",
+      "project:read",
+      "project:create",
+      "project:update",
+      "category:manage",
+      "media:read",
+      "media:manage",
+    ],
+  },
+  developer: {
+    name: "开发者",
+    capabilityIds: [
+      "dev_panel_access",
+      "project:read",
+      "submission:read",
+    ],
+  },
+};
+
+export function getRoleTemplates(): Record<string, RoleTemplate> {
+  return ROLE_TEMPLATES;
+}

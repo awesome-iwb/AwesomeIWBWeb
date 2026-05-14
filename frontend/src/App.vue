@@ -28,7 +28,7 @@ onMounted(async () => {
       v-if="route.meta.showNavBar"
       :show-back="route.meta.showBack as boolean"
       :title="route.meta.title as string"
-      :hide-search="route.name === 'home' && !globalState.isScrolledPastSearch"
+      :hide-search="false"
       @open-search="globalState.isSearchOpen = true"
     />
     <CommandPalette 

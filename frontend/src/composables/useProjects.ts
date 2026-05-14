@@ -1,5 +1,5 @@
 import { ref, computed } from 'vue';
-import { useApi } from './useApi';
+import { readJsonOrThrow, useApi } from './useApi';
 
 export interface Release {
   tag_name: string;
@@ -101,10 +101,7 @@ export function useProjects() {
     loading.value = true;
     try {
       const res = await apiFetch('/api/projects', { method: 'GET' });
-      if (!res.ok) throw new Error('Failed to fetch projects');
-      const text = await res.text();
-      if (!text) throw new Error('Empty response from server');
-      const json = JSON.parse(text);
+      const json = await readJsonOrThrow<{ categories?: Array<any> }>(res);
       categories.value = (json.categories ?? []).map((c: any) => ({
         ...c,
         projects: (c.projects ?? []).map(normalizeProject)
@@ -130,10 +127,8 @@ export function useProjects() {
   const fetchProjectByName = async (name: string): Promise<Project | null> => {
     try {
       const res = await apiFetch(`/api/projects/${encodeURIComponent(name)}`, { method: 'GET' });
-      if (!res.ok) return null;
-      const text = await res.text();
-      if (!text) return null;
-      return normalizeProject(JSON.parse(text));
+      const project = await readJsonOrThrow<any>(res);
+      return normalizeProject(project);
     } catch {
       return allProjects.value.find(p => p.name.toLowerCase() === name.toLowerCase()) || null;
     }
@@ -148,10 +143,7 @@ export function useProjects() {
   const fetchStats = async () => {
     try {
       const res = await apiFetch('/api/stats', { method: 'GET' });
-      if (!res.ok) throw new Error('Failed to fetch stats');
-      const text = await res.text();
-      if (!text) throw new Error('Empty response from server');
-      return JSON.parse(text);
+      return await readJsonOrThrow<any>(res);
     } catch {
       const totalProjects = categories.value.reduce((acc, cat) => acc + cat.projects.length, 0);
       const totalStars = categories.value.reduce((acc, cat) => {

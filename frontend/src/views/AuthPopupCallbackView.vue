@@ -8,6 +8,11 @@ const router = useRouter();
 const statusText = ref('正在确认登录状态...');
 const detailText = ref('请稍候，完成后将自动关闭此窗口。');
 
+const safeReturnTo = (value: unknown) => {
+  const asString = typeof value === 'string' ? value : '/';
+  return asString.startsWith('/') ? asString : '/';
+};
+
 const notifyOpener = (success: boolean, message?: string) => {
   if (!window.opener) return;
   window.opener.postMessage(
@@ -22,15 +27,19 @@ const notifyOpener = (success: boolean, message?: string) => {
 
 onMounted(async () => {
   const auth = route.query.auth;
-  const returnTo = typeof route.query.returnTo === 'string' ? route.query.returnTo : '/';
+  const returnTo = safeReturnTo(route.query.returnTo);
 
   if (auth === 'success') {
     statusText.value = '登录成功';
     detailText.value = '正在通知主页面同步登录状态...';
     notifyOpener(true);
-    window.setTimeout(() => {
-      window.close();
-      router.replace({ path: '/me', query: { auth: 'success', returnTo } });
+    window.setTimeout(async () => {
+      try {
+        window.close();
+      } catch {}
+      if (!window.closed) {
+        await router.replace({ path: '/me', query: { auth: 'success', returnTo } });
+      }
     }, 500);
     return;
   }
@@ -38,6 +47,7 @@ onMounted(async () => {
   statusText.value = '登录未完成';
   detailText.value = '未收到有效登录结果，请返回主页面重试。';
   notifyOpener(false, '未收到有效登录结果');
+  await router.replace({ path: '/me', query: { auth: 'failed', returnTo } });
 });
 </script>
 

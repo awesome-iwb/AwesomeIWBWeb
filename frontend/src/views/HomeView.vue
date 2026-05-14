@@ -67,6 +67,10 @@ const activeLanguage = ref('all');
 const hasBadges = ref(false);
 const isScrolledPastSearch = ref(false);
 
+const isCardsExpanded = ref(false);
+const fanCardsRef = ref<HTMLElement | null>(null);
+let cardsObserver: IntersectionObserver | null = null;
+
 const comparisonList = ref<Project[]>([]);
 
 const onCardClick = (project: Project) => {
@@ -146,27 +150,71 @@ const typeWriterTick = () => {
 
 onMounted(async () => {
   await fetchProjects();
-  // 立即开始打第一个字
   typeWriterTimer = setTimeout(typeWriterTick, 200);
   
   const handleScroll = () => {
     if (mainSearchInput.value) {
       const rect = mainSearchInput.value.getBoundingClientRect();
-      // If the bottom of the search input is above the top of the viewport (i.e. scrolled past)
-      const passed = rect.bottom < 64; // 64px is approx navbar height
+      const passed = rect.bottom < 64;
       isScrolledPastSearch.value = passed;
       globalState.isScrolledPastSearch = passed;
     }
   };
 
   window.addEventListener('scroll', handleScroll, { passive: true });
-  // Check initial state
   handleScroll();
+
+  const isMobile = () => window.innerWidth < 1024;
+
+  if (isMobile() && fanCardsRef.value) {
+    cardsObserver = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting && entry.intersectionRatio > 0.75) {
+            isCardsExpanded.value = true;
+          } else if (!entry.isIntersecting || entry.intersectionRatio < 0.25) {
+            isCardsExpanded.value = false;
+          }
+        }
+      },
+      { threshold: [0, 0.25, 0.75, 1] }
+    );
+    cardsObserver.observe(fanCardsRef.value);
+  }
+
+  const handleResize = () => {
+    if (!isMobile()) {
+      isCardsExpanded.value = false;
+      if (cardsObserver) {
+        cardsObserver.disconnect();
+        cardsObserver = null;
+      }
+    } else if (!cardsObserver && fanCardsRef.value) {
+      cardsObserver = new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            if (entry.isIntersecting && entry.intersectionRatio > 0.75) {
+              isCardsExpanded.value = true;
+            } else if (!entry.isIntersecting || entry.intersectionRatio < 0.25) {
+              isCardsExpanded.value = false;
+            }
+          }
+        },
+        { threshold: [0, 0.25, 0.75, 1] }
+      );
+      cardsObserver.observe(fanCardsRef.value);
+    }
+  };
+  window.addEventListener('resize', handleResize, { passive: true });
   
   onUnmounted(() => {
     window.removeEventListener('scroll', handleScroll);
+    window.removeEventListener('resize', handleResize);
     if (typeWriterTimer) {
       clearTimeout(typeWriterTimer);
+    }
+    if (cardsObserver) {
+      cardsObserver.disconnect();
     }
   });
 });
@@ -339,28 +387,23 @@ watch(heroCards, (cards) => {
             专为广大中小学电教打造的一站式软件推荐清单。告别臃肿难用的系统自带软件，用最现代的工具重塑课堂体验。
           </p>
 
-          <!-- Global Large Search Bar -->
-          <div class="relative w-full max-w-xl group" ref="mainSearchInput">
-            <div class="absolute inset-y-0 left-5 flex items-center pointer-events-none z-10">
-              <Search class="h-5 w-5 text-slate-400 group-focus-within:text-emerald-500 transition-colors" />
-            </div>
-            <input
-              type="text"
-              placeholder="搜索画板、课表、倒计时等工具..."
-              v-model="searchTerm"
-              class="w-full pl-14 pr-6 py-4 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white/60 dark:bg-[#0B1120]/60 backdrop-blur-xl shadow-sm hover:shadow-md focus:shadow-xl focus:shadow-emerald-500/10 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-transparent transition-all duration-300 text-lg placeholder:text-slate-400"
+          <div class="hidden lg:block relative w-full max-w-xl" ref="mainSearchInput">
+            <button
+              @click="globalState.isSearchOpen = true"
+              class="w-full flex items-center gap-3 pl-5 pr-6 py-4 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white/60 dark:bg-[#0B1120]/60 backdrop-blur-xl shadow-sm hover:shadow-md hover:border-emerald-300/50 dark:hover:border-emerald-700/50 transition-all duration-300 text-left group cursor-pointer"
               :class="isScrolledPastSearch ? 'opacity-0 scale-95 pointer-events-none' : 'opacity-100 scale-100'"
-            />
-            <div class="absolute inset-y-0 right-3 flex items-center transition-opacity duration-300" :class="isScrolledPastSearch ? 'opacity-0' : 'opacity-100'">
-              <div class="hidden sm:flex items-center gap-1 px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 text-xs text-slate-500 font-medium">
+            >
+              <Search class="h-5 w-5 text-slate-400 group-hover:text-emerald-500 transition-colors shrink-0" />
+              <span class="text-slate-400 dark:text-slate-500 text-base">搜索画板、课表、倒计时等工具...</span>
+              <span class="ml-auto hidden sm:flex items-center gap-1 px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 text-xs text-slate-500 font-medium shrink-0">
                 <span class="text-[10px]">⌘</span> K
-              </div>
-            </div>
+              </span>
+            </button>
           </div>
         </div>
 
         <!-- Right: Interface Craft Style Fan Cards -->
-        <div class="relative z-10 flex-1 w-full flex justify-center lg:justify-end lg:pr-32 h-[480px] sm:h-[520px] mt-12 lg:mt-0 perspective-1000 group/fan" v-if="heroCards.length >= 4">
+        <div ref="fanCardsRef" class="relative z-10 flex-1 w-full flex justify-center lg:justify-end lg:pr-32 h-[480px] sm:h-[520px] mt-12 lg:mt-0 perspective-1000 group/fan" v-if="heroCards.length >= 4">
           
           <!-- Stack Container -->
           <div class="relative w-[280px] sm:w-[320px] h-[360px] sm:h-[400px] top-1/2 -translate-y-1/2 transition-transform duration-500">
@@ -379,7 +422,11 @@ watch(heroCards, (cards) => {
                 index === 0 ? 'group-hover/fan:rotate-[-25deg] group-hover/fan:-translate-x-28 group-hover/fan:translate-y-8 hover:!-translate-y-16 hover:!z-50 hover:!scale-105' : '',
                 index === 1 ? 'group-hover/fan:rotate-[-5deg] group-hover/fan:-translate-x-10 group-hover/fan:translate-y-2 hover:!-translate-y-24 hover:!z-50 hover:!scale-105' : '',
                 index === 2 ? 'group-hover/fan:rotate-[15deg] group-hover/fan:translate-x-10 group-hover/fan:translate-y-2 hover:!-translate-y-24 hover:!z-50 hover:!scale-105' : '',
-                index === 3 ? 'group-hover/fan:rotate-[35deg] group-hover/fan:translate-x-32 group-hover/fan:translate-y-12 hover:!-translate-y-16 hover:!z-50 hover:!scale-105' : ''
+                index === 3 ? 'group-hover/fan:rotate-[35deg] group-hover/fan:translate-x-32 group-hover/fan:translate-y-12 hover:!-translate-y-16 hover:!z-50 hover:!scale-105' : '',
+                isCardsExpanded && index === 0 ? '!rotate-[-18deg] !-translate-x-16 !translate-y-6' : '',
+                isCardsExpanded && index === 1 ? '!rotate-[-4deg] !-translate-x-4 !translate-y-1' : '',
+                isCardsExpanded && index === 2 ? '!rotate-[10deg] !translate-x-4 !translate-y-1' : '',
+                isCardsExpanded && index === 3 ? '!rotate-[22deg] !translate-x-20 !translate-y-8' : ''
               ]"
               :style="{
                 boxShadow: cardColors[card.name] ? `0 0 40px -5px rgba(${cardColors[card.name]}, 0.5)` : '0 10px 40px -15px rgba(0,0,0,0.2)',
@@ -409,6 +456,19 @@ watch(heroCards, (cards) => {
               </div>
             </div>
           </div>
+        </div>
+
+        <div class="lg:hidden w-full max-w-xl mx-auto mt-2 mb-2">
+          <button
+            @click="globalState.isSearchOpen = true"
+            class="w-full flex items-center gap-3 pl-5 pr-6 py-4 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white/60 dark:bg-[#0B1120]/60 backdrop-blur-xl shadow-sm hover:shadow-md hover:border-emerald-300/50 dark:hover:border-emerald-700/50 active:scale-[0.98] transition-all duration-300 text-left group cursor-pointer"
+          >
+            <Search class="h-5 w-5 text-slate-400 group-hover:text-emerald-500 transition-colors shrink-0" />
+            <span class="text-slate-400 dark:text-slate-500 text-base">搜索画板、课表、倒计时等工具...</span>
+            <span class="ml-auto flex items-center gap-1 px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 text-xs text-slate-500 font-medium shrink-0">
+              <span class="text-[10px]">⌘</span> K
+            </span>
+          </button>
         </div>
 
       </div>

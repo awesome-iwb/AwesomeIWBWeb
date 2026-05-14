@@ -3,6 +3,8 @@ import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { MessageSquare, PencilLine, Send, X } from 'lucide-vue-next';
 import { useAuth } from '../composables/useAuth';
+import { formatApiError, readJsonOrThrow, useApi } from '../composables/useApi';
+import { API } from '../api/endpoints';
 import CommentPanel from '../components/CommentPanel.vue';
 
 
@@ -22,6 +24,7 @@ type Catalog = { categories: Array<{ projects: Project[] }> };
 
 const router = useRouter();
 const { user } = useAuth();
+const { apiFetch } = useApi();
 
 const activeTab = ref<'projects' | 'feedback'>('projects');
 const catalog = ref<Catalog | null>(null);
@@ -75,16 +78,15 @@ const submitUpdate = async () => {
         hzzc_user_id: user.value?.hzzc_user_id ?? ''
       }
     };
-    const res = await fetch('/api/dev/submissions', {
+    const res = await apiFetch(API.submissions.dev, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
-    const json = await res.json();
-    if (!res.ok) throw new Error(json?.error ?? 'submit failed');
+    const json = await readJsonOrThrow<any>(res);
     submissionId.value = json?.submissionId ?? '';
-  } catch (e: any) {
-    submitError.value = e?.message ?? '提交失败';
+  } catch (e: unknown) {
+    submitError.value = formatApiError(e, '提交失败');
   } finally {
     isSubmitting.value = false;
   }
@@ -94,11 +96,10 @@ const fetchCatalog = async () => {
   isLoading.value = true;
   loadError.value = '';
   try {
-    const res = await fetch('/api/projects');
-    if (!res.ok) throw new Error('load failed');
-    catalog.value = await res.json();
-  } catch (e: any) {
-    loadError.value = e?.message ?? '加载失败';
+    const res = await apiFetch(API.catalog.projects);
+    catalog.value = await readJsonOrThrow<Catalog>(res);
+  } catch (e: unknown) {
+    loadError.value = formatApiError(e, '加载失败');
   } finally {
     isLoading.value = false;
   }

@@ -4,6 +4,8 @@ import { useRoute, useRouter } from 'vue-router';
 import { useHead } from '@unhead/vue';
 import { AlertCircle, CheckCircle2, Copy, ArrowRight, ShieldCheck } from 'lucide-vue-next';
 import { useAuth } from '../composables/useAuth';
+import { useApi } from '../composables/useApi';
+import { API } from '../api/endpoints';
 
 useHead({
   title: '账号确认 - Awesome IWB',
@@ -15,6 +17,7 @@ useHead({
 const route = useRoute();
 const router = useRouter();
 const { fetchUser, user, capabilities, isSuperadmin, markProfileConfirmed } = useAuth();
+const { apiFetch } = useApi();
 
 const loading = ref(true);
 const loadError = ref('');
@@ -56,7 +59,7 @@ onMounted(async () => {
       return;
     }
 
-    const res = await fetch('/api/auth/me', { credentials: 'include' });
+    const res = await apiFetch(API.auth.me);
     if (!res.ok) {
       loadError.value = `读取 /api/auth/me 失败（${res.status}）`;
       return;

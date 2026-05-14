@@ -74,6 +74,15 @@ const orgs: FooterOrg[] = [
       <div class="mt-10 text-center text-xs text-slate-400">
         <span>© {{ new Date().getFullYear() }} Awesome IWB</span>
       </div>
+
+      <div class="mt-3 text-center text-xs text-slate-400">
+        <a
+          href="https://beian.miit.gov.cn/"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+        >津ICP备2025035356号</a>
+      </div>
     </div>
   </footer>
 </template>

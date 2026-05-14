@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { Elysia } from "elysia";
 import { verifyJwt, hashToken } from "../utils/jwt";
 import { findUserById } from "../services/users";
@@ -19,7 +20,12 @@ export type AuthContext = {
 };
 
 const dbEnabled = Boolean(process.env.DATABASE_URL);
-const devAllowDemoAdmin = process.env.DEV_ALLOW_DEMO_ADMIN === "true";
+
+function authError(set: any, status: number, code: string, message: string) {
+  const traceId = randomUUID();
+  set.status = status;
+  return { error: { code, message, traceId } };
+}
 
 export const authPlugin = new Elysia({ name: "auth" }).derive(
   { as: "global" },
@@ -89,34 +95,7 @@ export function requireAuth() {
   return ({ user, set }: { user: AuthUser | null; set: any }) => {
     if (!dbEnabled) return;
     if (!user) {
-      set.status = 401;
-      return { error: "Unauthorized" };
-    }
-  };
-}
-
-/** @deprecated Use requireCapability() instead. Role-based checks are being phased out. */
-export function requireRole(allowedRoles: Array<"user" | "dev" | "ops">) {
-  return ({ user, set }: { user: AuthUser | null; set: any }) => {
-    if (!dbEnabled) return;
-    if (!user) {
-      set.status = 401;
-      return { error: "Unauthorized" };
-    }
-    if (!allowedRoles.includes(user.role)) {
-      set.status = 403;
-      return { error: "Forbidden: insufficient role" };
-    }
-  };
-}
-
-/** @deprecated Use requireCapability() instead. */
-export function requireAuthOrDev() {
-  return ({ user, set }: { user: AuthUser | null; set: any }) => {
-    if (!dbEnabled) return;
-    if (!user && !devAllowDemoAdmin) {
-      set.status = 401;
-      return { error: "Unauthorized" };
+      return authError(set, 401, "UNAUTHORIZED", "Unauthorized");
     }
   };
 }
@@ -125,14 +104,12 @@ export function requireCapability(capabilityId: string) {
   return async ({ user, set }: { user: AuthUser | null; set: any }) => {
     if (!dbEnabled) return;
     if (!user) {
-      set.status = 401;
-      return { error: "Unauthorized" };
+      return authError(set, 401, "UNAUTHORIZED", "Unauthorized");
     }
     if (isSuperadmin(user.name)) return;
     const has = await userHasCapability(user.id, user.name, capabilityId);
     if (!has) {
-      set.status = 403;
-      return { error: "Forbidden: insufficient capability" };
+      return authError(set, 403, "FORBIDDEN", "Forbidden: insufficient capability");
     }
   };
 }

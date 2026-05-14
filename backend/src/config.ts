@@ -82,6 +82,27 @@ function resolveCookieSecure(): boolean {
   return false;
 }
 
+function ensureCookieConfigConsistency(cookieSecure: boolean) {
+  if (nodeEnv !== "production") return;
+  if (!oauthEnabled) return;
+  if (!allowedOrigins.length) return;
+
+  const hasHttpsOrigin = allowedOrigins.some((origin) => {
+    try {
+      return new URL(origin).protocol === "https:";
+    } catch {
+      return false;
+    }
+  });
+
+  if (hasHttpsOrigin && !cookieSecure) {
+    console.warn("[security] HTTPS origins configured but COOKIE_SECURE resolves to false; OAuth callback session may be unstable.");
+  }
+}
+
+const cookieSecure = resolveCookieSecure();
+ensureCookieConfigConsistency(cookieSecure);
+
 export const appConfig = {
   nodeEnv,
   isProduction: nodeEnv === "production",
@@ -109,5 +130,5 @@ export const appConfig = {
     redirectUri: process.env.CASDOOR_REDIRECT_URI?.trim() || "http://localhost:5173/api/auth/callback",
     allowedRedirectOrigins: parseList(process.env.AUTH_REDIRECT_ALLOWLIST || process.env.ALLOWED_ORIGINS)
   },
-  cookieSecure: resolveCookieSecure()
+  cookieSecure
 } as const;
