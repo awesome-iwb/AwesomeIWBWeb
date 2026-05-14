@@ -148,7 +148,7 @@ export const useAuth = () => {
     return user.value.capabilities?.includes(cap) ?? false;
   };
 
-  const isProjectMember = (projectId: string): boolean => {
+  const isProjectMember = (_projectId: string): boolean => {
     if (!user.value) return false;
     if (user.value.is_superadmin) return true;
     return false;
