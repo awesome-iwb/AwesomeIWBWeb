@@ -2,7 +2,7 @@
 import { computed, ref, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useHead } from '@unhead/vue';
-import { Github, LogIn, LogOut, Shield, Wrench, AlertCircle, Camera } from 'lucide-vue-next';
+import { Github, LogIn, LogOut, Shield, Wrench, AlertCircle, Camera, Building2, FolderKanban, ArrowRight } from 'lucide-vue-next';
 import { useAuth } from '../composables/useAuth';
 import ImageCropper from '../components/ImageCropper.vue';
 
@@ -15,7 +15,7 @@ useHead({
 
 const router = useRouter();
 const route = useRoute();
-const { user, isAuthenticated, logout, getCasdoorAuthorizeUrl, uploadAvatar, hasCapability, fetchUser } = useAuth();
+const { user, isAuthenticated, logout, getCasdoorAuthorizeUrl, uploadAvatar, hasCapability, fetchUser, organizations } = useAuth();
 
 const redirectTo = computed(() => {
   const q = route.query.redirect;
@@ -375,6 +375,69 @@ const handleLogout = async () => {
               </button>
             </div>
           </div>
+
+          <!-- My Organizations & Projects -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <button
+              @click="router.push('/dev/organizations')"
+              class="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/40 p-4 text-left hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors group"
+            >
+              <div class="flex items-center gap-3 mb-3">
+                <div class="w-10 h-10 rounded-xl bg-blue-100 dark:bg-blue-500/20 flex items-center justify-center">
+                  <Building2 class="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                </div>
+                <div>
+                  <div class="text-sm font-extrabold text-slate-900 dark:text-white">我的组织</div>
+                  <div class="text-xs text-slate-500 dark:text-slate-400">{{ organizations.length }} 个组织</div>
+                </div>
+              </div>
+              <div v-if="organizations.length > 0" class="space-y-1.5">
+                <div v-for="org in organizations.slice(0, 3)" :key="org.id" class="flex items-center gap-2">
+                  <img
+                    :src="org.avatar_url || ''"
+                    :alt="org.name"
+                    class="w-5 h-5 rounded object-cover"
+                    @error="(e) => { (e.target as HTMLImageElement).style.display = 'none' }"
+                  />
+                  <span class="text-xs text-slate-600 dark:text-slate-300 truncate">{{ org.name }}</span>
+                  <span class="text-[10px] text-slate-400 dark:text-slate-500 ml-auto shrink-0">{{ org.member_role === 'owner' ? '所有者' : org.member_role === 'admin' ? '管理员' : '成员' }}</span>
+                </div>
+              </div>
+              <div v-else class="text-xs text-slate-400 dark:text-slate-500">暂无组织</div>
+              <div class="flex items-center gap-1 mt-2 text-xs font-medium text-emerald-600 dark:text-emerald-400 group-hover:gap-2 transition-all">
+                查看全部 <ArrowRight class="w-3 h-3" />
+              </div>
+            </button>
+
+            <button
+              @click="router.push('/dev/projects')"
+              class="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/40 p-4 text-left hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors group"
+            >
+              <div class="flex items-center gap-3 mb-3">
+                <div class="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-500/20 flex items-center justify-center">
+                  <FolderKanban class="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                </div>
+                <div>
+                  <div class="text-sm font-extrabold text-slate-900 dark:text-white">我的项目</div>
+                  <div class="text-xs text-slate-500 dark:text-slate-400">管理参与的项目</div>
+                </div>
+              </div>
+              <div class="text-xs text-slate-400 dark:text-slate-500">在开发者后台查看和管理</div>
+              <div class="flex items-center gap-1 mt-2 text-xs font-medium text-emerald-600 dark:text-emerald-400 group-hover:gap-2 transition-all">
+                进入项目 <ArrowRight class="w-3 h-3" />
+              </div>
+            </button>
+          </div>
+
+          <!-- Dev Panel Access Button -->
+          <button
+            v-if="hasCapability('dev_panel_access')"
+            @click="router.push('/dev')"
+            class="w-full inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3.5 rounded-2xl font-extrabold transition-colors shadow-lg shadow-emerald-600/20"
+          >
+            <Wrench class="w-5 h-5" />
+            进入开发者后台
+          </button>
 
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <button
