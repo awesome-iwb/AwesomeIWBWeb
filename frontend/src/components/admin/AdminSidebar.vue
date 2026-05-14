@@ -34,6 +34,7 @@ import { useAuth } from '../../composables/useAuth';
 import {
   LayoutDashboard, FileText, Package, ClipboardCheck,
   Shield, MessageSquare, Users, Image, ScrollText, LogOut,
+  Building2, ClipboardList,
 } from 'lucide-vue-next';
 
 defineEmits<{ logout: [] }>();
@@ -51,6 +52,8 @@ const allItems = [
   { key: 'users', label: '用户权限', to: '/admin/users', icon: Users, cap: 'user:read' },
   { key: 'media', label: '图床管理', to: '/admin/media', icon: Image, cap: 'media:read' },
   { key: 'audit', label: '审计日志', to: '/admin/audit', icon: ScrollText, cap: 'audit:read' },
+  { key: 'organizations', label: '组织审核', to: '/admin/organizations', icon: Building2, cap: 'org:review' },
+  { key: 'claims', label: '认领审核', to: '/admin/claims', icon: ClipboardList, cap: 'claim:review' },
 ];
 
 const visibleItems = computed(() => allItems.filter(item => hasCapability(item.cap)));

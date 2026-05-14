@@ -36,6 +36,8 @@ export const routes: RouteRecordRaw[] = [
       { path: 'users', name: 'admin-users', component: () => import('../views/admin/UsersView.vue'), meta: { title: '用户权限', requiresCapability: 'user:read' } },
       { path: 'media', name: 'admin-media', component: () => import('../views/admin/MediaView.vue'), meta: { title: '图床管理', requiresCapability: 'media:read' } },
       { path: 'audit', name: 'admin-audit', component: () => import('../views/admin/AuditView.vue'), meta: { title: '审计日志', requiresCapability: 'audit:read' } },
+      { path: 'organizations', name: 'admin-organizations', component: () => import('../views/admin/AdminOrganizationsView.vue'), meta: { title: '组织审核', requiresCapability: 'org:review' } },
+      { path: 'claims', name: 'admin-claims', component: () => import('../views/admin/AdminClaimsView.vue'), meta: { title: '认领审核', requiresCapability: 'claim:review' } },
     ],
   },
   {

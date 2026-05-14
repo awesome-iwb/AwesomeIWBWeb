@@ -65,3 +65,5 @@ export const API = {
     projectClaims: '/api/dev/project-claims',
   },
 } as const;
+
+export type DevEndpoints = typeof API.dev;
