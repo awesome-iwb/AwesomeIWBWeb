@@ -87,7 +87,7 @@
       <div v-else class="flex items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl min-h-[400px]">
         <div class="text-center">
           <p class="text-slate-400 mb-2">点击下方悬浮栏选择待审核项目</p>
-          <button @click="panelRef?.expanded = true" class="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold transition-colors">打开列表</button>
+          <button @click="openPanel" class="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold transition-colors">打开列表</button>
         </div>
       </div>
     </template>
@@ -102,7 +102,7 @@
           <div
             v-for="s in submissionsPage.items"
             :key="s.id"
-            @click="selectSubmission(s); panelRef?.close()"
+            @click="selectSubmission(s); closePanel()"
             class="p-3 rounded-xl border cursor-pointer transition-all duration-200"
             :class="selectedSubmissionId === s.id ? 'bg-emerald-500 text-white border-emerald-500 shadow-md shadow-emerald-500/20' : 'bg-slate-50 dark:bg-slate-900/50 border-transparent hover:border-emerald-300'"
           >
@@ -133,6 +133,8 @@ import { adminFetch, formatAdminError } from '../../composables/useAdminFetch';
 import FloatingPanel from '../../components/admin/FloatingPanel.vue';
 
 const panelRef = ref<InstanceType<typeof FloatingPanel> | null>(null);
+const openPanel = () => { if (panelRef.value) panelRef.value.expanded = true; };
+const closePanel = () => { panelRef.value?.close(); };
 
 const adminCategories = ref<any[]>([]);
 
