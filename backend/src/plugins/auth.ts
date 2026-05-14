@@ -113,3 +113,23 @@ export function requireCapability(capabilityId: string) {
     }
   };
 }
+
+export function requireProjectMember(getProjectId: (context: { params: Record<string, string> }) => string) {
+  return async ({ user, set, params }: { user: AuthUser | null; set: any; params: Record<string, string> }) => {
+    if (!dbEnabled) return;
+    if (!user) {
+      return authError(set, 401, "UNAUTHORIZED", "Unauthorized");
+    }
+    if (isSuperadmin(user.name)) return;
+    const hasCap = await userHasCapability(user.id, user.name, "dev:project_edit");
+    if (!hasCap) {
+      return authError(set, 403, "FORBIDDEN", "Forbidden: insufficient capability");
+    }
+    const projectId = getProjectId({ params });
+    const { isProjectMember } = await import("../services/projectMembers");
+    const isMember = await isProjectMember(projectId, user.id);
+    if (!isMember) {
+      return authError(set, 403, "FORBIDDEN", "Forbidden: not a project member");
+    }
+  };
+}
