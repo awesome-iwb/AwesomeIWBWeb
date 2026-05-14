@@ -101,7 +101,7 @@ const handleInvite = async () => {
   }
 };
 
-const handleRemove = async (userId: string | null, orgId: string | null) => {
+const handleRemove = async (userId: string | null, _orgId: string | null) => {
   if (!confirm('确认移除该成员？')) return;
   try {
     let url: string;
