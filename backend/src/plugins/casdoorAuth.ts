@@ -413,6 +413,9 @@ export const casdoorAuthPlugin = new Elysia({ prefix: "/api/auth" })
 
     const capInfo = await getUserCapabilitiesWithInfo(user.id, user.name);
 
+    const { getUserOrganizations } = await import("../services/organizations");
+    const organizations = PG_ENABLED ? await getUserOrganizations(user.id) : [];
+
     return {
       user: {
         id: user.id,
@@ -427,6 +430,7 @@ export const casdoorAuthPlugin = new Elysia({ prefix: "/api/auth" })
       },
       is_superadmin: capInfo.is_superadmin,
       capabilities: capInfo.capabilities,
+      organizations,
     };
   })
   .post("/logout", async ({ user, set, headers }) => {

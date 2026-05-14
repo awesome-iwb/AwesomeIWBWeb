@@ -373,7 +373,8 @@ const app = new Elysia()
       set.status = 404;
       return apiNotFound(set, "Project not found");
     }
-    return project;
+    const members = dbEnabled ? await getProjectMembers(project.id) : [];
+    return { ...project, developers: members };
   })
   .get("/api/stats", async () => {
     if (!dbEnabled) {
@@ -867,6 +868,15 @@ const app = new Elysia()
     }
     return await listProjects({ q, category, sort, page, pageSize });
   })
+  .get("/api/admin/projects/:id", async ({ params: { id }, set, user }) => {
+    const capErr = await checkCap(user, set, "project:read");
+    if (capErr) return capErr;
+    if (!dbEnabled) return apiNotFound(set, "Project not found");
+    const project = await getProjectById(id);
+    if (!project) return apiNotFound(set, "Project not found");
+    const members = await getProjectMembers(id);
+    return { ...project, members };
+  })
   .get("/api/admin/projects/export.json", async ({ set, user }) => {
     const capErr = await checkCap(user, set, "project:export");
     if (capErr) return capErr;
@@ -1205,7 +1215,7 @@ const app = new Elysia()
     await logAuditCompat({ action: "rollback", entity_type: "project", entity_id: id, diff: { before, after: updated, revisionId } });
     return updated;
   })
-  .post("/api/submissions", async ({ body, set, headers }) => {
+  .post("/api/submissions", async ({ body, set, headers, user }) => {
     if (checkRateLimit({ headers, path: "/api/submissions", set })) return apiError(set, 429, "RATE_LIMITED", "Too Many Requests");
     const payload: any = body as any;
     if (!payload?.name || !payload?.developer || !payload?.github_url) {
@@ -1221,6 +1231,13 @@ const app = new Elysia()
     }
     const created = await createSubmission(payload);
     await logAuditCompat({ action: "submit", entity_type: "submission", entity_id: created.id });
+    if (dbEnabled && user) {
+      const newProject = await sql()<Array<{ id: string }>>`select id from projects where slug = ${payload.name ?? payload.slug} order by created_at desc limit 1`;
+      if (newProject.length) {
+        await addProjectMember({ project_id: newProject[0].id, user_id: user.id, role: "owner" });
+        await promoteToDev(user.id);
+      }
+    }
     return { success: true, submissionId: created.id };
   })
   .post("/api/dev/submissions", async ({ body, set, user, headers }) => {
