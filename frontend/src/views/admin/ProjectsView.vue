@@ -1,71 +1,17 @@
 <template>
-  <div>
-    <div class="grid grid-cols-1 lg:grid-cols-4 gap-4 lg:gap-8">
-      <!-- 项目列表侧栏 -->
-      <div class="lg:col-span-1 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col" :class="{ 'hidden lg:flex': isMobile && mobileView === 'detail' }" style="height: auto; min-height: 400px; max-height: 700px;">
-        <div class="p-4 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 flex justify-between items-center gap-2">
-          <h2 class="font-bold text-lg">软件库</h2>
-          <div class="flex items-center gap-2">
-            <button @click="showCategoryManager = true; openCategoryManager()" class="px-3 py-1.5 rounded-lg bg-slate-200/70 dark:bg-slate-700/60 text-slate-700 dark:text-slate-200 text-sm font-bold hover:bg-slate-300 dark:hover:bg-slate-700 transition-colors">
-              分类
-            </button>
-            <button @click="openAuditLogs" class="px-3 py-1.5 rounded-lg bg-slate-200/70 dark:bg-slate-700/60 text-slate-700 dark:text-slate-200 text-sm font-bold hover:bg-slate-300 dark:hover:bg-slate-700 transition-colors">
-              日志
-            </button>
-            <button @click="createNewProject" class="w-10 h-10 lg:w-8 lg:h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center hover:bg-blue-200 transition-colors" title="添加新软件">
-              <Plus class="w-5 h-5 lg:w-4 lg:h-4" />
-            </button>
-          </div>
-        </div>
-
-        <div class="p-4 border-b border-slate-100 dark:border-slate-700 space-y-3">
-          <input v-model="projectQuery.q" @keyup.enter="fetchAdminProjects" type="text" class="w-full px-3 py-3 lg:py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-blue-500 text-base lg:text-sm" placeholder="搜索项目（名称/开发者/关键词）" />
-          <select v-model="projectQuery.category" @change="projectQuery.page = 1; fetchAdminProjects()" class="w-full px-3 py-3 lg:py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-blue-500 text-base lg:text-sm">
-            <option value="">全部分类</option>
-            <option v-for="c in adminCategories" :key="c.id" :value="c.id">{{ c.name }}</option>
-          </select>
-          <div class="flex gap-2">
-            <button @click="projectQuery.page = 1; fetchAdminProjects()" class="flex-1 px-3 py-3 lg:py-2 rounded-xl bg-blue-500 hover:bg-blue-600 text-white text-base lg:text-sm font-bold transition-colors">搜索</button>
-            <button @click="resetProjectQuery" class="px-3 py-3 lg:py-2 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-base lg:text-sm font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">重置</button>
-          </div>
-        </div>
-
-        <div class="flex-1 overflow-y-auto p-4 space-y-2">
-          <div
-            v-for="p in projectsPage.items"
-            :key="p.id || p.slug || p.name"
-            @click="selectProject(p); if (isMobile) openDetail()"
-            class="p-3 rounded-xl border cursor-pointer transition-all duration-200 flex items-center gap-3"
-            :class="selectedProjectId === p.id ? 'bg-blue-500 text-white border-blue-500 shadow-md shadow-blue-500/20' : 'bg-slate-50 dark:bg-slate-900/50 border-transparent hover:border-blue-300'"
-          >
-            <img v-if="p.icon || p.avatar" :src="p.icon || p.avatar" class="w-10 h-10 lg:w-8 lg:h-8 rounded bg-white object-contain p-0.5" />
-            <div v-else class="w-10 h-10 lg:w-8 lg:h-8 rounded bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-xs font-bold text-slate-500">{{ (p.name || '?').charAt(0) }}</div>
-            <div class="flex-1 min-w-0">
-              <div class="font-medium truncate text-sm">{{ p.name }}</div>
-              <div class="text-xs opacity-80 truncate">{{ p.developer }}</div>
-            </div>
-          </div>
-          <div v-if="projectsPage.items.length === 0" class="text-sm text-slate-400 text-center py-10">暂无数据</div>
-        </div>
-
-        <div class="p-4 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between text-sm">
-          <button @click="prevProjectPage" :disabled="projectsPage.page <= 1" class="px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed">上一页</button>
-          <div class="text-slate-500 dark:text-slate-300">{{ projectsPage.page }} / {{ Math.max(1, Math.ceil(projectsPage.total / projectsPage.pageSize)) }}</div>
-          <button @click="nextProjectPage" :disabled="projectsPage.page >= Math.ceil(projectsPage.total / projectsPage.pageSize)" class="px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed">下一页</button>
-        </div>
-
-        <div class="p-4 border-t border-slate-100 dark:border-slate-700 grid grid-cols-2 gap-2">
-          <button @click="exportJson" class="px-3 py-3 lg:py-2 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-sm font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">导出 JSON</button>
-          <button @click="exportCsv" class="px-3 py-3 lg:py-2 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-sm font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">导出 CSV</button>
-          <button @click="triggerImportJson" class="px-3 py-3 lg:py-2 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-sm font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">导入 JSON</button>
-          <button @click="triggerImportCsv" class="px-3 py-3 lg:py-2 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-sm font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">导入 CSV</button>
-          <input ref="importJsonInput" type="file" class="hidden" accept="application/json" @change="importProjectsJson" />
-          <input ref="importCsvInput" type="file" class="hidden" accept=".csv,text/csv" @change="importProjectsCsv" />
-        </div>
-      </div>
-
-      <!-- 项目编辑器 -->
-      <div class="lg:col-span-3 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col" :class="{ 'hidden': isMobile && mobileView === 'list' }" v-if="projectDraft">
+  <FloatingPanel
+    ref="panelRef"
+    :selected-label="selectedProjectId ? projectDraft?.name : ''"
+    placeholder="选择一个项目"
+    list-label="项目列表"
+    :count="projectsPage.total"
+    :prev-enabled="projectsPage.page > 1"
+    :next-enabled="projectsPage.page < Math.ceil(projectsPage.total / projectsPage.pageSize)"
+    @prev="prevProjectPage"
+    @next="nextProjectPage"
+  >
+    <template #content>
+      <div v-if="projectDraft" class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col">
         <div class="p-4 lg:p-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50 flex items-start justify-between gap-4">
           <div>
             <h2 class="text-lg lg:text-xl font-bold text-slate-800 dark:text-white flex items-center gap-3">
@@ -87,30 +33,8 @@
           </div>
         </div>
 
-        <!-- 移动端步骤向导 -->
-        <div v-if="isMobile" class="p-4 border-b border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800">
-          <div class="flex items-center justify-between">
-            <button
-              v-for="step in 4"
-              :key="step"
-              @click="projectMobileStep = step"
-              class="flex flex-col items-center gap-1"
-            >
-              <div class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-colors"
-                :class="projectMobileStep === step ? 'bg-blue-500 text-white' : projectMobileStep > step ? 'bg-blue-200 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300' : 'bg-slate-200 dark:bg-slate-700 text-slate-500'"
-              >
-                {{ step }}
-              </div>
-              <span class="text-[10px]" :class="projectMobileStep === step ? 'text-blue-500 font-bold' : 'text-slate-400'">
-                {{ ['基本信息', '分类标签', '媒体资源', '高级设置'][step - 1] }}
-              </span>
-            </button>
-          </div>
-        </div>
-
         <div class="p-4 lg:p-8 space-y-4 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-8 overflow-y-auto" style="max-height: 600px;">
-          <!-- 步骤1：基本信息 -->
-          <div v-if="!isMobile || projectMobileStep === 1" class="lg:col-span-1 space-y-4">
+          <div class="lg:col-span-1 space-y-4">
             <div class="lg:col-span-1">
               <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">软件名称</label>
               <input type="text" v-model="projectDraft.name" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-blue-500 text-base" />
@@ -133,8 +57,7 @@
             </div>
           </div>
 
-          <!-- 步骤2：分类标签 -->
-          <div v-if="!isMobile || projectMobileStep === 2" class="lg:col-span-1 space-y-4">
+          <div class="lg:col-span-1 space-y-4">
             <div class="lg:col-span-1">
               <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">AI 使用率标签</label>
               <select v-model="projectDraft.ai_usage_state" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-blue-500 text-base">
@@ -172,8 +95,7 @@
             </div>
           </div>
 
-          <!-- 步骤3：媒体资源 -->
-          <div v-if="!isMobile || projectMobileStep === 3" class="lg:col-span-2 space-y-4">
+          <div class="lg:col-span-2 space-y-4">
             <div class="p-4 lg:p-6 rounded-2xl bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-700">
               <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
                 <div>
@@ -222,8 +144,7 @@
             <div v-if="uploadErrorMessage" class="text-xs text-rose-500">{{ uploadErrorMessage }}</div>
           </div>
 
-          <!-- 步骤4：高级设置 -->
-          <div v-if="!isMobile || projectMobileStep === 4" class="lg:col-span-2 space-y-4">
+          <div class="lg:col-span-2 space-y-4">
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <div>
                 <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">编程语言 (Language)</label>
@@ -255,109 +176,144 @@
               </div>
             </div>
           </div>
-
-          <!-- 移动端步骤导航 -->
-          <div v-if="isMobile" class="lg:col-span-2 flex items-center justify-between pt-4 border-t border-slate-200 dark:border-slate-700">
-            <button
-              @click="projectMobileStep = Math.max(1, projectMobileStep - 1)"
-              :disabled="projectMobileStep === 1"
-              class="px-4 py-3 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold disabled:opacity-50"
-            >
-              上一步
-            </button>
-            <span class="text-sm text-slate-500">步骤 {{ projectMobileStep }} / 4</span>
-            <button
-              v-if="projectMobileStep < 4"
-              @click="projectMobileStep = Math.min(4, projectMobileStep + 1)"
-              class="px-4 py-3 rounded-xl bg-blue-500 hover:bg-blue-600 text-white font-bold"
-            >
-              下一步
-            </button>
-            <button
-              v-else
-              @click="saveProjects"
-              class="px-4 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold flex items-center gap-2"
-            >
-              <Save class="w-4 h-4" />
-              {{ isSaving ? '保存中...' : '保存' }}
-            </button>
-          </div>
         </div>
       </div>
-      <div v-else class="lg:col-span-3 flex items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-3xl min-h-[300px] lg:min-h-[700px]" :class="{ 'hidden': isMobile && mobileView === 'list' }">
-        <p class="text-slate-400">请在左侧选择一个软件项目进行编辑</p>
+      <div v-else class="flex items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl min-h-[400px]">
+        <div class="text-center">
+          <p class="text-slate-400 mb-2">点击下方悬浮栏选择项目</p>
+          <button @click="panelRef?.expanded = true" class="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold transition-colors">打开列表</button>
+        </div>
+      </div>
+    </template>
+
+    <template #list>
+      <div class="space-y-3">
+        <div class="flex items-center gap-2">
+          <button @click="showCategoryManager = true; openCategoryManager()" class="px-3 py-1.5 rounded-lg bg-slate-200/70 dark:bg-slate-700/60 text-slate-700 dark:text-slate-200 text-sm font-bold hover:bg-slate-300 dark:hover:bg-slate-700 transition-colors">
+            分类
+          </button>
+          <button @click="openAuditLogs" class="px-3 py-1.5 rounded-lg bg-slate-200/70 dark:bg-slate-700/60 text-slate-700 dark:text-slate-200 text-sm font-bold hover:bg-slate-300 dark:hover:bg-slate-700 transition-colors">
+            日志
+          </button>
+          <div class="flex-1"></div>
+          <button @click="createNewProject" class="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center hover:bg-blue-200 transition-colors" title="添加新软件">
+            <Plus class="w-4 h-4" />
+          </button>
+        </div>
+
+        <div class="space-y-2">
+          <input v-model="projectQuery.q" @keyup.enter="fetchAdminProjects" type="text" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-blue-500 text-sm" placeholder="搜索项目（名称/开发者/关键词）" />
+          <select v-model="projectQuery.category" @change="projectQuery.page = 1; fetchAdminProjects()" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-blue-500 text-sm">
+            <option value="">全部分类</option>
+            <option v-for="c in adminCategories" :key="c.id" :value="c.id">{{ c.name }}</option>
+          </select>
+          <div class="flex gap-2">
+            <button @click="projectQuery.page = 1; fetchAdminProjects()" class="flex-1 px-3 py-2.5 rounded-xl bg-blue-500 hover:bg-blue-600 text-white text-sm font-bold transition-colors">搜索</button>
+            <button @click="resetProjectQuery" class="px-3 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-sm font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">重置</button>
+          </div>
+        </div>
+
+        <div class="space-y-2">
+          <div
+            v-for="p in projectsPage.items"
+            :key="p.id || p.slug || p.name"
+            @click="selectProject(p); panelRef?.close()"
+            class="p-3 rounded-xl border cursor-pointer transition-all duration-200 flex items-center gap-3"
+            :class="selectedProjectId === p.id ? 'bg-blue-500 text-white border-blue-500 shadow-md shadow-blue-500/20' : 'bg-slate-50 dark:bg-slate-900/50 border-transparent hover:border-blue-300'"
+          >
+            <img v-if="p.icon || p.avatar" :src="p.icon || p.avatar" class="w-8 h-8 rounded bg-white object-contain p-0.5" />
+            <div v-else class="w-8 h-8 rounded bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-xs font-bold text-slate-500">{{ (p.name || '?').charAt(0) }}</div>
+            <div class="flex-1 min-w-0">
+              <div class="font-medium truncate text-sm">{{ p.name }}</div>
+              <div class="text-xs opacity-80 truncate">{{ p.developer }}</div>
+            </div>
+          </div>
+          <div v-if="projectsPage.items.length === 0" class="text-sm text-slate-400 text-center py-10">暂无数据</div>
+        </div>
+
+        <div class="flex items-center justify-between text-sm pt-2 border-t border-slate-100 dark:border-slate-700">
+          <button @click="prevProjectPage" :disabled="projectsPage.page <= 1" class="px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed">上一页</button>
+          <div class="text-slate-500 dark:text-slate-300">{{ projectsPage.page }} / {{ Math.max(1, Math.ceil(projectsPage.total / projectsPage.pageSize)) }}</div>
+          <button @click="nextProjectPage" :disabled="projectsPage.page >= Math.ceil(projectsPage.total / projectsPage.pageSize)" class="px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed">下一页</button>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 dark:border-slate-700">
+          <button @click="exportJson" class="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-sm font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">导出 JSON</button>
+          <button @click="exportCsv" class="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-sm font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">导出 CSV</button>
+          <button @click="triggerImportJson" class="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-sm font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">导入 JSON</button>
+          <button @click="triggerImportCsv" class="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-sm font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">导入 CSV</button>
+          <input ref="importJsonInput" type="file" class="hidden" accept="application/json" @change="importProjectsJson" />
+          <input ref="importCsvInput" type="file" class="hidden" accept=".csv,text/csv" @change="importProjectsCsv" />
+        </div>
+      </div>
+    </template>
+  </FloatingPanel>
+
+  <div v-if="showCategoryManager" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="w-full max-w-3xl bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-2xl overflow-hidden">
+      <div class="p-6 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
+        <div class="text-xl font-extrabold text-slate-900 dark:text-white">分类管理</div>
+        <button @click="showCategoryManager = false" class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold">关闭</button>
+      </div>
+      <div class="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <input v-model="newCategoryName" type="text" placeholder="新分类名称" class="sm:col-span-1 px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 outline-none focus:border-emerald-500" />
+          <input v-model="newCategoryDescription" type="text" placeholder="描述（可选）" class="sm:col-span-2 px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 outline-none focus:border-emerald-500" />
+        </div>
+        <button @click="createCategory" class="w-full px-4 py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold transition-colors">创建分类</button>
+
+        <div class="space-y-3">
+          <div v-for="c in categoryDrafts" :key="c.id" class="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 items-center">
+              <input v-model="c.name" type="text" class="sm:col-span-1 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-emerald-500" />
+              <input v-model="c.description" type="text" class="sm:col-span-2 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-emerald-500" />
+            </div>
+            <div class="mt-3 flex gap-2">
+              <button @click="saveCategory(c)" class="flex-1 px-3 py-2 rounded-xl bg-blue-500 hover:bg-blue-600 text-white font-bold transition-colors">保存</button>
+              <button @click="deleteCategory(c)" class="px-3 py-2 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-bold transition-colors">删除</button>
+            </div>
+          </div>
+          <div v-if="categoryDrafts.length === 0" class="text-center text-slate-400 py-10">暂无分类</div>
+        </div>
       </div>
     </div>
+  </div>
 
-    <!-- 分类管理弹窗 -->
-    <div v-if="showCategoryManager" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div class="w-full max-w-3xl bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-2xl overflow-hidden">
-        <div class="p-6 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
-          <div class="text-xl font-extrabold text-slate-900 dark:text-white">分类管理</div>
-          <button @click="showCategoryManager = false" class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold">关闭</button>
-        </div>
-        <div class="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <input v-model="newCategoryName" type="text" placeholder="新分类名称" class="sm:col-span-1 px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 outline-none focus:border-emerald-500" />
-            <input v-model="newCategoryDescription" type="text" placeholder="描述（可选）" class="sm:col-span-2 px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 outline-none focus:border-emerald-500" />
+  <div v-if="showRevisionsModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="w-full max-w-3xl bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-2xl overflow-hidden">
+      <div class="p-6 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
+        <div class="text-xl font-extrabold text-slate-900 dark:text-white">历史版本</div>
+        <button @click="showRevisionsModal = false" class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold">关闭</button>
+      </div>
+      <div class="p-6 space-y-3 max-h-[70vh] overflow-y-auto">
+        <div v-for="r in revisions" :key="r.id" class="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 flex items-center justify-between gap-4">
+          <div class="min-w-0">
+            <div class="font-bold truncate">{{ new Date(r.created_at).toLocaleString() }}</div>
+            <div class="text-xs text-slate-500 dark:text-slate-400 truncate">{{ r.snapshot?.name }}</div>
           </div>
-          <button @click="createCategory" class="w-full px-4 py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold transition-colors">创建分类</button>
-
-          <div class="space-y-3">
-            <div v-for="c in categoryDrafts" :key="c.id" class="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950">
-              <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 items-center">
-                <input v-model="c.name" type="text" class="sm:col-span-1 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-emerald-500" />
-                <input v-model="c.description" type="text" class="sm:col-span-2 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-emerald-500" />
-              </div>
-              <div class="mt-3 flex gap-2">
-                <button @click="saveCategory(c)" class="flex-1 px-3 py-2 rounded-xl bg-blue-500 hover:bg-blue-600 text-white font-bold transition-colors">保存</button>
-                <button @click="deleteCategory(c)" class="px-3 py-2 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-bold transition-colors">删除</button>
-              </div>
-            </div>
-            <div v-if="categoryDrafts.length === 0" class="text-center text-slate-400 py-10">暂无分类</div>
-          </div>
+          <button @click="rollbackToRevision(r.id)" class="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold transition-colors">回滚</button>
         </div>
+        <div v-if="revisions.length === 0" class="text-center text-slate-400 py-10">暂无历史版本</div>
       </div>
     </div>
+  </div>
 
-    <!-- 历史版本弹窗 -->
-    <div v-if="showRevisionsModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div class="w-full max-w-3xl bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-2xl overflow-hidden">
-        <div class="p-6 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
-          <div class="text-xl font-extrabold text-slate-900 dark:text-white">历史版本</div>
-          <button @click="showRevisionsModal = false" class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold">关闭</button>
-        </div>
-        <div class="p-6 space-y-3 max-h-[70vh] overflow-y-auto">
-          <div v-for="r in revisions" :key="r.id" class="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 flex items-center justify-between gap-4">
-            <div class="min-w-0">
-              <div class="font-bold truncate">{{ new Date(r.created_at).toLocaleString() }}</div>
-              <div class="text-xs text-slate-500 dark:text-slate-400 truncate">{{ r.snapshot?.name }}</div>
-            </div>
-            <button @click="rollbackToRevision(r.id)" class="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold transition-colors">回滚</button>
-          </div>
-          <div v-if="revisions.length === 0" class="text-center text-slate-400 py-10">暂无历史版本</div>
-        </div>
+  <div v-if="showAuditModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="w-full max-w-4xl bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-2xl overflow-hidden">
+      <div class="p-6 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
+        <div class="text-xl font-extrabold text-slate-900 dark:text-white">最近操作日志</div>
+        <button @click="showAuditModal = false" class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold">关闭</button>
       </div>
-    </div>
-
-    <!-- 审计日志弹窗 -->
-    <div v-if="showAuditModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div class="w-full max-w-4xl bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-2xl overflow-hidden">
-        <div class="p-6 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
-          <div class="text-xl font-extrabold text-slate-900 dark:text-white">最近操作日志</div>
-          <button @click="showAuditModal = false" class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold">关闭</button>
-        </div>
-        <div class="p-6 max-h-[70vh] overflow-y-auto">
-          <div class="space-y-2">
-            <div v-for="l in auditPage.items" :key="l.id" class="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950">
-              <div class="flex items-center justify-between gap-4">
-                <div class="font-bold">{{ l.action }}</div>
-                <div class="text-xs text-slate-500 dark:text-slate-400">{{ new Date(l.created_at).toLocaleString() }}</div>
-              </div>
-              <div class="text-sm text-slate-700 dark:text-slate-200 mt-1">{{ l.entity_type }} {{ l.entity_id }}</div>
+      <div class="p-6 max-h-[70vh] overflow-y-auto">
+        <div class="space-y-2">
+          <div v-for="l in auditPage.items" :key="l.id" class="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950">
+            <div class="flex items-center justify-between gap-4">
+              <div class="font-bold">{{ l.action }}</div>
+              <div class="text-xs text-slate-500 dark:text-slate-400">{{ new Date(l.created_at).toLocaleString() }}</div>
             </div>
-            <div v-if="auditPage.items.length === 0" class="text-center text-slate-400 py-10">暂无日志</div>
+            <div class="text-sm text-slate-700 dark:text-slate-200 mt-1">{{ l.entity_type }} {{ l.entity_id }}</div>
           </div>
+          <div v-if="auditPage.items.length === 0" class="text-center text-slate-400 py-10">暂无日志</div>
         </div>
       </div>
     </div>
@@ -365,33 +321,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, onMounted } from 'vue';
 import { Save, Plus } from 'lucide-vue-next';
 import { adminFetch, formatAdminError, uploadFile, normalizeMediaUrl } from '../../composables/useAdminFetch';
+import FloatingPanel from '../../components/admin/FloatingPanel.vue';
 
-// 移动端适配
-const isMobile = ref(false);
-const mobileView = ref<'list' | 'detail'>('list');
-const updateIsMobile = () => {
-  if (typeof window !== 'undefined') {
-    isMobile.value = window.innerWidth < 1024;
-  }
-};
-onMounted(() => {
-  updateIsMobile();
-  window.addEventListener('resize', updateIsMobile);
-  fetchAdminCategories();
-  fetchAdminProjects();
-});
-onUnmounted(() => {
-  if (typeof window !== 'undefined') {
-    window.removeEventListener('resize', updateIsMobile);
-  }
-});
+const panelRef = ref<InstanceType<typeof FloatingPanel> | null>(null);
 
-const openDetail = () => { mobileView.value = 'detail'; };
-
-// 分类数据
 const adminCategories = ref<any[]>([]);
 
 const fetchAdminCategories = async () => {
@@ -408,7 +344,6 @@ const fetchAdminCategories = async () => {
   } catch {}
 };
 
-// 项目列表
 const projectsPage = ref<{ items: any[]; page: number; pageSize: number; total: number }>({
   items: [],
   page: 1,
@@ -423,7 +358,6 @@ const projectQuery = ref<{ q: string; category: string; page: number; pageSize: 
 });
 const selectedProjectId = ref<string | null>(null);
 const projectDraft = ref<any | null>(null);
-const projectMobileStep = ref(1);
 const isSaving = ref(false);
 const uploadErrorMessage = ref('');
 
@@ -505,7 +439,7 @@ const createNewProject = () => {
     keywords: '',
     category_id: projectQuery.value.category || null
   });
-  if (isMobile.value) openDetail();
+  panelRef.value?.close();
 };
 
 const saveProjects = async () => {
@@ -594,7 +528,6 @@ const resetProjectQuery = async () => {
   await fetchAdminProjects();
 };
 
-// 导入/导出
 const importJsonInput = ref<HTMLInputElement | null>(null);
 const importCsvInput = ref<HTMLInputElement | null>(null);
 
@@ -644,7 +577,6 @@ const importProjectsCsv = async (e: Event) => {
   }
 };
 
-// 图片上传
 const projectIconInput = ref<HTMLInputElement | null>(null);
 const projectBannerInput = ref<HTMLInputElement | null>(null);
 
@@ -675,7 +607,6 @@ const uploadProjectBanner = async (e: Event) => {
   }
 };
 
-// 平台开发者
 const addPlatformDeveloper = () => {
   if (!projectDraft.value) return;
   if (!Array.isArray(projectDraft.value.platform_developers)) projectDraft.value.platform_developers = [];
@@ -688,7 +619,6 @@ const removePlatformDeveloper = (idx: number) => {
   projectDraft.value.platform_developers.splice(idx, 1);
 };
 
-// 分类管理弹窗
 const showCategoryManager = ref(false);
 const categoryDrafts = ref<any[]>([]);
 const newCategoryName = ref('');
@@ -742,7 +672,6 @@ const deleteCategory = async (c: any) => {
   openCategoryManager();
 };
 
-// 历史版本弹窗
 const showRevisionsModal = ref(false);
 const revisions = ref<any[]>([]);
 
@@ -775,7 +704,6 @@ const rollbackToRevision = async (revisionId: string) => {
   showRevisionsModal.value = false;
 };
 
-// 审计日志弹窗
 const showAuditModal = ref(false);
 const auditPage = ref<{ items: any[]; page: number; pageSize: number; total: number }>({ items: [], page: 1, pageSize: 50, total: 0 });
 
@@ -788,4 +716,9 @@ const openAuditLogs = async () => {
   auditPage.value = await res.json();
   showAuditModal.value = true;
 };
+
+onMounted(() => {
+  fetchAdminCategories();
+  fetchAdminProjects();
+});
 </script>

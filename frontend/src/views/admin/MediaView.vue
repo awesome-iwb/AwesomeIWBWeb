@@ -1,58 +1,140 @@
 <template>
-  <div class="grid grid-cols-1 lg:grid-cols-4 gap-4 lg:gap-8">
-    <div
-      class="lg:col-span-1 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col"
-      :class="{ 'hidden lg:flex': isMobile && mobileView === 'detail' }"
-      style="height: auto; min-height: 400px; max-height: 700px;"
-    >
-      <div class="p-4 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
-        <h2 class="font-bold text-lg">媒体列表</h2>
+  <FloatingPanel
+    ref="panelRef"
+    :selected-label="selectedLabel"
+    placeholder="选择一个媒体文件"
+    list-label="媒体库"
+    :count="mediaPage.total"
+    :prev-enabled="mediaPage.page > 1 && !mediaLoading"
+    :next-enabled="mediaPage.page < maxPage && !mediaLoading"
+    @prev="prevMediaPage"
+    @next="nextMediaPage"
+  >
+    <template #content>
+      <div v-if="mediaDraft" class="bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+        <div class="p-4 lg:p-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50">
+          <div class="flex items-center gap-3">
+            <div>
+              <h2 class="text-lg lg:text-xl font-bold text-slate-800 dark:text-white">媒体详情</h2>
+              <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">{{ mediaDraft.id }}</p>
+            </div>
+          </div>
+        </div>
+        <div class="p-4 lg:p-6 space-y-4">
+          <div v-if="mediaError" class="p-3 rounded-xl bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-300 text-sm">{{ mediaError }}</div>
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div class="rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 p-4">
+              <img v-if="mediaDraft.url" :src="mediaDraft.url" class="w-full h-56 object-contain rounded-xl bg-white dark:bg-slate-800" />
+              <div v-else class="w-full h-56 rounded-xl bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-slate-500">无预览</div>
+            </div>
+            <div class="space-y-3">
+              <div class="text-sm"><span class="font-bold text-slate-700 dark:text-slate-300">URL：</span><a :href="mediaDraft.url" target="_blank" class="text-emerald-500 break-all hover:underline">{{ mediaDraft.url || '-' }}</a></div>
+              <div class="text-sm"><span class="font-bold text-slate-700 dark:text-slate-300">MIME：</span>{{ mediaDraft.mime || '-' }}</div>
+              <div class="text-sm"><span class="font-bold text-slate-700 dark:text-slate-300">大小：</span>{{ formatBytes(mediaDraft.size) }}</div>
+              <div class="text-sm"><span class="font-bold text-slate-700 dark:text-slate-300">状态：</span>{{ mediaDraft.deleted_at ? '已删除' : '正常' }}</div>
+              <div class="text-sm"><span class="font-bold text-slate-700 dark:text-slate-300">创建时间：</span>{{ formatDateTime(mediaDraft.created_at) }}</div>
+              <div class="text-sm">
+                <span class="font-bold text-slate-700 dark:text-slate-300">标签：</span>
+                <div class="mt-1">
+                  <MediaTagInput v-model="mediaDraftTags" @update:model-value="saveMediaTags" />
+                </div>
+              </div>
+              <div class="text-sm">
+                <span class="font-bold text-slate-700 dark:text-slate-300">引用：</span>
+                <button @click="toggleInlineRefs" class="ml-2 text-emerald-500 hover:underline text-xs">
+                  {{ showInlineRefs ? '收起引用' : `查看引用 (${inlineRefCount})` }}
+                </button>
+              </div>
+              <div v-if="showInlineRefs" class="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 p-3 max-h-48 overflow-y-auto space-y-2">
+                <div v-if="inlineRefLoading" class="text-xs text-slate-400 text-center py-4">加载中...</div>
+                <div v-else-if="inlineRefs.length === 0" class="text-xs text-slate-400 text-center py-4">暂无引用</div>
+                <div v-else v-for="(refItem, idx) in inlineRefs" :key="idx" class="p-2 rounded-lg border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-950">
+                  <pre class="text-[10px] whitespace-pre-wrap break-words text-slate-700 dark:text-slate-200">{{ JSON.stringify(refItem, null, 2) }}</pre>
+                </div>
+              </div>
+              <div class="flex flex-wrap gap-2 pt-2">
+                <button v-if="!mediaDraft.deleted_at" @click="softDeleteMedia(mediaDraft.id)" :disabled="mediaActionLoading" class="px-4 py-2 rounded-xl bg-rose-500 hover:bg-rose-600 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-bold transition-colors">{{ mediaActionLoading ? '处理中...' : '软删除' }}</button>
+                <button v-else @click="restoreMedia(mediaDraft.id)" :disabled="mediaActionLoading" class="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-bold transition-colors">{{ mediaActionLoading ? '处理中...' : '恢复' }}</button>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
-      <div class="p-4 border-b border-slate-100 dark:border-slate-700 space-y-3">
+      <div v-else class="flex items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-3xl min-h-[300px] lg:min-h-[700px]">
+        <p class="text-slate-400">点击下方悬浮栏选择媒体文件</p>
+      </div>
+
+      <div v-if="showBatchTagDialog" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+        <div class="w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-2xl overflow-hidden">
+          <div class="p-6 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
+            <div class="text-xl font-extrabold text-slate-900 dark:text-white">批量打标签</div>
+            <button @click="showBatchTagDialog = false" class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold">关闭</button>
+          </div>
+          <div class="p-6 space-y-4">
+            <div>
+              <label class="text-sm font-bold text-slate-700 dark:text-slate-300 block mb-1">添加标签</label>
+              <MediaTagInput v-model="batchTagsToAdd" />
+            </div>
+            <div>
+              <label class="text-sm font-bold text-slate-700 dark:text-slate-300 block mb-1">移除标签</label>
+              <MediaTagInput v-model="batchTagsToRemove" />
+            </div>
+            <div v-if="batchTagError" class="p-3 rounded-xl bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-300 text-sm">{{ batchTagError }}</div>
+            <button @click="handleBatchTag" :disabled="batchTagLoading" class="w-full px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-bold transition-colors">
+              {{ batchTagLoading ? '处理中...' : `确认（${selectedIds.length} 项）` }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <template #list>
+      <div class="space-y-3">
         <input
           v-model="mediaQuery.q"
           @keyup.enter="mediaQuery.page = 1; fetchMediaList()"
           type="text"
-          class="w-full px-3 py-3 lg:py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-emerald-500 text-base lg:text-sm"
+          class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-emerald-500 text-sm"
           placeholder="搜索 URL / MIME / 文件名"
         />
-        <select
-          v-model="mediaQuery.status"
-          @change="mediaQuery.page = 1; fetchMediaList()"
-          class="w-full px-3 py-3 lg:py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-emerald-500 text-base lg:text-sm"
-        >
-          <option value="all">全部状态</option>
-          <option value="active">正常</option>
-          <option value="deleted">已删除</option>
-        </select>
-        <select
-          v-model="mediaQuery.mime"
-          @change="mediaQuery.page = 1; fetchMediaList()"
-          class="w-full px-3 py-3 lg:py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-emerald-500 text-base lg:text-sm"
-        >
-          <option value="">全部类型</option>
-          <option value="image/png">image/png</option>
-          <option value="image/jpeg">image/jpeg</option>
-          <option value="image/webp">image/webp</option>
-          <option value="image/gif">image/gif</option>
-          <option value="image/svg+xml">image/svg+xml</option>
-        </select>
-        <div class="relative">
+        <div class="grid grid-cols-2 gap-2">
           <select
-            v-model="mediaQuery.tag"
+            v-model="mediaQuery.status"
             @change="mediaQuery.page = 1; fetchMediaList()"
-            class="w-full px-3 py-3 lg:py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-emerald-500 text-base lg:text-sm"
+            class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-emerald-500 text-sm"
           >
-            <option value="">全部标签</option>
-            <option v-for="t in allTags" :key="t" :value="t">{{ t }}</option>
+            <option value="all">全部状态</option>
+            <option value="active">正常</option>
+            <option value="deleted">已删除</option>
+          </select>
+          <select
+            v-model="mediaQuery.mime"
+            @change="mediaQuery.page = 1; fetchMediaList()"
+            class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-emerald-500 text-sm"
+          >
+            <option value="">全部类型</option>
+            <option value="image/png">image/png</option>
+            <option value="image/jpeg">image/jpeg</option>
+            <option value="image/webp">image/webp</option>
+            <option value="image/gif">image/gif</option>
+            <option value="image/svg+xml">image/svg+xml</option>
           </select>
         </div>
+        <select
+          v-model="mediaQuery.tag"
+          @change="mediaQuery.page = 1; fetchMediaList()"
+          class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-emerald-500 text-sm"
+        >
+          <option value="">全部标签</option>
+          <option v-for="t in allTags" :key="t" :value="t">{{ t }}</option>
+        </select>
         <div class="flex gap-2">
-          <button @click="mediaQuery.page = 1; fetchMediaList()" class="flex-1 px-3 py-3 lg:py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-base lg:text-sm font-bold transition-colors">搜索</button>
-          <button @click="resetMediaQuery" class="px-3 py-3 lg:py-2 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-base lg:text-sm font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">重置</button>
+          <button @click="mediaQuery.page = 1; fetchMediaList()" class="flex-1 px-3 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold transition-colors">搜索</button>
+          <button @click="resetMediaQuery" class="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-sm font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">重置</button>
         </div>
       </div>
-      <div class="p-3">
+
+      <div class="mt-3">
         <MediaBatchActions
           :selected-ids="selectedIds"
           @batch-tag="openBatchTagDialog"
@@ -60,7 +142,8 @@
           @clear-selection="clearSelection"
         />
       </div>
-      <div class="flex-1 overflow-y-auto p-4 space-y-2">
+
+      <div class="mt-3 space-y-2">
         <div v-if="mediaLoading" class="text-sm text-slate-400 text-center py-10">加载中...</div>
         <div
           v-else
@@ -75,9 +158,9 @@
             @click.stop="toggleSelect(m.id)"
             class="w-4 h-4 rounded border-slate-300 text-emerald-500 focus:ring-emerald-500 shrink-0"
           />
-          <div @click="selectMedia(m); if (isMobile) openDetail()" class="flex items-center gap-3 flex-1 min-w-0">
-            <img v-if="m.url" :src="m.url" class="w-10 h-10 lg:w-8 lg:h-8 rounded bg-white object-cover shrink-0" />
-            <div v-else class="w-10 h-10 lg:w-8 lg:h-8 rounded bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-xs font-bold text-slate-500 shrink-0">图</div>
+          <div @click="selectMedia(m)" class="flex items-center gap-3 flex-1 min-w-0">
+            <img v-if="m.url" :src="m.url" class="w-8 h-8 rounded bg-white object-cover shrink-0" />
+            <div v-else class="w-8 h-8 rounded bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-xs font-bold text-slate-500 shrink-0">图</div>
             <div class="flex-1 min-w-0">
               <div class="font-medium truncate text-sm">{{ m.mime || '未知类型' }}</div>
               <div class="text-xs opacity-80 truncate">{{ m.url || '-' }}</div>
@@ -100,128 +183,28 @@
         </div>
         <div v-if="!mediaLoading && mediaPage.items.length === 0" class="text-sm text-slate-400 text-center py-10">暂无数据</div>
       </div>
-      <div class="p-4 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between text-sm">
+
+      <div class="mt-3 flex items-center justify-between text-sm">
         <button @click="prevMediaPage" :disabled="mediaPage.page <= 1 || mediaLoading" class="px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed">上一页</button>
         <div class="text-slate-500 dark:text-slate-300">{{ mediaPage.page }} / {{ maxPage }}</div>
         <button @click="nextMediaPage" :disabled="mediaPage.page >= maxPage || mediaLoading" class="px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed">下一页</button>
       </div>
-    </div>
-
-    <div
-      class="lg:col-span-3 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden"
-      :class="{ 'hidden': isMobile && mobileView === 'list' }"
-      v-if="mediaDraft"
-    >
-      <div class="p-4 lg:p-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50">
-        <div class="flex items-center gap-3">
-          <button v-if="isMobile" @click="backToList" class="p-2 -ml-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
-          </button>
-          <div>
-            <h2 class="text-lg lg:text-xl font-bold text-slate-800 dark:text-white">媒体详情</h2>
-            <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">{{ mediaDraft.id }}</p>
-          </div>
-        </div>
-      </div>
-      <div class="p-4 lg:p-6 space-y-4">
-        <div v-if="mediaError" class="p-3 rounded-xl bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-300 text-sm">{{ mediaError }}</div>
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div class="rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 p-4">
-            <img v-if="mediaDraft.url" :src="mediaDraft.url" class="w-full h-56 object-contain rounded-xl bg-white dark:bg-slate-800" />
-            <div v-else class="w-full h-56 rounded-xl bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-slate-500">无预览</div>
-          </div>
-          <div class="space-y-3">
-            <div class="text-sm"><span class="font-bold text-slate-700 dark:text-slate-300">URL：</span><a :href="mediaDraft.url" target="_blank" class="text-emerald-500 break-all hover:underline">{{ mediaDraft.url || '-' }}</a></div>
-            <div class="text-sm"><span class="font-bold text-slate-700 dark:text-slate-300">MIME：</span>{{ mediaDraft.mime || '-' }}</div>
-            <div class="text-sm"><span class="font-bold text-slate-700 dark:text-slate-300">大小：</span>{{ formatBytes(mediaDraft.size) }}</div>
-            <div class="text-sm"><span class="font-bold text-slate-700 dark:text-slate-300">状态：</span>{{ mediaDraft.deleted_at ? '已删除' : '正常' }}</div>
-            <div class="text-sm"><span class="font-bold text-slate-700 dark:text-slate-300">创建时间：</span>{{ formatDateTime(mediaDraft.created_at) }}</div>
-            <div class="text-sm">
-              <span class="font-bold text-slate-700 dark:text-slate-300">标签：</span>
-              <div class="mt-1">
-                <MediaTagInput v-model="mediaDraftTags" @update:model-value="saveMediaTags" />
-              </div>
-            </div>
-            <div class="text-sm">
-              <span class="font-bold text-slate-700 dark:text-slate-300">引用：</span>
-              <button @click="toggleInlineRefs" class="ml-2 text-emerald-500 hover:underline text-xs">
-                {{ showInlineRefs ? '收起引用' : `查看引用 (${inlineRefCount})` }}
-              </button>
-            </div>
-            <div v-if="showInlineRefs" class="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 p-3 max-h-48 overflow-y-auto space-y-2">
-              <div v-if="inlineRefLoading" class="text-xs text-slate-400 text-center py-4">加载中...</div>
-              <div v-else-if="inlineRefs.length === 0" class="text-xs text-slate-400 text-center py-4">暂无引用</div>
-              <div v-else v-for="(refItem, idx) in inlineRefs" :key="idx" class="p-2 rounded-lg border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-950">
-                <pre class="text-[10px] whitespace-pre-wrap break-words text-slate-700 dark:text-slate-200">{{ JSON.stringify(refItem, null, 2) }}</pre>
-              </div>
-            </div>
-            <div class="flex flex-wrap gap-2 pt-2">
-              <button v-if="!mediaDraft.deleted_at" @click="softDeleteMedia(mediaDraft.id)" :disabled="mediaActionLoading" class="px-4 py-2 rounded-xl bg-rose-500 hover:bg-rose-600 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-bold transition-colors">{{ mediaActionLoading ? '处理中...' : '软删除' }}</button>
-              <button v-else @click="restoreMedia(mediaDraft.id)" :disabled="mediaActionLoading" class="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-bold transition-colors">{{ mediaActionLoading ? '处理中...' : '恢复' }}</button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div
-      v-else
-      class="lg:col-span-3 flex items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-3xl min-h-[300px] lg:min-h-[700px]"
-      :class="{ 'hidden': isMobile && mobileView === 'list' }"
-    >
-      <p class="text-slate-400">请在左侧选择一个媒体文件</p>
-    </div>
-
-    <div v-if="showBatchTagDialog" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div class="w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-2xl overflow-hidden">
-        <div class="p-6 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
-          <div class="text-xl font-extrabold text-slate-900 dark:text-white">批量打标签</div>
-          <button @click="showBatchTagDialog = false" class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold">关闭</button>
-        </div>
-        <div class="p-6 space-y-4">
-          <div>
-            <label class="text-sm font-bold text-slate-700 dark:text-slate-300 block mb-1">添加标签</label>
-            <MediaTagInput v-model="batchTagsToAdd" />
-          </div>
-          <div>
-            <label class="text-sm font-bold text-slate-700 dark:text-slate-300 block mb-1">移除标签</label>
-            <MediaTagInput v-model="batchTagsToRemove" />
-          </div>
-          <div v-if="batchTagError" class="p-3 rounded-xl bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-300 text-sm">{{ batchTagError }}</div>
-          <button @click="handleBatchTag" :disabled="batchTagLoading" class="w-full px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-bold transition-colors">
-            {{ batchTagLoading ? '处理中...' : `确认（${selectedIds.length} 项）` }}
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
+    </template>
+  </FloatingPanel>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { adminFetch, formatAdminError, formatBytes, formatDateTime } from '../../composables/useAdminFetch';
 import MediaTagInput from '../../components/admin/MediaTagInput.vue';
 import MediaBatchActions from '../../components/admin/MediaBatchActions.vue';
+import FloatingPanel from '../../components/admin/FloatingPanel.vue';
 
-const isMobile = ref(false);
-const updateIsMobile = () => {
-  if (typeof window !== 'undefined') {
-    isMobile.value = window.innerWidth < 1024;
-  }
-};
+const panelRef = ref<InstanceType<typeof FloatingPanel> | null>(null);
+
 onMounted(() => {
-  updateIsMobile();
-  window.addEventListener('resize', updateIsMobile);
   fetchMediaList();
 });
-onUnmounted(() => {
-  if (typeof window !== 'undefined') {
-    window.removeEventListener('resize', updateIsMobile);
-  }
-});
-
-const mobileView = ref<'list' | 'detail'>('list');
-const openDetail = () => { mobileView.value = 'detail'; };
-const backToList = () => { mobileView.value = 'list'; };
 
 const mediaPage = ref<{ items: any[]; page: number; pageSize: number; total: number }>({
   items: [],
@@ -259,6 +242,11 @@ const inlineRefLoading = ref(false);
 const inlineRefCount = ref(0);
 
 const mediaDraftTags = ref<string[]>([]);
+
+const selectedLabel = computed(() => {
+  if (!mediaDraft.value) return '';
+  return mediaDraft.value.url || mediaDraft.value.filename || mediaDraft.value.id || '';
+});
 
 watch(mediaDraft, (draft) => {
   mediaDraftTags.value = Array.isArray(draft?.tags) ? [...draft.tags] : [];
@@ -349,6 +337,7 @@ const selectMedia = (media: any) => {
   selectedMediaId.value = media?.id ?? null;
   mediaDraft.value = media ? { ...media } : null;
   mediaError.value = '';
+  panelRef.value?.close();
 };
 
 const prevMediaPage = async () => {
