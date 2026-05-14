@@ -1428,6 +1428,111 @@ const app = new Elysia()
     const [{ total_comments }] = await sql().unsafe(`select count(*)::text as total_comments from feedback_entries where project_name in (${nameList}) and kind = 'comment'`) as Array<{ total_comments: string }>;
     return { projects: projectIds.length, totalBugs: Number(total_bugs), openBugs: Number(open_bugs), totalComments: Number(total_comments) };
   })
+  .get("/api/dev/organizations", async ({ user, set }) => {
+    const capErr = await checkCap(user, set, "dev_panel_access");
+    if (capErr) return capErr;
+    if (!user) return apiUnauthorized(set);
+    return getUserOrganizations(user.id);
+  })
+  .post("/api/dev/organizations", async ({ body, user, set }) => {
+    const capErr = await checkCap(user, set, "user:create_org");
+    if (capErr) return capErr;
+    if (!user) return apiUnauthorized(set);
+    const payload = body as any;
+    if (!payload?.name) return apiBadRequest(set, "name is required");
+    if (!validateOrgName(payload.name)) return apiBadRequest(set, "Invalid organization name");
+    const slug = payload.slug ?? generateOrgSlug(payload.name);
+    const existing = await findOrganizationBySlug(slug);
+    if (existing) return apiBadRequest(set, "Slug already taken");
+    const org = await createOrganization({ name: payload.name, slug, description: payload.description, website_url: payload.website_url, created_by: user.id });
+    await logAuditCompat({ actor: user.name, action: "create", entity_type: "organization", entity_id: org.id, diff: { name: payload.name, slug } });
+    return org;
+  })
+  .get("/api/dev/organizations/:id", async ({ params: { id }, user, set }) => {
+    const capErr = await checkCap(user, set, "dev_panel_access");
+    if (capErr) return capErr;
+    if (!user) return apiUnauthorized(set);
+    const org = await findOrganizationById(id);
+    if (!org) return apiNotFound(set, "Organization not found");
+    const isAdmin = await isOrgAdminOrAbove(id, user.id);
+    const memberCheck = await isOrgMember(id, user.id);
+    if (!memberCheck && org.status !== "approved") return apiForbidden(set, "Not a member");
+    const members = await getOrganizationMembers(id);
+    return { ...org, members, is_admin: isAdmin };
+  })
+  .patch("/api/dev/organizations/:id", async ({ params: { id }, body, user, set }) => {
+    const capErr = await checkCap(user, set, "dev:member_manage");
+    if (capErr) return capErr;
+    if (!user) return apiUnauthorized(set);
+    const isAdmin = await isOrgAdminOrAbove(id, user.id);
+    if (!isAdmin) return apiForbidden(set, "Only owner/admin can edit organization");
+    const payload = body as any;
+    const updated = await updateOrganization(id, { name: payload?.name, description: payload?.description, website_url: payload?.website_url, avatar_url: payload?.avatar_url });
+    if (!updated) return apiNotFound(set, "Organization not found");
+    return updated;
+  })
+  .get("/api/dev/organizations/:id/members", async ({ params: { id }, user, set }) => {
+    const capErr = await checkCap(user, set, "dev_panel_access");
+    if (capErr) return capErr;
+    if (!user) return apiUnauthorized(set);
+    const memberCheck = await isOrgMember(id, user.id);
+    if (!memberCheck) return apiForbidden(set, "Not a member");
+    return getOrganizationMembers(id);
+  })
+  .post("/api/dev/organizations/:id/members", async ({ params: { id }, body, user, set }) => {
+    const capErr = await checkCap(user, set, "dev:member_manage");
+    if (capErr) return capErr;
+    if (!user) return apiUnauthorized(set);
+    const isAdmin = await isOrgAdminOrAbove(id, user.id);
+    if (!isAdmin) return apiForbidden(set, "Only owner/admin can invite members");
+    const payload = body as any;
+    if (!payload?.user_id) return apiBadRequest(set, "user_id is required");
+    const result = await addOrganizationMember({ org_id: id, user_id: payload.user_id, role: payload.role ?? "member" });
+    await promoteToDev(payload.user_id);
+    return result;
+  })
+  .delete("/api/dev/organizations/:id/members/:userId", async ({ params: { id, userId }, user, set }) => {
+    const capErr = await checkCap(user, set, "dev:member_manage");
+    if (capErr) return capErr;
+    if (!user) return apiUnauthorized(set);
+    const isAdmin = await isOrgAdminOrAbove(id, user.id);
+    if (!isAdmin) return apiForbidden(set, "Only owner/admin can remove members");
+    const removed = await removeOrganizationMember(id, userId);
+    if (!removed) return apiBadRequest(set, "Cannot remove member");
+    await demoteFromDev(userId);
+    return { ok: true };
+  })
+  .patch("/api/dev/organizations/:id/members/:userId", async ({ params: { id, userId }, body, user, set }) => {
+    const capErr = await checkCap(user, set, "dev:member_manage");
+    if (capErr) return capErr;
+    if (!user) return apiUnauthorized(set);
+    const isOrgOwner = await sql()<Array<{ role: string }>>`select role from organization_members where org_id = ${id} and user_id = ${user.id} and role = 'owner'`;
+    if (!isOrgOwner.length) return apiForbidden(set, "Only owner can change member roles");
+    const payload = body as any;
+    if (!payload?.role || !["admin", "member"].includes(payload.role)) return apiBadRequest(set, "Invalid role");
+    const result = await updateOrganizationMemberRole(id, userId, payload.role);
+    if (!result) return apiBadRequest(set, "Cannot update role");
+    return result;
+  })
+  .post("/api/dev/project-claims", async ({ body, user, set }) => {
+    const capErr = await checkCap(user, set, "dev_panel_access");
+    if (capErr) return capErr;
+    if (!user) return apiUnauthorized(set);
+    const payload = body as any;
+    if (!payload?.project_id) return apiBadRequest(set, "project_id is required");
+    const existing = await isProjectMember(payload.project_id, user.id);
+    if (existing) return apiBadRequest(set, "Already a project member");
+    const claim = await createProjectClaim({ project_id: payload.project_id, user_id: user.id, message: payload.message });
+    return claim;
+  })
+  .get("/api/dev/project-claims", async ({ user, set, query }) => {
+    const capErr = await checkCap(user, set, "dev_panel_access");
+    if (capErr) return capErr;
+    if (!user) return apiUnauthorized(set);
+    const page = Math.max(1, Number((query as any)?.page) || 1);
+    const pageSize = Math.min(100, Math.max(1, Number((query as any)?.pageSize) || 20));
+    return listProjectClaims({ user_id: user.id, page, pageSize });
+  })
   .post("/api/submit", async ({ body, set, headers }) => {
     if (checkRateLimit({ headers, path: "/api/submit", set })) return apiError(set, 429, "RATE_LIMITED", "Too Many Requests");
     const payload: any = body as any;
