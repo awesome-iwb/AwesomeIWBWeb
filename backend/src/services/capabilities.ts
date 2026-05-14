@@ -13,6 +13,12 @@ export type Capability = {
 };
 
 const ALL_CAPABILITIES: Capability[] = [
+  { id: "user:comment", name: "发表评论", category: "user", description: "发表项目评论", sort_index: 10 },
+  { id: "user:avatar", name: "上传头像", category: "user", description: "上传和更改头像", sort_index: 20 },
+  { id: "user:feedback", name: "提交反馈", category: "user", description: "提交 Bug 反馈", sort_index: 30 },
+  { id: "user:submit_project", name: "提交项目", category: "user", description: "提交新项目申请", sort_index: 40 },
+  { id: "user:profile", name: "修改资料", category: "user", description: "修改个人资料", sort_index: 50 },
+  { id: "user:create_org", name: "创建组织", category: "user", description: "申请创建组织", sort_index: 60 },
   { id: "admin_panel_access", name: "访问运维后台", category: "panel", description: "查看和进入运维管理后台", sort_index: 10 },
   { id: "dev_panel_access", name: "访问开发者后台", category: "panel", description: "查看和进入开发者后台", sort_index: 20 },
   { id: "project:read", name: "查看项目", category: "project", description: "查看项目列表和详情", sort_index: 100 },
@@ -38,6 +44,14 @@ const ALL_CAPABILITIES: Capability[] = [
   { id: "comment:manage", name: "管理评论", category: "comment", description: "管理自己和他人的评论/Issue状态", sort_index: 1950 },
   { id: "media:read", name: "查看媒体", category: "media", description: "查看媒体资产和引用关系", sort_index: 2000 },
   { id: "media:manage", name: "管理媒体", category: "media", description: "软删除和恢复媒体资产", sort_index: 2010 },
+  { id: "dev:project_edit", name: "编辑项目", category: "dev", description: "编辑自己参与的项目", sort_index: 2100 },
+  { id: "dev:bug_manage", name: "管理 Bug", category: "dev", description: "处理自己项目的 Bug 反馈", sort_index: 2200 },
+  { id: "dev:comment_manage", name: "管理评论", category: "dev", description: "管理自己项目的评论", sort_index: 2300 },
+  { id: "dev:stats_view", name: "查看数据", category: "dev", description: "查看自己项目的统计数据", sort_index: 2400 },
+  { id: "dev:member_manage", name: "管理成员", category: "dev", description: "管理项目/组织成员", sort_index: 2500 },
+  { id: "org:review", name: "审核组织", category: "org", description: "审核组织创建申请", sort_index: 2600 },
+  { id: "claim:review", name: "审核认领", category: "claim", description: "审核项目认领申请", sort_index: 2700 },
+  { id: "org:manage", name: "管理组织", category: "org", description: "管理组织状态", sort_index: 2800 },
 ];
 
 const ALL_CAPABILITY_IDS = new Set(ALL_CAPABILITIES.map(c => c.id));
@@ -122,39 +136,39 @@ export const ROLE_TEMPLATES: Record<string, RoleTemplate> = {
     name: "超级管理员",
     capabilityIds: getAllCapabilityIds(),
   },
+  user: {
+    name: "用户",
+    capabilityIds: [
+      "user:comment", "user:avatar", "user:feedback",
+      "user:submit_project", "user:profile", "user:create_org",
+    ],
+  },
+  developer: {
+    name: "开发者",
+    capabilityIds: [
+      "user:comment", "user:avatar", "user:feedback",
+      "user:submit_project", "user:profile", "user:create_org",
+      "dev_panel_access",
+      "dev:project_edit", "dev:bug_manage", "dev:comment_manage",
+      "dev:stats_view", "dev:member_manage",
+    ],
+  },
   reviewer: {
     name: "审核员",
     capabilityIds: [
       "admin_panel_access",
-      "submission:read",
-      "submission:approve",
-      "submission:reject",
-      "moderation:read",
-      "moderation:approve",
-      "moderation:reject",
-      "feedback:manage",
-      "comment:manage",
+      "submission:read", "submission:approve", "submission:reject",
+      "moderation:read", "moderation:approve", "moderation:reject",
+      "feedback:manage", "comment:manage",
+      "org:review", "claim:review",
     ],
   },
   editor: {
     name: "编辑",
     capabilityIds: [
       "admin_panel_access",
-      "story:manage",
-      "project:read",
-      "project:create",
-      "project:update",
-      "category:manage",
-      "media:read",
-      "media:manage",
-    ],
-  },
-  developer: {
-    name: "开发者",
-    capabilityIds: [
-      "dev_panel_access",
-      "project:read",
-      "submission:read",
+      "story:manage", "project:read", "project:create", "project:update",
+      "category:manage", "media:read", "media:manage",
     ],
   },
 };
