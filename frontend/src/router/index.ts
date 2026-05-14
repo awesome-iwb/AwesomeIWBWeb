@@ -13,7 +13,6 @@ import AuthResultView from '../views/AuthResultView.vue'
 import AuthPopupCallbackView from '../views/AuthPopupCallbackView.vue'
 import NotFoundView from '../views/NotFoundView.vue'
 import { useAuth } from '../composables/useAuth'
-const isDev = import.meta.env.DEV
 
 export const routes: RouteRecordRaw[] = [
   {
@@ -99,14 +98,22 @@ export const routes: RouteRecordRaw[] = [
     component: AuthResultView,
     meta: { showNavBar: true, showBack: true, title: '账号信息确认', requiresAuth: true }
   },
-  ...(isDev
-    ? [{
-        path: '/dev',
-        name: 'dev',
-        component: () => import('../views/DevView.vue'),
-        meta: { showNavBar: true, showBack: true, title: '开发者后台', requiresAuth: true, requiresCapability: 'dev_panel_access' }
-      } as RouteRecordRaw]
-    : []),
+  {
+    path: '/dev',
+    component: () => import('../views/dev/DevLayout.vue'),
+    meta: { requiresAuth: true, requiresCapability: 'dev_panel_access' },
+    children: [
+      { path: '', redirect: '/dev/dashboard' },
+      { path: 'dashboard', name: 'dev-dashboard', component: () => import('../views/dev/DevDashboardView.vue'), meta: { title: '总览' } },
+      { path: 'organizations', name: 'dev-organizations', component: () => import('../views/dev/DevOrganizationsView.vue'), meta: { title: '组织管理' } },
+      { path: 'organizations/create', name: 'dev-org-create', component: () => import('../views/dev/DevOrgCreateView.vue'), meta: { title: '创建组织' } },
+      { path: 'organizations/:id', name: 'dev-org-detail', component: () => import('../views/dev/DevOrgDetailView.vue'), meta: { title: '组织详情' } },
+      { path: 'projects', name: 'dev-projects', component: () => import('../views/dev/DevProjectsView.vue'), meta: { title: '项目管理' } },
+      { path: 'projects/:id', name: 'dev-project-detail', component: () => import('../views/dev/DevProjectDetailView.vue'), meta: { title: '项目详情' } },
+      { path: 'bugs', name: 'dev-bugs', component: () => import('../views/dev/DevBugsView.vue'), meta: { title: 'Bug 反馈' } },
+      { path: 'comments', name: 'dev-comments', component: () => import('../views/dev/DevCommentsView.vue'), meta: { title: '评论管理' } },
+    ],
+  },
   {
     path: '/project/:name',
     name: 'project-detail',
