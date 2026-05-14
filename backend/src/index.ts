@@ -60,9 +60,15 @@ import { ensureSuperadminInitialized, SUPERADMIN_INITIAL_USERNAME, setLocalAccou
 import { listCapabilities, getUserCapabilitiesWithInfo, setUserCapabilities, isSuperadmin as isSuperadminUser } from "./services/capabilities";
 import { getRoleTemplates } from "./services/capabilities";
 import { getDashboardData } from "./services/dashboard";
-import { createOrGetMediaAssetFromUpload, getMediaReferences, listMediaAssets, restoreMedia, softDeleteMedia, getMediaTags, setMediaTags, batchTagMedia, batchSoftDeleteMedia } from "./services/media";
+import { createOrGetMediaAssetFromUpload, getMediaReferences, listMediaAssets, restoreMedia, softDeleteMedia, getMediaTags, setMediaTags, batchTagMedia, batchSoftDeleteMedia, upsertMediaReference, upsertMediaReferencesForEntity } from "./services/media";
+import { buildKey, writeFile as storageWriteFile, readFile as storageReadFile, publicUrl as storagePublicUrl, ensureRoot } from "./services/storage";
 import { appConfig } from "./config";
 import { checkRateLimit } from "./plugins/rateLimit";
+import { addProjectMember, removeProjectMember, removeProjectOrgMember, getProjectMembers, getUserProjects, isProjectMember, isProjectOwner } from "./services/projectMembers";
+import { createOrganization, findOrganizationById, findOrganizationBySlug, listOrganizations, updateOrganization, updateOrganizationStatus, deleteOrganization, getOrganizationMembers, addOrganizationMember, removeOrganizationMember, updateOrganizationMemberRole, getUserOrganizations, isOrgMember, isOrgAdminOrAbove, generateOrgSlug, validateOrgName, type OrganizationStatus } from "./services/organizations";
+import { createProjectClaim, listProjectClaims, approveProjectClaim, rejectProjectClaim, type ClaimStatus } from "./services/projectClaims";
+import { promoteToDev, demoteFromDev } from "./services/rolePromotion";
+import { sql } from "./db/client";
 
 /**
  * Awesome-IWB backend API.
@@ -79,8 +85,7 @@ await fs.mkdir(STORIES_DIR, { recursive: true });
 const RUNTIME_DIR = path.join(__dirname, "../runtime");
 await fs.mkdir(RUNTIME_DIR, { recursive: true });
 
-const UPLOADS_DIR = path.join(RUNTIME_DIR, "uploads");
-await fs.mkdir(UPLOADS_DIR, { recursive: true });
+await ensureRoot();
 
 const DATA_PATH = path.join(RUNTIME_DIR, "data.json");
 const SUBMISSIONS_PATH = path.join(RUNTIME_DIR, "submissions.json");
@@ -275,6 +280,7 @@ function trySendNotModified(headers: Record<string, string | undefined>, set: an
 async function registerUploadedMedia(input: {
   sha256: string;
   filename: string;
+  storageKey: string;
   url: string;
   mime: string;
   size: number;
@@ -283,7 +289,7 @@ async function registerUploadedMedia(input: {
 }) {
   return await createOrGetMediaAssetFromUpload({
     sha256: input.sha256,
-    storageKey: input.filename,
+    storageKey: input.storageKey,
     url: input.url,
     mime: input.mime,
     size: input.size,
@@ -717,6 +723,7 @@ const app = new Elysia()
       return { ...project, id, category_id: cat.id };
     }
     const created = await createProject(normalizeProjectInput(input));
+    await upsertMediaReferencesForEntity({ entityType: "project", entityId: created.id, fields: buildProjectMediaFields(normalizeProjectInput(input)) });
     await logAuditCompat({ action: "create", entity_type: "project", entity_id: created.id }, user?.name);
     return created;
   })
@@ -796,6 +803,7 @@ const app = new Elysia()
       set.status = 404;
       return apiNotFound(set, "Project not found");
     }
+    await upsertMediaReferencesForEntity({ entityType: "project", entityId: id, fields: buildProjectMediaFields(normalizeProjectInput(body as any)) });
     await logAuditCompat({ action: "update", entity_type: "project", entity_id: id, diff: { before, after: updated } }, user?.name);
     return updated;
   })
@@ -1242,6 +1250,84 @@ const app = new Elysia()
     await logAuditCompat({ action: "submit", entity_type: "submission", entity_id: created.id, diff: { kind: "project_update" } });
     return { success: true, submissionId: created.id };
   })
+  .get("/api/dev/projects", async ({ user, set, query }) => {
+    const capErr = await checkCap(user, set, "dev_panel_access");
+    if (capErr) return capErr;
+    if (!user) return apiUnauthorized(set);
+    const projects = await getUserProjects(user.id);
+    const projectIds = projects.map(p => p.project_id);
+    if (projectIds.length === 0) return { items: [], page: 1, pageSize: 20, total: 0 };
+    const page = Math.max(1, Number((query as any)?.page) || 1);
+    const pageSize = Math.min(100, Math.max(1, Number((query as any)?.pageSize) || 20));
+    const offset = (page - 1) * pageSize;
+    const idList = projectIds.map(id => `'${id}'`).join(",");
+    const items = await sql().unsafe(
+      `select id, slug, name, developer, description, icon, banner, stars, language, status, updated_at from projects where id in (${idList}) order by updated_at desc limit ${pageSize} offset ${offset}`
+    );
+    return { items, page, pageSize, total: projects.length };
+  })
+  .get("/api/dev/projects/:id", async ({ params: { id }, user, set }) => {
+    const capErr = await checkCap(user, set, "dev_panel_access");
+    if (capErr) return capErr;
+    if (!user) return apiUnauthorized(set);
+    const member = await isProjectMember(id, user.id);
+    if (!member) return apiForbidden(set, "Not a project member");
+    const project = await getProjectById(id);
+    if (!project) return apiNotFound(set, "Project not found");
+    const members = await getProjectMembers(id);
+    return { ...project, members };
+  })
+  .patch("/api/dev/projects/:id", async ({ params: { id }, body, user, set }) => {
+    const capErr = await checkCap(user, set, "dev:project_edit");
+    if (capErr) return capErr;
+    if (!user) return apiUnauthorized(set);
+    const member = await isProjectMember(id, user.id);
+    if (!member) return apiForbidden(set, "Not a project member");
+    const payload = body as any;
+    const allowedFields = ["name", "description", "icon", "banner", "github_url", "language", "status", "version", "keywords"];
+    const updates: Record<string, any> = {};
+    for (const field of allowedFields) {
+      if (payload?.[field] !== undefined) updates[field] = payload[field];
+    }
+    if (Object.keys(updates).length === 0) return apiBadRequest(set, "No valid fields to update");
+    const updated = await updateProject(id, updates);
+    if (!updated) return apiNotFound(set, "Project not found");
+    await logAuditCompat({ actor: user.name, action: "update", entity_type: "project", entity_id: id, diff: updates });
+    return updated;
+  })
+  .get("/api/dev/projects/:id/members", async ({ params: { id }, user, set }) => {
+    const capErr = await checkCap(user, set, "dev:member_manage");
+    if (capErr) return capErr;
+    if (!user) return apiUnauthorized(set);
+    const member = await isProjectMember(id, user.id);
+    if (!member) return apiForbidden(set, "Not a project member");
+    return getProjectMembers(id);
+  })
+  .post("/api/dev/projects/:id/members", async ({ params: { id }, body, user, set }) => {
+    const capErr = await checkCap(user, set, "dev:member_manage");
+    if (capErr) return capErr;
+    if (!user) return apiUnauthorized(set);
+    const isOwner = await isProjectOwner(id, user.id);
+    if (!isOwner) return apiForbidden(set, "Only project owner can invite members");
+    const payload = body as any;
+    if (!payload?.user_id) return apiBadRequest(set, "user_id is required");
+    const result = await addProjectMember({ project_id: id, user_id: payload.user_id, role: payload.role ?? "collaborator" });
+    await promoteToDev(payload.user_id);
+    await logAuditCompat({ actor: user.name, action: "add_member", entity_type: "project", entity_id: id, diff: { user_id: payload.user_id } });
+    return result;
+  })
+  .delete("/api/dev/projects/:id/members/:userId", async ({ params: { id, userId }, user, set }) => {
+    const capErr = await checkCap(user, set, "dev:member_manage");
+    if (capErr) return capErr;
+    if (!user) return apiUnauthorized(set);
+    const isOwner = await isProjectOwner(id, user.id);
+    if (!isOwner) return apiForbidden(set, "Only project owner can remove members");
+    const removed = await removeProjectMember(id, userId);
+    if (!removed) return apiBadRequest(set, "Cannot remove member");
+    await demoteFromDev(userId);
+    await logAuditCompat({ actor: user.name, action: "remove_member", entity_type: "project", entity_id: id, diff: { user_id: userId } });
+    return { ok: true };
+  })
   .post("/api/submit", async ({ body, set, headers }) => {
     if (checkRateLimit({ headers, path: "/api/submit", set })) return apiError(set, 429, "RATE_LIMITED", "Too Many Requests");
     const payload: any = body as any;
@@ -1493,6 +1579,7 @@ const app = new Elysia()
       }
 
       const createdProject = await createProject({ ...projectInput, category_id: categoryId });
+      await upsertMediaReferencesForEntity({ entityType: "project", entityId: createdProject.id, fields: buildProjectMediaFields(projectInput) });
       await updateSubmissionStatus(id, "approved", "");
       await logAuditCompat({ action: "approve", entity_type: "submission", entity_id: id, diff: { project_id: createdProject.id } });
       await logAuditCompat({ action: "create", entity_type: "project", entity_id: createdProject.id, diff: { from_submission: id } });
@@ -1544,7 +1631,6 @@ const app = new Elysia()
   .post("/api/stories", async ({ body, set, user }) => {
     const capErr = await checkCap(user, set, "story:manage");
     if (capErr) return capErr;
-    // In a real app, we'd save this to the DB/JSON file. For now, we update in-memory and write to file.
     const newStories = body as any;
     
     for (const story of newStories) {
@@ -1564,21 +1650,27 @@ const app = new Elysia()
       
       await fs.writeFile(path.join(dirPath, "meta.json"), JSON.stringify(meta, null, 2));
       await fs.writeFile(path.join(dirPath, "content.md"), content || "");
+
+      if (meta.cover && dbEnabled) {
+        await upsertMediaReferencesForEntity({
+          entityType: "story",
+          entityId: safeId,
+          fields: [{ url: meta.cover, fieldPath: "cover" }],
+        });
+      }
     }
 
     return { success: true };
   })
   .get("/api/uploads/:filename", async ({ params: { filename }, set }) => {
-    const safe = path.basename(filename);
-    const filePath = path.join(UPLOADS_DIR, safe);
-    try {
-      await fs.access(filePath);
-      set.headers["cache-control"] = "public, max-age=31536000, immutable";
-      return Bun.file(filePath);
-    } catch {
+    const key = path.basename(filename);
+    const file = await storageReadFile(key);
+    if (!(await file.exists())) {
       set.status = 404;
       return apiNotFound(set);
     }
+    set.headers["cache-control"] = "public, max-age=31536000, immutable";
+    return file;
   })
   .post("/api/upload", async ({ body: { image }, set, user, headers }) => {
     if (checkRateLimit({ headers, path: "/api/upload", set })) {
@@ -1607,19 +1699,20 @@ const app = new Elysia()
     }
     const hash = crypto.createHash("sha256").update(buffer).digest("hex");
     const filename = `${hash}.${ext}`;
-    const uploadPath = path.join(UPLOADS_DIR, filename);
-    await Bun.write(uploadPath, buffer);
-    const url = `/api/uploads/${filename}`;
+    const key = buildKey(filename);
+    await storageWriteFile(key, buffer);
+    const url = storagePublicUrl(key);
     const media = await registerUploadedMedia({
       sha256: hash,
       filename,
+      storageKey: key,
       url,
       mime,
       size: buffer.length,
       source: "upload",
       uploaderId: user?.id,
     });
-    return { url, media_id: media?.id };
+    return { url, media_id: media?.id, storage_key: key };
   }, {
     body: t.Object({
       image: t.File()
@@ -1652,12 +1745,13 @@ const app = new Elysia()
     }
     const hash = crypto.createHash("sha256").update(buffer).digest("hex");
     const filename = `${hash}.${ext}`;
-    const uploadPath = path.join(UPLOADS_DIR, filename);
-    await Bun.write(uploadPath, buffer);
-    const avatarUrl = `/api/uploads/${filename}`;
+    const key = buildKey(filename);
+    await storageWriteFile(key, buffer);
+    const avatarUrl = storagePublicUrl(key);
     const media = await registerUploadedMedia({
       sha256: hash,
       filename,
+      storageKey: key,
       url: avatarUrl,
       mime,
       size: buffer.length,
@@ -1673,7 +1767,16 @@ const app = new Elysia()
       });
     }
 
-    return { url: avatarUrl, media_id: media?.id };
+    if (media?.id && user?.id) {
+      await upsertMediaReference({
+        mediaId: media.id,
+        entityType: "user",
+        entityId: String(user.id),
+        fieldPath: "avatar",
+      });
+    }
+
+    return { url: avatarUrl, media_id: media?.id, storage_key: key };
   }, {
     body: t.Object({
       image: t.File()
@@ -2052,6 +2155,14 @@ const app = new Elysia()
  * The CSV import supports bilingual / alias column headers and maps them into canonical keys.
  * The return value is a partial project input that is further sanitized by {@link normalizeProjectInput}.
  */
+function buildProjectMediaFields(project: any): Array<{ url: string; fieldPath: string }> {
+  const fields: Array<{ url: string; fieldPath: string }> = [];
+  if (project.icon) fields.push({ url: project.icon, fieldPath: "icon" });
+  if (project.banner) fields.push({ url: project.banner, fieldPath: "banner" });
+  if (project.avatar) fields.push({ url: project.avatar, fieldPath: "avatar" });
+  return fields;
+}
+
 function normalizeCsvRow(row: Record<string, string>) {  const aliases: Record<string, string> = {
     name: "name",
     github: "github_url",
