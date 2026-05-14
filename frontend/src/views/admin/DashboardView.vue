@@ -1,11 +1,11 @@
 <template>
-  <div class="space-y-4 lg:space-y-6">
+  <div class="space-y-4 lg:space-y-6 max-w-full overflow-x-hidden">
     <div v-if="loading" class="flex items-center justify-center py-20">
       <div class="w-8 h-8 border-3 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
     </div>
 
     <template v-else>
-      <div class="flex gap-2 overflow-x-auto pb-1 scrollbar-hide lg:hidden">
+      <div class="flex gap-2 overflow-x-auto pb-1 -webkit-overflow-scrolling-touch lg:hidden max-w-full">
         <div v-if="hasCapability('project:read')" class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 flex-shrink-0">
           <Package class="w-3.5 h-3.5" /><span class="text-xs font-bold">{{ data.projects?.total ?? '—' }}</span><span class="text-[10px]">项目</span>
         </div>

@@ -1,8 +1,8 @@
 <template>
-  <div class="min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white flex">
+  <div class="min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white flex overflow-x-hidden">
     <AdminSidebar @logout="handleLogout" />
 
-    <div class="flex-1 flex flex-col min-h-screen lg:min-w-0">
+    <div class="flex-1 flex flex-col min-h-screen min-w-0 overflow-x-hidden">
       <header class="sticky top-0 z-40 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-4 lg:px-6 py-2.5 lg:py-3 flex items-center justify-between">
         <div class="flex items-center gap-3">
           <h2 class="text-base lg:text-lg font-bold text-slate-900 dark:text-white">{{ currentTitle }}</h2>
