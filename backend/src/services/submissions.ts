@@ -18,11 +18,14 @@ export async function listSubmissions(params: { status?: string; q?: string; pag
   const status = params.status?.trim() || "pending";
   const q = params.q?.trim();
 
-  const whereParts = [db`status = ${status}`];
-  if (q) whereParts.push(db`(payload->>'name' ilike ${"%" + q + "%"} or payload->>'github_url' ilike ${"%" + q + "%"})`);
-  const where = db.join(whereParts, db` and `);
+  let where;
+  if (q) {
+    where = sql()`status = ${status} and (payload->>'name' ilike ${"%" + q + "%"} or payload->>'github_url' ilike ${"%" + q + "%"})`;
+  } else {
+    where = sql()`status = ${status}`;
+  }
 
-  const items = await db<Array<any>>`
+  const items = await sql()<Array<any>>`
     select id, status, payload, review_note, created_at, updated_at
     from project_submissions
     where ${where}
@@ -30,7 +33,7 @@ export async function listSubmissions(params: { status?: string; q?: string; pag
     limit ${pageSize} offset ${offset}
   `;
 
-  const [{ count }] = await db<Array<{ count: string }>>`
+  const [{ count }] = await sql()<Array<{ count: string }>>`
     select count(*)::text as count
     from project_submissions
     where ${where}

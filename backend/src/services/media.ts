@@ -77,23 +77,23 @@ export async function listMediaAssets(
 
   const whereParts = [];
   const q = filters.q?.trim();
-  if (q) whereParts.push(db`(url ilike ${"%" + q + "%"} or sha256 ilike ${"%" + q + "%"} or storage_key ilike ${"%" + q + "%"})`);
-  if (filters.status) whereParts.push(db`status = ${filters.status}`);
-  if (filters.mime) whereParts.push(db`mime = ${filters.mime}`);
-  if (filters.source) whereParts.push(db`source = ${filters.source}`);
+  if (q) whereParts.push(sql()`(url ilike ${"%" + q + "%"} or sha256 ilike ${"%" + q + "%"} or storage_key ilike ${"%" + q + "%"})`);
+  if (filters.status) whereParts.push(sql()`status = ${filters.status}`);
+  if (filters.mime) whereParts.push(sql()`mime = ${filters.mime}`);
+  if (filters.source) whereParts.push(sql()`source = ${filters.source}`);
   if (filters.tag) {
-    whereParts.push(db`id in (select media_id from media_tags where tag = ${filters.tag})`);
+    whereParts.push(sql()`id in (select media_id from media_tags where tag = ${filters.tag})`);
   }
-  const where = whereParts.length ? db.join(whereParts, db` and `) : db`true`;
+  const where = whereParts.length ? sql().join(whereParts, sql()` and `) : sql()`true`;
 
-  const items = await db<MediaAsset[]>`
+  const items = await sql()<MediaAsset[]>`
     select id, sha256, storage_key, url, mime, size, width, height, source, uploader_id, status, created_at, deleted_at, last_referenced_at
     from media_assets
     where ${where}
     order by created_at desc
     limit ${pageSize} offset ${offset}
   `;
-  const [{ count }] = await db<Array<{ count: string }>>`
+  const [{ count }] = await sql()<Array<{ count: string }>>`
     select count(*)::text as count from media_assets where ${where}
   `;
 

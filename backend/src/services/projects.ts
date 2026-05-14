@@ -162,11 +162,11 @@ export async function listProjects(params: {
         : db`name asc`;
 
   const whereParts = [];
-  if (q) whereParts.push(db`(name ilike ${"%" + q + "%"} or developer ilike ${"%" + q + "%"} or ${q} = any(keywords))`);
-  if (category) whereParts.push(db`category_id = ${category}`);
-  const where = whereParts.length ? db.join(whereParts, db` and `) : db`true`;
+  if (q) whereParts.push(sql()`(name ilike ${"%" + q + "%"} or developer ilike ${"%" + q + "%"} or ${q} = any(keywords))`);
+  if (category) whereParts.push(sql()`category_id = ${category}`);
+  const where = whereParts.length ? sql().join(whereParts, sql()` and `) : sql()`true`;
 
-  const items = await db<ProjectRow[]>`
+  const items = await sql()<ProjectRow[]>`
     select id, slug, name, category_id, developer, status, version, ai_usage_state, description, keywords, recommendation, github_url, avatar, icon, banner, stars, language, last_update, github_is_fork, github_parent_url, github_source_url, extra
     from projects
     where ${where}
@@ -174,7 +174,7 @@ export async function listProjects(params: {
     limit ${pageSize} offset ${offset}
   `;
 
-  const [{ count }] = await db<Array<{ count: string }>>`
+  const [{ count }] = await sql()<Array<{ count: string }>>`
     select count(*)::text as count from projects where ${where}
   `;
 
