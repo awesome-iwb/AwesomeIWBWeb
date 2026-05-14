@@ -19,11 +19,14 @@ export type FeedbackEntry = {
 
 export async function listFeedback(input: {
   project_name?: string;
+  project_names?: string[];
   kind?: FeedbackKind;
   status?: "open" | "closed";
   limit?: number;
+  page?: number;
+  pageSize?: number;
+  ids?: string[];
 }) {
-  const limit = Math.min(Math.max(Number(input.limit ?? 50) || 50, 1), 200);
   const where: string[] = [];
   const params: any[] = [];
 
@@ -31,14 +34,42 @@ export async function listFeedback(input: {
     params.push(input.project_name);
     where.push(`project_name = $${params.length}`);
   }
+  if (input.project_names && input.project_names.length > 0) {
+    const list = input.project_names.map(n => `'${n.replace(/'/g, "''")}'`).join(",");
+    where.push(`project_name in (${list})`);
+  }
   if (input.kind) {
     params.push(input.kind);
     where.push(`kind = $${params.length}`);
   }
   if (input.status === "open") where.push(`status <> 'done'`);
   if (input.status === "closed") where.push(`status = 'done'`);
+  if (input.ids && input.ids.length > 0) {
+    const idList = input.ids.map(id => `'${id.replace(/'/g, "''")}'`).join(",");
+    where.push(`id in (${idList})`);
+  }
 
   const clause = where.length ? `where ${where.join(" and ")}` : "";
+
+  if (input.page || input.pageSize) {
+    const page = Math.max(1, input.page ?? 1);
+    const pageSize = Math.min(100, Math.max(1, input.pageSize ?? 20));
+    const offset = (page - 1) * pageSize;
+    const rows = await sql().unsafe(
+      `select id, project_name, kind, title, body, labels, status, actor_username, actor_role, created_at, updated_at
+       from feedback_entries ${clause}
+       order by created_at desc
+       limit ${pageSize} offset ${offset}`,
+      params
+    );
+    const [{ count }] = await sql().unsafe(
+      `select count(*)::text as count from feedback_entries ${clause}`,
+      params
+    ) as Array<{ count: string }>;
+    return { items: rows as FeedbackEntry[], page, pageSize, total: Number(count) };
+  }
+
+  const limit = Math.min(Math.max(Number(input.limit ?? 50) || 50, 1), 200);
   const rows = await sql().unsafe(
     `select id, project_name, kind, title, body, labels, status, actor_username, actor_role, created_at, updated_at
      from feedback_entries ${clause}

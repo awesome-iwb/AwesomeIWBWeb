@@ -1352,14 +1352,14 @@ const app = new Elysia()
     if (capErr) return capErr;
     if (!user) return apiUnauthorized(set);
     const payload = body as any;
-    const feedback = await listFeedback({ ids: [id] });
-    if (!feedback.items.length) return apiNotFound(set, "Feedback not found");
-    const fb = feedback.items[0];
+    const feedback = await listFeedback({ ids: [id], page: 1, pageSize: 1 });
+    if (!(feedback as any).items?.length) return apiNotFound(set, "Feedback not found");
+    const fb = (feedback as any).items[0];
     const userProjects = await getUserProjects(user.id);
     const projectIds = new Set(userProjects.map(p => p.project_id));
     const project = await sql()<Array<{ id: string }>>`select id from projects where slug = ${fb.project_name} limit 1`;
     if (!project.length || !projectIds.has(project[0].id)) return apiForbidden(set, "Not a project member");
-    const updated = await updateFeedback(id, { status: payload?.status, labels: payload?.labels });
+    const updated = await updateFeedback({ id, status: payload?.status, labels: payload?.labels });
     return updated;
   })
   .post("/api/dev/feedback/:id/replies", async ({ params: { id }, body, user, set }) => {
@@ -1392,9 +1392,9 @@ const app = new Elysia()
     const capErr = await checkCap(user, set, "dev:comment_manage");
     if (capErr) return capErr;
     if (!user) return apiUnauthorized(set);
-    const feedback = await listFeedback({ ids: [id] });
-    if (!feedback.items.length) return apiNotFound(set, "Comment not found");
-    const fb = feedback.items[0];
+    const feedback = await listFeedback({ ids: [id], page: 1, pageSize: 1 });
+    if (!(feedback as any).items?.length) return apiNotFound(set, "Comment not found");
+    const fb = (feedback as any).items[0];
     const userProjects = await getUserProjects(user.id);
     const projectIds = new Set(userProjects.map(p => p.project_id));
     const project = await sql()<Array<{ id: string }>>`select id from projects where slug = ${fb.project_name} limit 1`;
