@@ -20,6 +20,19 @@ export interface Relation {
  * - `ai_usage_state` is a stable tri-state used by the project detail "reCAPTCHA-style" badge.
  * - `recommendation` may be a string (JSON mode) or array (DB mode / normalized payloads).
  */
+export interface ProjectDeveloper {
+  project_id: string;
+  user_id: string | null;
+  org_id: string | null;
+  role: string;
+  joined_at: string;
+  user_name?: string;
+  user_avatar_url?: string;
+  org_name?: string;
+  org_slug?: string;
+  org_avatar_url?: string;
+}
+
 export interface Project {
   id?: string;
   slug?: string;
@@ -49,6 +62,7 @@ export interface Project {
   relations?: Relation[];
   releases?: Release[];
   extra?: any;
+  developers?: ProjectDeveloper[];
 }
 
 export interface Category {

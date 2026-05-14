@@ -9,6 +9,7 @@ import CommentPanel from '../components/CommentPanel.vue';
 import { computeCursorFrames } from '../utils/captchaCursor';
 import { useProjects } from '../composables/useProjects';
 import type { Project } from '../composables/useProjects';
+import type { ProjectDeveloper } from '../composables/useProjects';
 import { 
   Github, 
   Download, 
@@ -20,7 +21,8 @@ import {
   Sparkles,
   History,
   ArrowRight,
-  X
+  X,
+  Users
 } from 'lucide-vue-next';
 
 const route = useRoute();
@@ -67,6 +69,22 @@ const techStack = computed(() => {
   const tech = (project.value as any)?.extra?.feishu?.tech_stack;
   if (Array.isArray(tech) && tech.length) return tech as string[];
   return project.value?.language ? [project.value.language] : [];
+});
+
+const developerMembers = computed(() => {
+  const devs = (project.value as any)?.developers as ProjectDeveloper[] | undefined;
+  if (!devs || !Array.isArray(devs) || devs.length === 0) return null;
+  return devs.filter(d => d.user_id);
+});
+
+const developerOrgs = computed(() => {
+  const devs = (project.value as any)?.developers as ProjectDeveloper[] | undefined;
+  if (!devs || !Array.isArray(devs) || devs.length === 0) return null;
+  return devs.filter(d => d.org_id);
+});
+
+const hasDevelopersData = computed(() => {
+  return (developerMembers.value && developerMembers.value.length > 0) || (developerOrgs.value && developerOrgs.value.length > 0);
 });
 
 const deriveAccentFromImage = (url: string) => {
@@ -750,6 +768,47 @@ if (allProjects.value.length === 0) {
                 <span class="font-medium text-slate-900 dark:text-white text-right">{{ project.status }}</span>
               </li>
             </ul>
+          </div>
+
+          <!-- Developers Card -->
+          <div v-if="hasDevelopersData" class="bg-slate-50 dark:bg-[#111827] rounded-3xl p-6 border border-slate-200/50 dark:border-slate-800/80">
+            <h3 class="font-bold text-lg text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+              <Users class="w-5 h-5 text-emerald-500" /> 开发者
+            </h3>
+            <div class="space-y-3">
+              <div
+                v-for="member in developerMembers"
+                :key="member.user_id!"
+                class="flex items-center gap-3"
+              >
+                <img
+                  :src="member.user_avatar_url || getFallbackImage(member.user_name || '')"
+                  :alt="member.user_name"
+                  class="w-8 h-8 rounded-full object-cover border border-slate-200 dark:border-slate-700"
+                  @error="(e) => { (e.target as HTMLImageElement).src = getFallbackImage(member.user_name || '') }"
+                />
+                <div class="min-w-0 flex-1">
+                  <div class="text-sm font-medium text-slate-900 dark:text-white truncate">{{ member.user_name }}</div>
+                  <div class="text-xs text-slate-500 dark:text-slate-400">{{ member.role === 'owner' ? '负责人' : '协作者' }}</div>
+                </div>
+              </div>
+              <div
+                v-for="org in developerOrgs"
+                :key="org.org_id!"
+                class="flex items-center gap-3"
+              >
+                <img
+                  :src="org.org_avatar_url || getFallbackImage(org.org_name || '')"
+                  :alt="org.org_name"
+                  class="w-8 h-8 rounded-lg object-cover border border-slate-200 dark:border-slate-700"
+                  @error="(e) => { (e.target as HTMLImageElement).src = getFallbackImage(org.org_name || '') }"
+                />
+                <div class="min-w-0 flex-1">
+                  <div class="text-sm font-medium text-slate-900 dark:text-white truncate">{{ org.org_name }}</div>
+                  <div class="text-xs text-slate-500 dark:text-slate-400">组织</div>
+                </div>
+              </div>
+            </div>
           </div>
 
           <!-- Features -->
