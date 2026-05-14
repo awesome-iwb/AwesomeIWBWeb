@@ -1328,6 +1328,106 @@ const app = new Elysia()
     await logAuditCompat({ actor: user.name, action: "remove_member", entity_type: "project", entity_id: id, diff: { user_id: userId } });
     return { ok: true };
   })
+  .get("/api/dev/feedback", async ({ user, set, query }) => {
+    const capErr = await checkCap(user, set, "dev:bug_manage");
+    if (capErr) return capErr;
+    if (!user) return apiUnauthorized(set);
+    const userProjects = await getUserProjects(user.id);
+    const projectIds = userProjects.map(p => p.project_id);
+    if (projectIds.length === 0) return { items: [], page: 1, pageSize: 20, total: 0 };
+    const projectNames: string[] = [];
+    for (const pid of projectIds) {
+      const p = await getProjectById(pid);
+      if (p) projectNames.push(p.slug);
+    }
+    const kind = (query as any)?.kind === "bug" ? "bug" : undefined;
+    const status = (query as any)?.status || undefined;
+    const page = Math.max(1, Number((query as any)?.page) || 1);
+    const pageSize = Math.min(100, Math.max(1, Number((query as any)?.pageSize) || 20));
+    const result = await listFeedback({ project_names: projectNames, kind, status, page, pageSize });
+    return result;
+  })
+  .patch("/api/dev/feedback/:id", async ({ params: { id }, body, user, set }) => {
+    const capErr = await checkCap(user, set, "dev:bug_manage");
+    if (capErr) return capErr;
+    if (!user) return apiUnauthorized(set);
+    const payload = body as any;
+    const feedback = await listFeedback({ ids: [id] });
+    if (!feedback.items.length) return apiNotFound(set, "Feedback not found");
+    const fb = feedback.items[0];
+    const userProjects = await getUserProjects(user.id);
+    const projectIds = new Set(userProjects.map(p => p.project_id));
+    const project = await sql()<Array<{ id: string }>>`select id from projects where slug = ${fb.project_name} limit 1`;
+    if (!project.length || !projectIds.has(project[0].id)) return apiForbidden(set, "Not a project member");
+    const updated = await updateFeedback(id, { status: payload?.status, labels: payload?.labels });
+    return updated;
+  })
+  .post("/api/dev/feedback/:id/replies", async ({ params: { id }, body, user, set }) => {
+    const capErr = await checkCap(user, set, "dev:bug_manage");
+    if (capErr) return capErr;
+    if (!user) return apiUnauthorized(set);
+    const payload = body as any;
+    if (!payload?.body) return apiBadRequest(set, "body is required");
+    const reply = await createReply({ feedback_id: id, body: payload.body, actor_username: user.name, actor_role: user.role ?? "dev" });
+    return reply;
+  })
+  .get("/api/dev/comments", async ({ user, set, query }) => {
+    const capErr = await checkCap(user, set, "dev:comment_manage");
+    if (capErr) return capErr;
+    if (!user) return apiUnauthorized(set);
+    const userProjects = await getUserProjects(user.id);
+    const projectIds = userProjects.map(p => p.project_id);
+    if (projectIds.length === 0) return { items: [], page: 1, pageSize: 20, total: 0 };
+    const projectNames: string[] = [];
+    for (const pid of projectIds) {
+      const p = await getProjectById(pid);
+      if (p) projectNames.push(p.slug);
+    }
+    const page = Math.max(1, Number((query as any)?.page) || 1);
+    const pageSize = Math.min(100, Math.max(1, Number((query as any)?.pageSize) || 20));
+    const result = await listFeedback({ project_names: projectNames, kind: "comment", page, pageSize });
+    return result;
+  })
+  .delete("/api/dev/comments/:id", async ({ params: { id }, user, set }) => {
+    const capErr = await checkCap(user, set, "dev:comment_manage");
+    if (capErr) return capErr;
+    if (!user) return apiUnauthorized(set);
+    const feedback = await listFeedback({ ids: [id] });
+    if (!feedback.items.length) return apiNotFound(set, "Comment not found");
+    const fb = feedback.items[0];
+    const userProjects = await getUserProjects(user.id);
+    const projectIds = new Set(userProjects.map(p => p.project_id));
+    const project = await sql()<Array<{ id: string }>>`select id from projects where slug = ${fb.project_name} limit 1`;
+    if (!project.length || !projectIds.has(project[0].id)) return apiForbidden(set, "Not a project member");
+    await sql()`delete from feedback_entries where id = ${id}`;
+    await logAuditCompat({ actor: user.name, action: "delete", entity_type: "comment", entity_id: id });
+    return { ok: true };
+  })
+  .post("/api/dev/comments/:id/replies", async ({ params: { id }, body, user, set }) => {
+    const capErr = await checkCap(user, set, "dev:comment_manage");
+    if (capErr) return capErr;
+    if (!user) return apiUnauthorized(set);
+    const payload = body as any;
+    if (!payload?.body) return apiBadRequest(set, "body is required");
+    const reply = await createReply({ feedback_id: id, body: payload.body, actor_username: user.name, actor_role: user.role ?? "dev" });
+    return reply;
+  })
+  .get("/api/dev/stats", async ({ user, set }) => {
+    const capErr = await checkCap(user, set, "dev:stats_view");
+    if (capErr) return capErr;
+    if (!user) return apiUnauthorized(set);
+    const userProjects = await getUserProjects(user.id);
+    const projectIds = userProjects.map(p => p.project_id);
+    if (projectIds.length === 0) return { projects: 0, totalBugs: 0, openBugs: 0, totalComments: 0 };
+    const idList = projectIds.map(id => `'${id}'`).join(",");
+    const projects = await sql().unsafe(`select id, slug, name, stars from projects where id in (${idList})`);
+    const projectNames = projects.map((p: any) => p.slug);
+    const nameList = projectNames.map((n: string) => `'${n}'`).join(",");
+    const [{ total_bugs }] = await sql().unsafe(`select count(*)::text as total_bugs from feedback_entries where project_name in (${nameList}) and kind = 'bug'`) as Array<{ total_bugs: string }>;
+    const [{ open_bugs }] = await sql().unsafe(`select count(*)::text as open_bugs from feedback_entries where project_name in (${nameList}) and kind = 'bug' and status = 'open'`) as Array<{ open_bugs: string }>;
+    const [{ total_comments }] = await sql().unsafe(`select count(*)::text as total_comments from feedback_entries where project_name in (${nameList}) and kind = 'comment'`) as Array<{ total_comments: string }>;
+    return { projects: projectIds.length, totalBugs: Number(total_bugs), openBugs: Number(open_bugs), totalComments: Number(total_comments) };
+  })
   .post("/api/submit", async ({ body, set, headers }) => {
     if (checkRateLimit({ headers, path: "/api/submit", set })) return apiError(set, 429, "RATE_LIMITED", "Too Many Requests");
     const payload: any = body as any;
@@ -2146,6 +2246,116 @@ const app = new Elysia()
     await setUserCapabilities(id, capabilityIds);
     await logAuditCompat({ action: "update_capabilities", entity_type: "user", entity_id: id, diff: { capabilities: capabilityIds } }, user?.name);
     return { success: true };
+  })
+  .get("/api/admin/organizations", async ({ user, set, query }) => {
+    const capErr = await checkCap(user, set, "org:review");
+    if (capErr) return capErr;
+    const page = Math.max(1, Number(query?.page) || 1);
+    const pageSize = Math.min(100, Math.max(1, Number(query?.pageSize) || 20));
+    const status = query?.status as OrganizationStatus | undefined;
+    return listOrganizations({ status, page, pageSize });
+  })
+  .get("/api/admin/organizations/:id", async ({ params: { id }, user, set }) => {
+    const capErr = await checkCap(user, set, "org:review");
+    if (capErr) return capErr;
+    const org = await findOrganizationById(id);
+    if (!org) return apiNotFound(set, "Organization not found");
+    const members = await getOrganizationMembers(id);
+    return { ...org, members };
+  })
+  .post("/api/admin/organizations/:id/approve", async ({ params: { id }, body, user, set }) => {
+    const capErr = await checkCap(user, set, "org:review");
+    if (capErr) return capErr;
+    const payload = body as any;
+    const org = await updateOrganizationStatus(id, "approved", payload?.review_note);
+    if (!org) return apiNotFound(set, "Organization not found");
+    await sql()`insert into notifications (user_name, type, title, body) select name, 'org_approved', '组织审核通过', ${'您的组织「' + org.name + '」已通过审核。'} from users where id = ${org.created_by}`;
+    await logAuditCompat({ actor: user?.name, action: "approve", entity_type: "organization", entity_id: id });
+    return org;
+  })
+  .post("/api/admin/organizations/:id/reject", async ({ params: { id }, body, user, set }) => {
+    const capErr = await checkCap(user, set, "org:review");
+    if (capErr) return capErr;
+    const payload = body as any;
+    const org = await updateOrganizationStatus(id, "rejected", payload?.review_note);
+    if (!org) return apiNotFound(set, "Organization not found");
+    await sql()`insert into notifications (user_name, type, title, body) select name, 'org_rejected', '组织审核未通过', ${'您的组织「' + org.name + '」未通过审核。原因：' + (payload?.review_note ?? '无')} from users where id = ${org.created_by}`;
+    await logAuditCompat({ actor: user?.name, action: "reject", entity_type: "organization", entity_id: id });
+    return org;
+  })
+  .patch("/api/admin/organizations/:id", async ({ params: { id }, body, user, set }) => {
+    const capErr = await checkCap(user, set, "org:manage");
+    if (capErr) return capErr;
+    const payload = body as any;
+    if (payload?.status) {
+      const org = await updateOrganizationStatus(id, payload.status, payload.review_note);
+      if (!org) return apiNotFound(set, "Organization not found");
+      return org;
+    }
+    const updated = await updateOrganization(id, { name: payload?.name, description: payload?.description, website_url: payload?.website_url });
+    if (!updated) return apiNotFound(set, "Organization not found");
+    return updated;
+  })
+  .delete("/api/admin/organizations/:id", async ({ params: { id }, user, set }) => {
+    const capErr = await checkCap(user, set, "org:manage");
+    if (capErr) return capErr;
+    const deleted = await deleteOrganization(id);
+    if (!deleted) return apiNotFound(set, "Organization not found");
+    await logAuditCompat({ actor: user?.name, action: "delete", entity_type: "organization", entity_id: id });
+    return { ok: true };
+  })
+  .get("/api/admin/project-claims", async ({ user, set, query }) => {
+    const capErr = await checkCap(user, set, "claim:review");
+    if (capErr) return capErr;
+    const page = Math.max(1, Number(query?.page) || 1);
+    const pageSize = Math.min(100, Math.max(1, Number(query?.pageSize) || 20));
+    const status = query?.status as ClaimStatus | undefined;
+    return listProjectClaims({ status, page, pageSize });
+  })
+  .post("/api/admin/project-claims/:id/approve", async ({ params: { id }, body, user, set }) => {
+    const capErr = await checkCap(user, set, "claim:review");
+    if (capErr) return capErr;
+    const payload = body as any;
+    const claim = await approveProjectClaim(id, payload?.review_note);
+    if (!claim) return apiNotFound(set, "Claim not found or already processed");
+    await sql()`insert into notifications (user_name, type, title, body) select name, 'claim_approved', '项目认领已通过', '您申请认领的项目已通过审核。' from users where id = ${claim.user_id}`;
+    await logAuditCompat({ actor: user?.name, action: "approve_claim", entity_type: "project_claim", entity_id: id });
+    return claim;
+  })
+  .post("/api/admin/project-claims/:id/reject", async ({ params: { id }, body, user, set }) => {
+    const capErr = await checkCap(user, set, "claim:review");
+    if (capErr) return capErr;
+    const payload = body as any;
+    const claim = await rejectProjectClaim(id, payload?.review_note);
+    if (!claim) return apiNotFound(set, "Claim not found or already processed");
+    await sql()`insert into notifications (user_name, type, title, body) select name, 'claim_rejected', '项目认领未通过', ${'您申请认领的项目未通过审核。原因：' + (payload?.review_note ?? '无')} from users where id = ${claim.user_id}`;
+    await logAuditCompat({ actor: user?.name, action: "reject_claim", entity_type: "project_claim", entity_id: id });
+    return claim;
+  })
+  .post("/api/admin/projects/:id/members", async ({ params: { id }, body, user, set }) => {
+    const capErr = await checkCap(user, set, "project:update");
+    if (capErr) return capErr;
+    const payload = body as any;
+    if (!payload?.user_id && !payload?.org_id) return apiBadRequest(set, "user_id or org_id is required");
+    const result = await addProjectMember({ project_id: id, user_id: payload.user_id, org_id: payload.org_id, role: payload.role ?? "owner" });
+    if (payload.user_id) await promoteToDev(payload.user_id);
+    await logAuditCompat({ actor: user?.name, action: "add_project_member", entity_type: "project", entity_id: id, diff: { user_id: payload.user_id, org_id: payload.org_id, role: payload.role } });
+    return result;
+  })
+  .delete("/api/admin/projects/:id/members/:memberId", async ({ params: { id, memberId }, body, user, set }) => {
+    const capErr = await checkCap(user, set, "project:update");
+    if (capErr) return capErr;
+    const payload = body as any;
+    let removed = false;
+    if (payload?.org_id) {
+      removed = await removeProjectOrgMember(id, payload.org_id);
+    } else if (memberId) {
+      removed = await removeProjectMember(id, memberId);
+      if (removed) await demoteFromDev(memberId);
+    }
+    if (!removed) return apiBadRequest(set, "Cannot remove member");
+    await logAuditCompat({ actor: user?.name, action: "remove_project_member", entity_type: "project", entity_id: id });
+    return { ok: true };
   })
   .listen(Number(process.env.PORT ?? 8081));
 
