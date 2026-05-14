@@ -1,16 +1,19 @@
 import { sql } from "../db/client";
 import { userHasCapability, isSuperadmin } from "./capabilities";
+import fs from "fs";
+import path from "path";
 
 const dbEnabled = Boolean(process.env.DATABASE_URL);
+const STORIES_DIR = path.join(process.cwd(), "stories");
 
 export type DashboardData = {
-  projects?: { total: number; newThisWeek: number };
-  pendingSubmissions?: number;
-  pendingModeration?: { comments: number; bugs: number };
-  openFeedback?: number;
-  users?: { total: number; newThisWeek: number };
-  media?: { total: number; totalSize: number };
-  stories?: number;
+  projects?: { total: number; newThisWeek: number; recent: Array<{ slug: string; name: string; description: string; icon: string; banner: string; stars: number; language: string; developer: string; created_at: string }> };
+  pendingSubmissions?: { count: number; recent: Array<{ id: string; status: string; payload: any; created_at: string }> };
+  pendingModeration?: { comments: number; bugs: number; recentComments: Array<{ id: string; project_name: string; body: string; actor_username: string; created_at: string }>; recentBugs: Array<{ id: string; project_name: string; title: string; actor_username: string; created_at: string }> };
+  openFeedback?: { count: number; recent: Array<{ id: string; project_name: string; kind: string; title: string; body: string; actor_username: string; created_at: string }> };
+  users?: { total: number; newThisWeek: number; recent: Array<{ id: string; name: string; avatar_url: string; role: string; created_at: string }> };
+  media?: { total: number; totalSize: number; recent: Array<{ id: string; url: string; mime: string; size: number; uploader_id: string; created_at: string }> };
+  stories?: { total: number; recent: Array<{ id: string; title: string; cover: string; author: string; created_at: string }> };
   recentActivity?: Array<{ action: string; entity_type: string; entity_id: string; actor: string; created_at: string }>;
 };
 
@@ -28,40 +31,82 @@ export async function getDashboardData(userId: string, username: string): Promis
   if (await hasCap("project:read")) {
     const [{ total }] = await sql()<Array<{ total: string }>>`select count(*)::text as total from projects`;
     const [{ new_this_week }] = await sql()<Array<{ new_this_week: string }>>`select count(*)::text as new_this_week from projects where created_at >= now() - interval '7 days'`;
-    data.projects = { total: Number(total), newThisWeek: Number(new_this_week) };
+    const recent = await sql()<Array<{ slug: string; name: string; description: string; icon: string; banner: string; stars: number; language: string; developer: string; created_at: string }>>`
+      select slug, name, description, icon, banner, stars, language, developer, created_at
+      from projects order by created_at desc limit 5
+    `;
+    data.projects = { total: Number(total), newThisWeek: Number(new_this_week), recent };
   }
 
   if (await hasCap("submission:read")) {
-    const [{ count }] = await sql()<Array<{ count: string }>>`select count(*)::text as count from submissions where status = 'pending'`;
-    data.pendingSubmissions = Number(count);
+    const [{ count }] = await sql()<Array<{ count: string }>>`select count(*)::text as count from project_submissions where status = 'pending'`;
+    const recent = await sql()<Array<{ id: string; status: string; payload: any; created_at: string }>>`
+      select id, status, payload, created_at from project_submissions order by created_at desc limit 5
+    `;
+    data.pendingSubmissions = { count: Number(count), recent };
   }
 
   if (await hasCap("moderation:read")) {
-    const [{ comments }] = await sql()<Array<{ comments: string }>>`select count(*)::text as comments from feedback where kind = 'comment' and status = 'pending'`;
-    const [{ bugs }] = await sql()<Array<{ bugs: string }>>`select count(*)::text as bugs from feedback where kind = 'bug' and status = 'pending'`;
-    data.pendingModeration = { comments: Number(comments), bugs: Number(bugs) };
+    const [{ comments }] = await sql()<Array<{ comments: string }>>`select count(*)::text as comments from comment_moderation where status = 'pending'`;
+    const [{ bugs }] = await sql()<Array<{ bugs: string }>>`select count(*)::text as bugs from bug_moderation where status = 'pending'`;
+    const recentComments = await sql()<Array<{ id: string; project_name: string; body: string; actor_username: string; created_at: string }>>`
+      select id, project_name, body, actor_username, created_at from comment_moderation order by created_at desc limit 3
+    `;
+    const recentBugs = await sql()<Array<{ id: string; project_name: string; title: string; actor_username: string; created_at: string }>>`
+      select id, project_name, title, actor_username, created_at from bug_moderation order by created_at desc limit 3
+    `;
+    data.pendingModeration = { comments: Number(comments), bugs: Number(bugs), recentComments, recentBugs };
   }
 
   if (await hasCap("feedback:manage")) {
-    const [{ count }] = await sql()<Array<{ count: string }>>`select count(*)::text as count from feedback where status = 'open'`;
-    data.openFeedback = Number(count);
+    const [{ count }] = await sql()<Array<{ count: string }>>`select count(*)::text as count from feedback_entries where status = 'open'`;
+    const recent = await sql()<Array<{ id: string; project_name: string; kind: string; title: string; body: string; actor_username: string; created_at: string }>>`
+      select id, project_name, kind, title, body, actor_username, created_at from feedback_entries order by created_at desc limit 5
+    `;
+    data.openFeedback = { count: Number(count), recent };
   }
 
   if (await hasCap("user:read")) {
     const [{ total }] = await sql()<Array<{ total: string }>>`select count(*)::text as total from users`;
     const [{ new_this_week }] = await sql()<Array<{ new_this_week: string }>>`select count(*)::text as new_this_week from users where created_at >= now() - interval '7 days'`;
-    data.users = { total: Number(total), newThisWeek: Number(new_this_week) };
+    const recent = await sql()<Array<{ id: string; name: string; avatar_url: string; role: string; created_at: string }>>`
+      select id, name, avatar_url, role, created_at from users order by created_at desc limit 5
+    `;
+    data.users = { total: Number(total), newThisWeek: Number(new_this_week), recent };
   }
 
   if (await hasCap("media:read")) {
     const [{ total }] = await sql()<Array<{ total: string }>>`select count(*)::text as total from media_assets where status = 'active'`;
     const [{ total_size }] = await sql()<Array<{ total_size: string }>>`select coalesce(sum(size), 0)::text as total_size from media_assets where status = 'active'`;
-    data.media = { total: Number(total), totalSize: Number(total_size) };
+    const recent = await sql()<Array<{ id: string; url: string; mime: string; size: number; uploader_id: string; created_at: string }>>`
+      select id, url, mime, size, uploader_id, created_at from media_assets where status = 'active' order by created_at desc limit 6
+    `;
+    data.media = { total: Number(total), totalSize: Number(total_size), recent };
   }
 
   if (await hasCap("story:manage")) {
-    const [{ count }] = await sql()<Array<{ count: string }>>`select count(*)::text as count from stories`;
-    data.stories = Number(count);
+    try {
+      const dirs = await fs.promises.readdir(STORIES_DIR);
+      const storyList: Array<{ id: string; title: string; cover: string; author: string; created_at: string }> = [];
+      for (const dir of dirs) {
+        try {
+          const metaPath = path.join(STORIES_DIR, dir, "meta.json");
+          const metaContent = await fs.promises.readFile(metaPath, "utf-8");
+          const meta = JSON.parse(metaContent);
+          storyList.push({
+            id: dir,
+            title: meta.title || dir,
+            cover: meta.cover || meta.image || "",
+            author: meta.author || "",
+            created_at: meta.date || meta.created_at || "",
+          });
+        } catch {}
+      }
+      storyList.sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
+      data.stories = { total: storyList.length, recent: storyList.slice(0, 5) };
+    } catch {
+      data.stories = { total: 0, recent: [] };
+    }
   }
 
   if (await hasCap("audit:read")) {
