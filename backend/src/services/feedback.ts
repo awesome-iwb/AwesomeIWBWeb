@@ -13,6 +13,7 @@ export type FeedbackEntry = {
   status: FeedbackStatus;
   actor_username: string;
   actor_role: string;
+  actor_avatar_url: string;
   created_at: string;
   updated_at: string;
 };
@@ -56,9 +57,13 @@ export async function listFeedback(input: {
     const pageSize = Math.min(100, Math.max(1, input.pageSize ?? 20));
     const offset = (page - 1) * pageSize;
     const rows = await sql().unsafe(
-      `select id, project_name, kind, title, body, labels, status, actor_username, actor_role, created_at, updated_at
-       from feedback_entries ${clause}
-       order by created_at desc
+      `select fe.id, fe.project_name, fe.kind, fe.title, fe.body, fe.labels, fe.status,
+              fe.actor_username, fe.actor_role, coalesce(u.avatar_url, '') as actor_avatar_url,
+              fe.created_at, fe.updated_at
+       from feedback_entries fe
+       left join users u on u.name = fe.actor_username
+       ${clause}
+       order by fe.created_at desc
        limit ${pageSize} offset ${offset}`,
       params
     );
@@ -71,9 +76,13 @@ export async function listFeedback(input: {
 
   const limit = Math.min(Math.max(Number(input.limit ?? 50) || 50, 1), 200);
   const rows = await sql().unsafe(
-    `select id, project_name, kind, title, body, labels, status, actor_username, actor_role, created_at, updated_at
-     from feedback_entries ${clause}
-     order by created_at desc
+    `select fe.id, fe.project_name, fe.kind, fe.title, fe.body, fe.labels, fe.status,
+            fe.actor_username, fe.actor_role, coalesce(u.avatar_url, '') as actor_avatar_url,
+            fe.created_at, fe.updated_at
+     from feedback_entries fe
+     left join users u on u.name = fe.actor_username
+     ${clause}
+     order by fe.created_at desc
      limit ${limit}`,
     params
   );
@@ -95,6 +104,10 @@ export async function createFeedback(input: {
   >`insert into feedback_entries (project_name, kind, title, body, labels, status, actor_username, actor_role)
     values (${input.project_name}, ${input.kind}, ${input.title}, ${input.body}, ${input.labels}, ${input.status}, ${input.actor_username}, ${input.actor_role})
     returning id, project_name, kind, title, body, labels, status, actor_username, actor_role, created_at, updated_at`;
+  if (row) {
+    const avatarRow = await sql()<Array<{ avatar_url: string }>>`select coalesce(avatar_url, '') as avatar_url from users where name = ${input.actor_username} limit 1`;
+    (row as any).actor_avatar_url = avatarRow[0]?.avatar_url ?? '';
+  }
   return row ?? null;
 }
 
@@ -120,6 +133,11 @@ export async function updateFeedback(input: { id: string; status?: FeedbackStatu
      returning id, project_name, kind, title, body, labels, status, actor_username, actor_role, created_at, updated_at`,
     params
   );
-  return (rows as FeedbackEntry[])[0] ?? null;
+  const row = (rows as FeedbackEntry[])[0] ?? null;
+  if (row) {
+    const avatarRow = await sql()<Array<{ avatar_url: string }>>`select coalesce(avatar_url, '') as avatar_url from users where name = ${row.actor_username} limit 1`;
+    (row as any).actor_avatar_url = avatarRow[0]?.avatar_url ?? '';
+  }
+  return row;
 }
 

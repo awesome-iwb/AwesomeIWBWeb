@@ -21,6 +21,7 @@ type EntryBase = {
   kind: CommentKind;
   project_name: string;
   author: string;
+  author_avatar_url: string;
   created_at: string;
   moderation_status?: ModerationStatus;
   moderation_id?: string;
@@ -49,6 +50,7 @@ type ReplyItem = {
   body: string;
   actor_username: string;
   actor_role: string;
+  actor_avatar_url: string;
   created_at: string;
 };
 
@@ -80,6 +82,7 @@ const mapFromApi = (item: any): Entry | null => {
     kind,
     project_name: String(item.project_name ?? props.projectName),
     author: String(item.actor_username ?? item.author ?? '用户'),
+    author_avatar_url: String(item.actor_avatar_url ?? ''),
     created_at: String(item.created_at ?? new Date().toISOString())
   };
   if (item.moderation_status) {
@@ -576,9 +579,13 @@ const handleIssueClick = (id: string) => {
         <div v-if="comments.length === 0" class="text-center py-10 text-slate-500">暂无评论</div>
         <div v-for="e in comments" :key="e.id" class="p-5 rounded-2xl border" :class="e.moderation_status === 'pending' ? 'border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800/50 opacity-70' : 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/30'">
           <div class="flex items-center justify-between gap-3">
-            <div class="min-w-0">
-              <div class="font-extrabold text-slate-900 dark:text-white truncate">{{ e.author }}</div>
-              <div class="text-xs text-slate-500 dark:text-slate-400">{{ formatTime(e.created_at) }}</div>
+            <div class="flex items-center gap-3 min-w-0">
+              <img v-if="e.author_avatar_url" :src="e.author_avatar_url" :alt="e.author" class="w-8 h-8 rounded-full object-cover shrink-0" />
+              <div v-else class="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center shrink-0 text-emerald-700 dark:text-emerald-300 text-sm font-extrabold">{{ e.author.charAt(0).toUpperCase() }}</div>
+              <div class="min-w-0">
+                <div class="font-extrabold text-slate-900 dark:text-white truncate">{{ e.author }}</div>
+                <div class="text-xs text-slate-500 dark:text-slate-400">{{ formatTime(e.created_at) }}</div>
+              </div>
             </div>
             <div v-if="e.moderation_status === 'pending'" class="shrink-0 px-2.5 py-1 rounded-full border text-xs font-extrabold bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-600">
               审核中
@@ -898,7 +905,11 @@ const handleIssueClick = (id: string) => {
                     class="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/30"
                   >
                     <div class="flex items-center justify-between gap-3">
-                      <div class="font-extrabold text-slate-900 dark:text-white">{{ r.actor_username }}</div>
+                      <div class="flex items-center gap-2.5">
+                        <img v-if="r.actor_avatar_url" :src="r.actor_avatar_url" :alt="r.actor_username" class="w-6 h-6 rounded-full object-cover shrink-0" />
+                        <div v-else class="w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center shrink-0 text-emerald-700 dark:text-emerald-300 text-xs font-extrabold">{{ r.actor_username.charAt(0).toUpperCase() }}</div>
+                        <div class="font-extrabold text-slate-900 dark:text-white">{{ r.actor_username }}</div>
+                      </div>
                       <div class="text-xs text-slate-500 dark:text-slate-400">{{ formatTime(r.created_at) }}</div>
                     </div>
                     <div class="mt-2 prose prose-sm prose-slate dark:prose-invert max-w-none" v-html="renderMarkdown(r.body)"></div>
