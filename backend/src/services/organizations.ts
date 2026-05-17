@@ -24,6 +24,8 @@ export type OrganizationMember = {
   user_id: string;
   role: OrgMemberRole;
   joined_at: string;
+  user_name?: string | null;
+  user_avatar_url?: string | null;
 };
 
 const ORG_COLUMNS = "id, name, slug, avatar_url, description, website_url, status, review_note, created_by, created_at, updated_at";
@@ -75,6 +77,7 @@ export async function findOrganizationBySlug(slug: string): Promise<Organization
 }
 
 export async function listOrganizations(params: {
+  q?: string;
   status?: OrganizationStatus;
   created_by?: string;
   page?: number;
@@ -88,6 +91,10 @@ export async function listOrganizations(params: {
   const whereParts: string[] = [];
   const queryParams: any[] = [];
 
+  if (params.q) {
+    queryParams.push(`%${params.q}%`);
+    whereParts.push(`(name ilike $${queryParams.length} or slug ilike $${queryParams.length})`);
+  }
   if (params.status) {
     queryParams.push(params.status);
     whereParts.push(`status = $${queryParams.length}`);
@@ -149,7 +156,11 @@ export async function deleteOrganization(id: string): Promise<boolean> {
 export async function getOrganizationMembers(orgId: string): Promise<OrganizationMember[]> {
   if (!dbEnabled) return [];
   return sql()<OrganizationMember[]>`
-    select ${sql(ORG_MEMBER_COLUMNS)} from organization_members where org_id = ${orgId} order by joined_at asc
+    select om.*, u.name as user_name, u.avatar_url as user_avatar_url
+    from organization_members om
+    left join users u on u.id = om.user_id
+    where om.org_id = ${orgId}
+    order by om.joined_at asc
   `;
 }
 

@@ -1,27 +1,22 @@
 <template>
   <div class="space-y-4">
-    <div v-if="loading" class="flex items-center justify-center py-20">
-      <div class="w-8 h-8 border-3 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-    </div>
+    <ui-LoadingSpinner v-if="loading" brand="dev" />
 
     <template v-else-if="project">
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-xl overflow-hidden flex-shrink-0 bg-slate-100 dark:bg-slate-700">
-            <img v-if="project.icon" :src="project.icon" :alt="project.name" class="w-full h-full object-cover" />
-            <div v-else class="w-full h-full flex items-center justify-center text-slate-400 text-sm font-bold">{{ (project.name || '?')[0] }}</div>
-          </div>
+          <ui-Avatar :src="project.icon" :name="project.name" size="md" rounded="default" />
           <div>
             <h2 class="text-lg font-bold text-slate-900 dark:text-white">{{ project.name }}</h2>
             <div class="text-xs text-slate-400">{{ project.slug }}</div>
           </div>
         </div>
-        <button @click="saveProject" :disabled="isSaving" class="px-4 py-2 rounded-xl bg-blue-500 hover:bg-blue-600 text-white text-sm font-bold shadow-lg shadow-blue-500/20 transition-all disabled:opacity-50">
+        <button v-if="hasCapability('dev:project_edit')" @click="saveProject" :disabled="isSaving" class="px-4 py-2 rounded-xl bg-blue-500 hover:bg-blue-600 text-white text-sm font-bold shadow-lg shadow-blue-500/20 transition-all disabled:opacity-50">
           {{ isSaving ? '保存中...' : '保存修改' }}
         </button>
       </div>
 
-      <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+      <div v-if="hasCapability('dev:project_edit')" class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
         <div class="p-4 lg:p-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50">
           <h3 class="font-bold text-sm text-slate-700 dark:text-slate-300">项目信息</h3>
         </div>
@@ -31,9 +26,41 @@
               <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">软件名称</label>
               <input type="text" v-model="draft.name" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-blue-500 text-base" />
             </div>
-            <div>
-              <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">开发者</label>
-              <input type="text" v-model="draft.developer" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-blue-500 text-base" />
+            <div class="space-y-1">
+              <label class="block text-sm font-bold text-slate-700 dark:text-slate-300">主要开发者（平台账号）</label>
+              <SearchSelect
+                v-if="canEditPrimaryDeveloper"
+                :key="`lead-${projectId}`"
+                v-model="draft.developer_user_id"
+                :search-fn="searchProjectUsers"
+                placeholder="至少输入 1 个字符搜索平台用户"
+                :initial-label="project?.developer_user_name || project?.developer || ''"
+                clearable
+                @update:model-value="onLeadDeveloperSelect"
+              />
+              <div
+                v-else
+                class="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm text-slate-600 dark:text-slate-400"
+              >
+                {{ project?.developer_user_name || project?.developer || '未指定' }}
+              </div>
+            </div>
+          </div>
+          <div class="space-y-1" v-if="hasCapability('dev:org_manage')">
+            <label class="block text-sm font-bold text-slate-700 dark:text-slate-300">所属组织</label>
+            <SearchSelect
+              :key="`org-${projectId}`"
+              v-model="draft.organization_id"
+              :search-fn="searchMyOrganizations"
+              placeholder="输入名称或 slug 筛选组织"
+              :initial-label="project?.organization_name || ''"
+              @update:model-value="onOrgSelect"
+            />
+          </div>
+          <div class="space-y-1" v-else>
+            <label class="block text-sm font-bold text-slate-700 dark:text-slate-300">所属组织</label>
+            <div class="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm text-slate-600 dark:text-slate-400">
+              {{ project?.organization_name || '未指定' }}
             </div>
           </div>
           <div>
@@ -67,24 +94,81 @@
         </div>
       </div>
 
-      <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+      <div
+        v-if="canEditOwnerAdminFields"
+        class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden"
+      >
         <div class="p-4 lg:p-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50">
-          <h3 class="font-bold text-sm text-slate-700 dark:text-slate-300">项目成员</h3>
+          <h3 class="font-bold text-sm text-slate-700 dark:text-slate-300">展示素材与扩展信息</h3>
+          <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">仅项目负责人且具备「项目管理者」权限时可编辑（图标、横幅、星级与备案相关 JSON 等）。</p>
         </div>
-        <div class="p-4 lg:p-6">
-          <div class="space-y-2">
-            <div v-for="m in members" :key="m.user_id ?? m.org_id ?? ''" class="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-900/50">
-              <div class="w-8 h-8 rounded-full overflow-hidden bg-slate-200 dark:bg-slate-700 flex-shrink-0">
-                <img v-if="m.user_avatar_url || m.org_avatar_url" :src="m.user_avatar_url || m.org_avatar_url" class="w-full h-full object-cover" />
-                <div v-else class="w-full h-full flex items-center justify-center text-xs font-bold text-slate-400">{{ (m.user_name || m.org_name || '?')[0] }}</div>
-              </div>
-              <div class="flex-1 min-w-0">
-                <div class="text-sm font-medium truncate text-slate-900 dark:text-white">{{ m.user_name || m.org_name || '未知' }}</div>
-                <div v-if="m.org_name" class="text-[10px] text-slate-400">组织</div>
-              </div>
-              <span class="text-[10px] px-1.5 py-0.5 rounded font-medium" :class="m.role === 'owner' ? 'bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400' : 'bg-slate-100 dark:bg-slate-700 text-slate-500'">{{ m.role === 'owner' ? '所有者' : '协作者' }}</span>
+        <div class="p-4 lg:p-6 space-y-4">
+          <ProjectMediaFields v-model:icon="draft.icon" v-model:banner="draft.banner" />
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">AI 使用率标签</label>
+              <select v-model="draft.ai_usage_state" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-blue-500 text-base">
+                <option value="unknown">未知</option>
+                <option value="under50">未超过 50%</option>
+                <option value="over50">超过 50%</option>
+              </select>
             </div>
-            <div v-if="members.length === 0" class="text-sm text-slate-400 text-center py-6">暂无成员</div>
+            <div>
+              <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">稳定性标签</label>
+              <select v-model="draft.recommendation" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-blue-500 text-base">
+                <option value="">无</option>
+                <option value="稳定">稳定</option>
+                <option value="不稳定">不稳定</option>
+                <option value="观望中">观望中</option>
+              </select>
+            </div>
+            <div class="lg:col-span-2">
+              <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Star 数量</label>
+              <input type="number" v-model.number="draft.stars" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-blue-500 text-base" />
+            </div>
+          </div>
+          <div>
+            <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">扩展信息（JSON，可含备案图 URL 等）</label>
+            <textarea
+              v-model="extraJsonText"
+              rows="8"
+              class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-blue-500 font-mono text-sm"
+              spellcheck="false"
+            ></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+        <div class="p-4 lg:p-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50 flex items-center justify-between">
+          <h3 class="font-bold text-sm text-slate-700 dark:text-slate-300">项目成员</h3>
+          <button v-if="hasCapability('dev:project_admin')" @click="showAddMember = true" class="px-3 py-1.5 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-xs font-bold transition-colors">邀请协作者</button>
+        </div>
+        <div class="p-4 lg:p-6 space-y-2">
+          <div v-if="members.length === 0" class="text-sm text-slate-400 text-center py-4">暂无成员</div>
+          <div v-for="m in members" :key="m.id || m.user_id" class="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-900/50">
+            <ui-Avatar :src="m.user_avatar_url" :name="m.user_name" size="sm" />
+            <div class="flex-1 min-w-0">
+              <div class="text-sm font-bold text-slate-800 dark:text-white truncate">{{ m.user_name || m.user_id }}</div>
+            </div>
+            <span class="px-2 py-0.5 rounded text-xs font-bold" :class="m.role === 'owner' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400'">{{ m.role === 'owner' ? '负责人' : '协作者' }}</span>
+            <button v-if="hasCapability('dev:project_admin') && m.role !== 'owner'" @click="removeMember(m)" class="text-xs text-rose-500 hover:underline">移除</button>
+            <button v-if="hasCapability('dev:project_admin') && m.role !== 'owner'" @click="transferOwnership(m)" class="text-xs text-blue-500 hover:underline">转让</button>
+          </div>
+        </div>
+      </div>
+
+      <div v-if="showAddMember" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="showAddMember = false">
+        <div class="bg-white dark:bg-slate-800 rounded-2xl p-6 w-full max-w-md mx-4 shadow-xl">
+          <h3 class="font-bold text-lg text-slate-800 dark:text-white mb-4">邀请协作者</h3>
+          <SearchSelect
+            v-model="newMemberId"
+            :search-fn="searchProjectUsers"
+            placeholder="至少输入 1 个字符搜索用户"
+          />
+          <div class="flex gap-3 mt-4">
+            <button @click="addMember" :disabled="!newMemberId" class="flex-1 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-sm disabled:opacity-50 transition-colors">确认邀请</button>
+            <button @click="showAddMember = false; newMemberId = null" class="flex-1 px-4 py-2 rounded-xl bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-sm transition-colors">取消</button>
           </div>
         </div>
       </div>
@@ -97,12 +181,17 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { useRoute } from 'vue-router';
-import { adminFetch, formatAdminError } from '../../composables/useAdminFetch';
+import { adminFetch, formatAdminError, normalizeMediaUrl } from '../../composables/useAdminFetch';
 import { API } from '../../api/endpoints';
+import { useAuth } from '../../composables/useAuth';
+import SearchSelect from '../../components/admin/SearchSelect.vue';
+import ProjectMediaFields from '../../components/shared/ProjectMediaFields.vue';
+import { LoadingSpinner as uiLoadingSpinner, Avatar as uiAvatar } from '../../components/ui';
 
 const route = useRoute();
+const { hasCapability, user: authUser } = useAuth();
 const projectId = route.params.id as string;
 
 const project = ref<any | null>(null);
@@ -110,6 +199,42 @@ const draft = ref<any>({});
 const members = ref<any[]>([]);
 const loading = ref(true);
 const isSaving = ref(false);
+const showAddMember = ref(false);
+const newMemberId = ref<string | null>(null);
+const extraJsonText = ref('{}');
+const orgLabelCache = new Map<string, string>();
+const userLabelCache = new Map<string, string>();
+
+const isProjectOwner = computed(() => {
+  const uid = authUser.value?.id;
+  if (!uid) return false;
+  return members.value.some((m) => m.role === 'owner' && m.user_id === uid);
+});
+
+const canEditPrimaryDeveloper = computed(
+  () => hasCapability('dev:project_admin') && isProjectOwner.value
+);
+
+const canEditOwnerAdminFields = computed(
+  () => hasCapability('dev:project_admin') && isProjectOwner.value
+);
+
+const normalizeDevDraft = (j: any) => {
+  const d = { ...j };
+  if (Array.isArray(d.keywords)) d.keywords = d.keywords.join(', ');
+  const rec = d.recommendation;
+  if (Array.isArray(rec) && rec.length) d.recommendation = String(rec[0]);
+  else if (Array.isArray(rec)) d.recommendation = '';
+  else if (typeof rec !== 'string') d.recommendation = '';
+  if (d.ai_usage_state !== 'unknown' && d.ai_usage_state !== 'over50' && d.ai_usage_state !== 'under50') {
+    d.ai_usage_state = 'unknown';
+  }
+  const n = Number(d.stars);
+  d.stars = Number.isFinite(n) ? n : 0;
+  if (typeof d.icon !== 'string') d.icon = '';
+  if (typeof d.banner !== 'string') d.banner = '';
+  return d;
+};
 
 const fetchProject = async () => {
   loading.value = true;
@@ -118,8 +243,9 @@ const fetchProject = async () => {
     if (res.ok) {
       const json = await res.json();
       project.value = json;
-      draft.value = { ...json };
+      draft.value = normalizeDevDraft(json);
       members.value = json.members ?? [];
+      extraJsonText.value = JSON.stringify(json.extra ?? {}, null, 2);
     }
   } catch (e) {
     console.error('Fetch dev project detail error:', e);
@@ -128,14 +254,133 @@ const fetchProject = async () => {
   }
 };
 
+const fetchMembers = async () => {
+  try {
+    const res = await adminFetch(API.dev.projectDetail(projectId));
+    if (res.ok) {
+      const json = await res.json();
+      members.value = json.members ?? [];
+    }
+  } catch (e) {
+    console.error('Fetch members error:', e);
+  }
+};
+
+const searchMyOrganizations = async (q: string) => {
+  const qt = q.trim();
+  const qs = new URLSearchParams({ pageSize: '20' });
+  if (qt) qs.set('q', qt);
+  const res = await adminFetch(`/api/dev/organizations?${qs.toString()}`);
+  if (!res.ok) return [];
+  const data = await res.json();
+  const raw = Array.isArray(data) ? data : data.items || [];
+  return raw.map((o: any) => {
+    orgLabelCache.set(String(o.id), o.name || '');
+    const statusLabel = o.status === 'approved' ? '已通过' : o.status === 'pending' ? '审核中' : (o.status || '');
+    return {
+      id: String(o.id),
+      label: o.name || '',
+      subtitle: [o.slug ? `@${o.slug}` : '', statusLabel].filter(Boolean).join(' · '),
+      avatar: o.avatar_url,
+    };
+  });
+};
+
+const searchProjectUsers = async (q: string) => {
+  const qt = q.trim();
+  if (qt.length < 1) return [];
+  const qs = new URLSearchParams({ q: qt, pageSize: '15' });
+  const res = await adminFetch(`${API.dev.projectUserSearch(projectId)}?${qs.toString()}`);
+  if (!res.ok) return [];
+  const data = await res.json();
+  const rows = data.items || [];
+  return rows.map((u: any) => {
+    const label = u.name || u.id || '';
+    userLabelCache.set(String(u.id), label);
+    return { id: String(u.id), label, avatar: u.avatar_url || '' };
+  });
+};
+
+const onOrgSelect = (val: string | null) => {
+  if (val) draft.value.organization_name = orgLabelCache.get(val) || draft.value.organization_name;
+  else draft.value.organization_name = '';
+};
+
+const onLeadDeveloperSelect = (val: string | null) => {
+  if (val) {
+    const label = userLabelCache.get(val) || '';
+    draft.value.developer_user_name = label;
+    draft.value.developer = label;
+  } else {
+    draft.value.developer_user_id = null;
+    draft.value.developer_user_name = '';
+    draft.value.developer = '';
+  }
+};
+
+const addMember = async () => {
+  if (!newMemberId.value || !project.value?.id) return;
+  const res = await adminFetch(`/api/dev/projects/${encodeURIComponent(project.value.id)}/members`, {
+    method: 'POST',
+    body: JSON.stringify({ user_id: newMemberId.value, role: 'collaborator' }),
+  });
+  if (res.ok) {
+    showAddMember.value = false;
+    newMemberId.value = null;
+    await fetchMembers();
+  } else {
+    const json = await res.json();
+    alert(json.error || '添加失败');
+  }
+};
+
+const removeMember = async (m: any) => {
+  if (!project.value?.id || !confirm('确定移除此成员？')) return;
+  const res = await adminFetch(`/api/dev/projects/${encodeURIComponent(project.value.id)}/members/${encodeURIComponent(m.user_id || m.id)}`, {
+    method: 'DELETE',
+  });
+  if (res.ok) await fetchMembers();
+};
+
+const transferOwnership = async (m: any) => {
+  if (!project.value?.id || !confirm('确定将项目转让给此成员？你将变为协作者。')) return;
+  const res = await adminFetch(`/api/dev/projects/${encodeURIComponent(project.value.id)}/members/${encodeURIComponent(m.user_id || m.id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ role: 'owner' }),
+  });
+  if (res.ok) await fetchProject();
+};
+
 const saveProject = async () => {
   isSaving.value = true;
   try {
-    const allowedFields = ['name', 'description', 'icon', 'banner', 'github_url', 'language', 'status', 'version', 'keywords'];
     const updates: Record<string, any> = {};
-    for (const field of allowedFields) {
+    const baseFields = ['name', 'description', 'github_url', 'language', 'status', 'version'];
+    for (const field of baseFields) {
       if (draft.value[field] !== undefined) updates[field] = draft.value[field];
     }
+    if (draft.value.keywords !== undefined) updates.keywords = draft.value.keywords;
+    if (hasCapability('dev:org_manage') && draft.value.organization_id !== undefined) {
+      updates.organization_id = draft.value.organization_id;
+    }
+    if (canEditPrimaryDeveloper.value && draft.value.developer_user_id !== undefined) {
+      updates.developer_user_id = draft.value.developer_user_id;
+    }
+    if (canEditOwnerAdminFields.value) {
+      updates.icon = normalizeMediaUrl(draft.value.icon);
+      updates.banner = normalizeMediaUrl(draft.value.banner);
+      updates.stars = Number(draft.value.stars) || 0;
+      updates.ai_usage_state = draft.value.ai_usage_state;
+      const rec = String(draft.value.recommendation ?? '').trim();
+      updates.recommendation = rec ? [rec] : [];
+      try {
+        updates.extra = JSON.parse(extraJsonText.value || '{}') as object;
+      } catch {
+        alert('扩展信息（JSON）格式无效，请修正后再保存。');
+        return;
+      }
+    }
+
     const res = await adminFetch(API.dev.projectDetail(projectId), {
       method: 'PATCH',
       body: JSON.stringify(updates),
@@ -143,7 +388,9 @@ const saveProject = async () => {
     const json = await res.json();
     if (!res.ok) throw new Error(formatAdminError(json, '保存失败', res.status));
     project.value = json;
-    draft.value = { ...json };
+    draft.value = normalizeDevDraft(json);
+    members.value = json.members ?? members.value;
+    extraJsonText.value = JSON.stringify(json.extra ?? {}, null, 2);
     alert('保存成功');
   } catch (e: unknown) {
     alert(formatAdminError({ message: e instanceof Error ? e.message : '' }, '保存失败'));

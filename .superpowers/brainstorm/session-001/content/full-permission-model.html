@@ -1,0 +1,157 @@
+<h2>完整权限模型：四层结构</h2>
+<p class="subtitle">用户 → 组织 → 项目 → 能力</p>
+
+<div style="background: linear-gradient(135deg, #f0fdf4 0%, #eff6ff 50%, #fce7f3 100%); border-radius: 16px; padding: 24px; margin-bottom: 20px;">
+  <div style="display: flex; align-items: center; justify-content: center; gap: 16px; flex-wrap: wrap;">
+    
+    <div style="background: white; border-radius: 12px; padding: 16px; min-width: 140px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+      <div style="font-size: 24px; margin-bottom: 4px;">👤</div>
+      <div style="font-weight: 700; color: #166534;">用户</div>
+      <div style="font-size: 11px; color: #64748b; margin-top: 4px;">评论、头像、反馈</div>
+      <div style="font-size: 10px; color: #16a34a; margin-top: 2px;">默认拥有</div>
+    </div>
+
+    <div style="font-size: 20px; color: #94a3b8;">→</div>
+
+    <div style="background: white; border-radius: 12px; padding: 16px; min-width: 140px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+      <div style="font-size: 24px; margin-bottom: 4px;">🏢</div>
+      <div style="font-weight: 700; color: #1e40af;">组织</div>
+      <div style="font-size: 11px; color: #64748b; margin-top: 4px;">组织者 + 成员</div>
+      <div style="font-size: 10px; color: #2563eb; margin-top: 2px;">组织者管理成员</div>
+    </div>
+
+    <div style="font-size: 20px; color: #94a3b8;">→</div>
+
+    <div style="background: white; border-radius: 12px; padding: 16px; min-width: 140px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+      <div style="font-size: 24px; margin-bottom: 4px;">📦</div>
+      <div style="font-weight: 700; color: #7c3aed;">项目</div>
+      <div style="font-size: 11px; color: #64748b; margin-top: 4px;">归属组织或个人</div>
+      <div style="font-size: 10px; color: #7c3aed; margin-top: 2px;">owner + collaborator</div>
+    </div>
+
+    <div style="font-size: 20px; color: #94a3b8;">→</div>
+
+    <div style="background: white; border-radius: 12px; padding: 16px; min-width: 140px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+      <div style="font-size: 24px; margin-bottom: 4px;">🛡️</div>
+      <div style="font-weight: 700; color: #9d174d;">运维</div>
+      <div style="font-size: 11px; color: #64748b; margin-top: 4px;">全局管理</div>
+      <div style="font-size: 10px; color: #db2777; margin-top: 2px;">手动分配</div>
+    </div>
+
+  </div>
+</div>
+
+<div class="section">
+  <h3>📊 完整数据模型</h3>
+  <div style="background: #1e293b; border-radius: 12px; padding: 20px; color: #e2e8f0; font-family: monospace; font-size: 12px; line-height: 1.7; overflow-x: auto;">
+    <span style="color: #f472b6;">users</span> (现有)<br>
+    ├─ id, name, avatar_url, email<br>
+    ├─ role → <span style="color: #fbbf24;">user | dev | ops</span> <em style="color: #94a3b8;">← 保留，dev 由项目归属隐式获得</em><br>
+    └─ is_active, created_at, ...<br>
+    <br>
+    <span style="color: #f472b6;">organizations</span> <span style="color: #4ade80;">← 新增</span><br>
+    ├─ id, name, slug, avatar_url<br>
+    ├─ description, website_url<br>
+    └─ created_by → users.id, created_at<br>
+    <br>
+    <span style="color: #f472b6;">organization_members</span> <span style="color: #4ade80;">← 新增</span><br>
+    ├─ org_id → organizations.id<br>
+    ├─ user_id → users.id<br>
+    ├─ role → <span style="color: #fbbf24;">owner | admin | member</span><br>
+    └─ joined_at<br>
+    <br>
+    <span style="color: #f472b6;">project_members</span> <span style="color: #4ade80;">← 新增</span><br>
+    ├─ project_id → projects.id<br>
+    ├─ member_type → <span style="color: #fbbf24;">user | organization</span><br>
+    ├─ user_id → users.id <em style="color: #94a3b8;">← 当 member_type=user</em><br>
+    ├─ org_id → organizations.id <em style="color: #94a3b8;">← 当 member_type=organization</em><br>
+    └─ role → <span style="color: #fbbf24;">owner | collaborator</span><br>
+    <br>
+    <span style="color: #f472b6;">capabilities</span> (现有，扩展)<br>
+    ├─ <span style="color: #4ade80;">user:comment</span> <em style="color: #94a3b8;">← 新增：发表评论</em><br>
+    ├─ <span style="color: #4ade80;">user:avatar</span> <em style="color: #94a3b8;">← 新增：上传/更改头像</em><br>
+    ├─ <span style="color: #4ade80;">user:feedback</span> <em style="color: #94a3b8;">← 新增：提交反馈</em><br>
+    ├─ <span style="color: #4ade80;">user:submit_project</span> <em style="color: #94a3b8;">← 新增：提交项目</em><br>
+    ├─ <span style="color: #4ade80;">user:profile</span> <em style="color: #94a3b8;">← 新增：修改个人资料</em><br>
+    ├─ dev_panel_access (现有)<br>
+    ├─ admin_panel_access (现有)<br>
+    └─ ... (现有运维能力不变)
+  </div>
+</div>
+
+<div class="section">
+  <h3>🔄 权限流转逻辑</h3>
+  <div style="background: #f8fafc; border-radius: 12px; padding: 16px; font-size: 12px; line-height: 2;">
+    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+      <span style="background: #dcfce7; padding: 2px 8px; border-radius: 4px; font-weight: 600;">新用户注册</span>
+      → 自动获得所有 user:* 能力
+    </div>
+    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+      <span style="background: #dbeafe; padding: 2px 8px; border-radius: 4px; font-weight: 600;">提交项目</span>
+      → 自动成为项目 owner → 获得 dev_panel_access
+    </div>
+    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+      <span style="background: #dbeafe; padding: 2px 8px; border-radius: 4px; font-weight: 600;">被邀请加入项目</span>
+      → 成为 collaborator → 获得 dev_panel_access
+    </div>
+    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+      <span style="background: #e0e7ff; padding: 2px 8px; border-radius: 4px; font-weight: 600;">加入组织</span>
+      → 组织下的项目自动获得管理权限
+    </div>
+    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+      <span style="background: #fce7f3; padding: 2px 8px; border-radius: 4px; font-weight: 600;">运维分配</span>
+      → 在项目页指定开发者 → 获得 dev_panel_access
+    </div>
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <span style="background: #fef3c7; padding: 2px 8px; border-radius: 4px; font-weight: 600;">组织者管理</span>
+      → 组织 owner/admin 可邀请/移除成员
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>🖥️ 开发者后台功能规划</h3>
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+    <div style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px;">
+      <div style="font-weight: 600; margin-bottom: 8px;">📋 我的项目</div>
+      <ul style="font-size: 12px; color: #475569; margin: 0; padding-left: 16px; line-height: 1.8;">
+        <li>查看自己参与的所有项目</li>
+        <li>编辑项目信息</li>
+        <li>管理项目成员（邀请协作者）</li>
+      </ul>
+    </div>
+    <div style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px;">
+      <div style="font-weight: 600; margin-bottom: 8px;">🐛 Bug 反馈</div>
+      <ul style="font-size: 12px; color: #475569; margin: 0; padding-left: 16px; line-height: 1.8;">
+        <li>查看自己项目的 Bug 列表</li>
+        <li>修改 Bug 状态（处理中/已修复）</li>
+        <li>回复 Bug 反馈</li>
+      </ul>
+    </div>
+    <div style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px;">
+      <div style="font-weight: 600; margin-bottom: 8px;">💬 评论管理</div>
+      <ul style="font-size: 12px; color: #475569; margin: 0; padding-left: 16px; line-height: 1.8;">
+        <li>查看自己项目的评论</li>
+        <li>删除/屏蔽不当评论</li>
+        <li>回复评论</li>
+      </ul>
+    </div>
+    <div style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px;">
+      <div style="font-weight: 600; margin-bottom: 8px;">📊 项目数据</div>
+      <ul style="font-size: 12px; color: #475569; margin: 0; padding-left: 16px; line-height: 1.8;">
+        <li>查看项目访问量</li>
+        <li>查看评论/反馈统计</li>
+        <li>趋势图表</li>
+      </ul>
+    </div>
+    <div style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; grid-column: span 2;">
+      <div style="font-weight: 600; margin-bottom: 8px;">🏢 组织管理（组织者可见）</div>
+      <ul style="font-size: 12px; color: #475569; margin: 0; padding-left: 16px; line-height: 1.8;">
+        <li>查看/编辑组织信息</li>
+        <li>邀请/移除组织成员</li>
+        <li>设置成员角色（admin/member）</li>
+        <li>管理组织下的项目</li>
+      </ul>
+    </div>
+  </div>
+</div>

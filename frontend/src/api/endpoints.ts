@@ -6,6 +6,8 @@ export const API = {
     logout: '/api/auth/logout',
     capabilities: '/api/capabilities',
     userAvatar: '/api/user/avatar',
+    userAvatarSource: '/api/user/avatar-source',
+    userRename: '/api/user/name',
   },
   catalog: {
     categories: '/api/categories',
@@ -43,14 +45,18 @@ export const API = {
     organizationDetail: (id: string) => `/api/admin/organizations/${encodeURIComponent(id)}`,
     organizationApprove: (id: string) => `/api/admin/organizations/${encodeURIComponent(id)}/approve`,
     organizationReject: (id: string) => `/api/admin/organizations/${encodeURIComponent(id)}/reject`,
+    organizationMemberSearch: (id: string) => `/api/admin/organizations/${encodeURIComponent(id)}/member-search`,
+    organizationAddMember: (id: string) => `/api/admin/organizations/${encodeURIComponent(id)}/members`,
     claims: '/api/admin/project-claims',
     claimApprove: (id: string) => `/api/admin/project-claims/${encodeURIComponent(id)}/approve`,
     claimReject: (id: string) => `/api/admin/project-claims/${encodeURIComponent(id)}/reject`,
     projectMembers: (id: string) => `/api/admin/projects/${encodeURIComponent(id)}/members`,
+    userRename: (id: string) => `/api/admin/users/${encodeURIComponent(id)}/name`,
   },
   dev: {
     projects: '/api/dev/projects',
     projectDetail: (id: string) => `/api/dev/projects/${encodeURIComponent(id)}`,
+    projectUserSearch: (id: string) => `/api/dev/projects/${encodeURIComponent(id)}/users/search`,
     projectMembers: (id: string) => `/api/dev/projects/${encodeURIComponent(id)}/members`,
     feedback: '/api/dev/feedback',
     feedbackDetail: (id: string) => `/api/dev/feedback/${encodeURIComponent(id)}`,
@@ -63,6 +69,12 @@ export const API = {
     organizationDetail: (id: string) => `/api/dev/organizations/${encodeURIComponent(id)}`,
     organizationMembers: (id: string) => `/api/dev/organizations/${encodeURIComponent(id)}/members`,
     projectClaims: '/api/dev/project-claims',
+  },
+  users: {
+    profile: (name: string) => `/api/users/${encodeURIComponent(name)}/profile`,
+    comments: (name: string) => `/api/users/${encodeURIComponent(name)}/comments`,
+    projects: (name: string) => `/api/users/${encodeURIComponent(name)}/projects`,
+    organizations: (name: string) => `/api/users/${encodeURIComponent(name)}/organizations`,
   },
 } as const;
 

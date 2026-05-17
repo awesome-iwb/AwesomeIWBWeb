@@ -4,14 +4,10 @@
       <h2 class="text-lg font-bold text-slate-900 dark:text-white">我的项目</h2>
     </div>
 
-    <div v-if="loading" class="flex items-center justify-center py-20">
-      <div class="w-8 h-8 border-3 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-    </div>
+    <ui-LoadingSpinner v-if="loading" brand="dev" />
 
-    <div v-else-if="projects.length === 0" class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-10 text-center">
-      <Package class="w-12 h-12 mx-auto mb-3 text-slate-300 dark:text-slate-600" />
-      <p class="text-slate-500 dark:text-slate-400 text-sm">暂无参与的项目</p>
-      <p class="text-xs text-slate-400 mt-1">提交项目或申请认领后即可在此管理</p>
+    <div v-else-if="projects.length === 0" class="bg-white/72 dark:bg-slate-900/62 backdrop-blur-lg rounded-3xl border border-white/70 dark:border-slate-700/70 shadow-xl shadow-slate-900/8 dark:shadow-black/30">
+      <ui-EmptyState :icon="Package" title="暂无参与的项目" description="提交项目或申请认领后即可在此管理" containerClass="p-10" />
     </div>
 
     <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -19,7 +15,7 @@
         v-for="p in projects"
         :key="p.id"
         :to="`/dev/projects/${p.id}`"
-        class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-5 hover:shadow-md transition-shadow flex flex-col gap-3"
+        class="bg-white/72 dark:bg-slate-900/62 backdrop-blur-lg rounded-3xl border border-white/70 dark:border-slate-700/70 shadow-xl shadow-slate-900/8 dark:shadow-black/30 p-5 hover:shadow-2xl transition-shadow flex flex-col gap-3"
       >
         <div class="flex items-center gap-3">
           <div class="w-10 h-10 rounded-xl overflow-hidden flex-shrink-0 bg-slate-100 dark:bg-slate-700">
@@ -28,7 +24,7 @@
           </div>
           <div class="flex-1 min-w-0">
             <div class="font-bold text-sm truncate text-slate-900 dark:text-white">{{ p.name }}</div>
-            <div class="text-xs text-slate-400 truncate">{{ p.developer }}</div>
+            <div class="text-xs text-slate-400 truncate">{{ p.developer }}<span v-if="p.organization_name" class="text-slate-300 dark:text-slate-600"> · </span><span v-if="p.organization_name" class="text-blue-400">{{ p.organization_name }}</span></div>
           </div>
         </div>
         <p class="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">{{ p.description || '暂无简介' }}</p>
@@ -40,27 +36,22 @@
       </router-link>
     </div>
 
-    <div v-if="totalPages > 1" class="flex items-center justify-between text-sm pt-2">
-      <button @click="prevPage" :disabled="page <= 1" class="px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed">上一页</button>
-      <div class="text-slate-500 dark:text-slate-300">{{ page }} / {{ totalPages }}</div>
-      <button @click="nextPage" :disabled="page >= totalPages" class="px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed">下一页</button>
-    </div>
+    <ui-Pagination v-model:page="page" :total="total" :page-size="20" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, watch } from 'vue';
 import { adminFetch } from '../../composables/useAdminFetch';
 import { API } from '../../api/endpoints';
 import { Package } from 'lucide-vue-next';
+import { Pagination as uiPagination, LoadingSpinner as uiLoadingSpinner, EmptyState as uiEmptyState } from '../../components/ui';
 
 const projects = ref<any[]>([]);
 const page = ref(1);
 const pageSize = ref(20);
 const total = ref(0);
 const loading = ref(true);
-
-const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize.value)));
 
 const fetchProjects = async () => {
   loading.value = true;
@@ -78,8 +69,7 @@ const fetchProjects = async () => {
   }
 };
 
-const prevPage = () => { if (page.value > 1) { page.value--; fetchProjects(); } };
-const nextPage = () => { if (page.value < totalPages.value) { page.value++; fetchProjects(); } };
+watch(page, fetchProjects);
 
 onMounted(fetchProjects);
 </script>

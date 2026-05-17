@@ -1,0 +1,196 @@
+<h2>第二部分：数据模型设计</h2>
+<p class="subtitle">新增 3 张表 + 扩展 2 张表 + 新增能力定义</p>
+
+<div class="section">
+  <h3>📊 新增表一览</h3>
+  <div style="display: flex; gap: 12px; margin-bottom: 16px;">
+    <div style="flex:1; background: #dbeafe; border-radius: 8px; padding: 12px; text-align: center;">
+      <div style="font-weight: 700; color: #1e40af;">organizations</div>
+      <div style="font-size: 11px; color: #64748b;">组织/团队</div>
+    </div>
+    <div style="flex:1; background: #e0e7ff; border-radius: 8px; padding: 12px; text-align: center;">
+      <div style="font-weight: 700; color: #3730a3;">organization_members</div>
+      <div style="font-size: 11px; color: #64748b;">组织成员关系</div>
+    </div>
+    <div style="flex:1; background: #ede9fe; border-radius: 8px; padding: 12px; text-align: center;">
+      <div style="font-weight: 700; color: #6d28d9;">project_members</div>
+      <div style="font-size: 11px; color: #64748b;">项目成员关系</div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>🏢 organizations 表</h3>
+  <div style="background: #1e293b; border-radius: 12px; padding: 16px; color: #e2e8f0; font-family: monospace; font-size: 12px; line-height: 1.7;">
+    CREATE TABLE organizations (<br>
+    &nbsp;&nbsp;id UUID PRIMARY KEY DEFAULT gen_random_uuid(),<br>
+    &nbsp;&nbsp;name TEXT NOT NULL,<br>
+    &nbsp;&nbsp;slug TEXT NOT NULL UNIQUE,<br>
+    &nbsp;&nbsp;avatar_url TEXT NOT NULL DEFAULT '',<br>
+    &nbsp;&nbsp;description TEXT NOT NULL DEFAULT '',<br>
+    &nbsp;&nbsp;website_url TEXT NOT NULL DEFAULT '',<br>
+    &nbsp;&nbsp;status TEXT NOT NULL DEFAULT 'pending'<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;CHECK (status IN ('pending','approved','rejected','suspended')),<br>
+    &nbsp;&nbsp;review_note TEXT NOT NULL DEFAULT '',<br>
+    &nbsp;&nbsp;created_by UUID NOT NULL REFERENCES users(id),<br>
+    &nbsp;&nbsp;created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),<br>
+    &nbsp;&nbsp;updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()<br>
+    );<br>
+    <br>
+    <span style="color: #94a3b8;">-- 索引</span><br>
+    CREATE INDEX org_status_idx ON organizations(status);<br>
+    CREATE INDEX org_created_by_idx ON organizations(created_by);
+  </div>
+  <div style="margin-top: 8px; font-size: 12px; color: #475569; line-height: 1.8;">
+    <strong>status 字段说明：</strong><br>
+    • <code>pending</code> — 刚创建，等待运维审核<br>
+    • <code>approved</code> — 审核通过，正常使用<br>
+    • <code>rejected</code> — 审核拒绝<br>
+    • <code>suspended</code> — 运维暂停（违规等）
+  </div>
+</div>
+
+<div class="section">
+  <h3>👥 organization_members 表</h3>
+  <div style="background: #1e293b; border-radius: 12px; padding: 16px; color: #e2e8f0; font-family: monospace; font-size: 12px; line-height: 1.7;">
+    CREATE TABLE organization_members (<br>
+    &nbsp;&nbsp;org_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,<br>
+    &nbsp;&nbsp;user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,<br>
+    &nbsp;&nbsp;role TEXT NOT NULL DEFAULT 'member'<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;CHECK (role IN ('owner','admin','member')),<br>
+    &nbsp;&nbsp;joined_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),<br>
+    &nbsp;&nbsp;PRIMARY KEY (org_id, user_id)<br>
+    );<br>
+    <br>
+    <span style="color: #94a3b8;">-- 索引</span><br>
+    CREATE INDEX org_members_user_idx ON organization_members(user_id);
+  </div>
+  <div style="margin-top: 8px; font-size: 12px; color: #475569; line-height: 1.8;">
+    <strong>role 字段说明：</strong><br>
+    • <code>owner</code> — 创建者，拥有全部权限（不可移除自己）<br>
+    • <code>admin</code> — 可邀请/移除成员，管理组织下项目<br>
+    • <code>member</code> — 可管理组织下的项目，不能管理成员
+  </div>
+</div>
+
+<div class="section">
+  <h3>📦 project_members 表</h3>
+  <div style="background: #1e293b; border-radius: 12px; padding: 16px; color: #e2e8f0; font-family: monospace; font-size: 12px; line-height: 1.7;">
+    CREATE TABLE project_members (<br>
+    &nbsp;&nbsp;project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,<br>
+    &nbsp;&nbsp;user_id UUID NULL REFERENCES users(id) ON DELETE CASCADE,<br>
+    &nbsp;&nbsp;org_id UUID NULL REFERENCES organizations(id) ON DELETE CASCADE,<br>
+    &nbsp;&nbsp;role TEXT NOT NULL DEFAULT 'collaborator'<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;CHECK (role IN ('owner','collaborator')),<br>
+    &nbsp;&nbsp;joined_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),<br>
+    &nbsp;&nbsp;PRIMARY KEY (project_id, COALESCE(user_id, '00000000-0000-0000-0000-000000000000'), COALESCE(org_id, '00000000-0000-0000-0000-000000000000'))<br>
+    );<br>
+    <br>
+    <span style="color: #94a3b8;">-- 约束：user_id 和 org_id 至少有一个非空</span><br>
+    ALTER TABLE project_members<br>
+    &nbsp;&nbsp;ADD CONSTRAINT pm_member_target CHECK (<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;(user_id IS NOT NULL AND org_id IS NULL) OR<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;(user_id IS NULL AND org_id IS NOT NULL)<br>
+    &nbsp;&nbsp;);<br>
+    <br>
+    <span style="color: #94a3b8;">-- 索引</span><br>
+    CREATE INDEX pm_user_idx ON project_members(user_id) WHERE user_id IS NOT NULL;<br>
+    CREATE INDEX pm_org_idx ON project_members(org_id) WHERE org_id IS NOT NULL;<br>
+    CREATE INDEX pm_project_idx ON project_members(project_id);
+  </div>
+  <div style="margin-top: 8px; font-size: 12px; color: #475569; line-height: 1.8;">
+    <strong>设计说明：</strong><br>
+    • 每条记录要么关联 user_id（个人），要么关联 org_id（组织），不能同时有也不能都没有<br>
+    • 一个项目可以有多条记录：多个个人 + 多个组织<br>
+    • 组织成员通过 org_id 间接获得项目权限<br>
+    • <code>owner</code> — 项目所有者（每项目最多一个 owner）<br>
+    • <code>collaborator</code> — 协作者
+  </div>
+</div>
+
+<div class="section">
+  <h3>🔄 projects 表扩展</h3>
+  <div style="background: #fef3c7; border-radius: 12px; padding: 16px; font-size: 12px; line-height: 1.8; color: #78350f;">
+    <strong>现有字段：</strong><code>developer TEXT NOT NULL DEFAULT ''</code><br>
+    <strong>问题：</strong>这只是一个纯文本字段，存的是开发者名字字符串，没有关联到用户表<br><br>
+    <strong>迁移策略：</strong><br>
+    ① 保留 <code>developer</code> 字段不变（向后兼容，用于展示）<br>
+    ② 新增 <code>project_members</code> 表来建立正式的用户-项目关联<br>
+    ③ 运维可以在后台项目管理页指定项目开发者（选择已有用户）<br>
+    ④ 前端展示时优先使用 <code>project_members</code>，回退到 <code>developer</code> 字段
+  </div>
+</div>
+
+<div class="section">
+  <h3>📋 project_claims 表（项目认领申请）</h3>
+  <div style="background: #1e293b; border-radius: 12px; padding: 16px; color: #e2e8f0; font-family: monospace; font-size: 12px; line-height: 1.7;">
+    CREATE TABLE project_claims (<br>
+    &nbsp;&nbsp;id UUID PRIMARY KEY DEFAULT gen_random_uuid(),<br>
+    &nbsp;&nbsp;project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,<br>
+    &nbsp;&nbsp;user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,<br>
+    &nbsp;&nbsp;message TEXT NOT NULL DEFAULT '',<br>
+    &nbsp;&nbsp;status TEXT NOT NULL DEFAULT 'pending'<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;CHECK (status IN ('pending','approved','rejected')),<br>
+    &nbsp;&nbsp;review_note TEXT NOT NULL DEFAULT '',<br>
+    &nbsp;&nbsp;created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),<br>
+    &nbsp;&nbsp;reviewed_at TIMESTAMPTZ NULL<br>
+    );<br>
+    <br>
+    <span style="color: #94a3b8;">-- 索引</span><br>
+    CREATE INDEX claims_status_idx ON project_claims(status);<br>
+    CREATE INDEX claims_user_idx ON project_claims(user_id);<br>
+    CREATE INDEX claims_project_idx ON project_claims(project_id);
+  </div>
+</div>
+
+<div class="section">
+  <h3>🔑 新增能力定义（capabilities 扩展）</h3>
+  <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;">
+    <div style="background: #dcfce7; border-radius: 8px; padding: 10px;">
+      <div style="font-weight: 600; color: #166534; font-size: 12px; margin-bottom: 6px;">🟢 用户能力 (user)</div>
+      <div style="font-size: 11px; color: #166534; line-height: 1.6;">
+        <code>user:comment</code> — 发表评论<br>
+        <code>user:avatar</code> — 上传/更改头像<br>
+        <code>user:feedback</code> — 提交反馈<br>
+        <code>user:submit_project</code> — 提交项目<br>
+        <code>user:profile</code> — 修改个人资料<br>
+        <code>user:create_org</code> — 申请创建组织
+      </div>
+    </div>
+    <div style="background: #dbeafe; border-radius: 8px; padding: 10px;">
+      <div style="font-weight: 600; color: #1e40af; font-size: 12px; margin-bottom: 6px;">🔵 开发者能力 (dev)</div>
+      <div style="font-size: 11px; color: #1e40af; line-height: 1.6;">
+        <code>dev_panel_access</code> — 访问开发者后台<br>
+        <code>dev:project_edit</code> — 编辑自己的项目<br>
+        <code>dev:bug_manage</code> — 处理项目 Bug<br>
+        <code>dev:comment_manage</code> — 管理项目评论<br>
+        <code>dev:stats_view</code> — 查看项目数据<br>
+        <code>dev:member_manage</code> — 管理项目成员
+      </div>
+    </div>
+    <div style="background: #fce7f3; border-radius: 8px; padding: 10px;">
+      <div style="font-weight: 600; color: #9d174d; font-size: 12px; margin-bottom: 6px;">🟣 运维新增能力 (ops)</div>
+      <div style="font-size: 11px; color: #9d174d; line-height: 1.6;">
+        <code>org:review</code> — 审核组织申请<br>
+        <code>claim:review</code> — 审核项目认领<br>
+        <code>org:manage</code> — 管理组织（暂停等）
+      </div>
+    </div>
+  </div>
+</div>
+
+<div style="margin-top: 16px; background: #f0fdf4; border-radius: 12px; padding: 16px; border: 1px solid #86efac;">
+  <h3 style="margin: 0 0 8px 0; color: #166534; font-size: 14px;">📐 ER 关系图（新增部分）</h3>
+  <div style="font-family: monospace; font-size: 12px; color: #166534; line-height: 2;">
+    users ──1:N──→ organizations (created_by)<br>
+    users ──M:N──→ organizations (通过 organization_members)<br>
+    users ──M:N──→ projects (通过 project_members, user_id)<br>
+    organizations ──M:N──→ projects (通过 project_members, org_id)<br>
+    users ──1:N──→ project_claims (user_id)<br>
+    projects ──1:N──→ project_claims (project_id)<br>
+    <br>
+    <em>权限传递链：</em><br>
+    organization_members.user_id → org_id → project_members.org_id → project_id<br>
+    即：用户 → 组织 → 项目（间接获得项目权限）
+  </div>
+</div>

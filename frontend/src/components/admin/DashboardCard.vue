@@ -1,5 +1,5 @@
 <template>
-  <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-5 shadow-sm">
+  <div class="bg-white/72 dark:bg-slate-900/62 backdrop-blur-lg rounded-3xl border border-white/70 dark:border-slate-700/70 p-5 shadow-xl shadow-slate-900/8 dark:shadow-black/30">
     <div class="flex items-center gap-3 mb-3">
       <div class="w-10 h-10 rounded-xl flex items-center justify-center" :class="iconBgClass">
         <component :is="icon" class="w-5 h-5" :class="iconTextClass" />
@@ -19,7 +19,7 @@ const props = defineProps<{
   mainValue: string | number;
   subValue?: string;
   icon: any;
-  color?: 'emerald' | 'amber' | 'blue' | 'rose' | 'purple' | 'teal';
+  color?: 'emerald' | 'amber' | 'blue' | 'rose' | 'purple' | 'teal' | 'indigo';
 }>();
 
 const colorMap: Record<string, { bg: string; text: string }> = {
@@ -29,6 +29,7 @@ const colorMap: Record<string, { bg: string; text: string }> = {
   rose: { bg: 'bg-rose-100 dark:bg-rose-500/20', text: 'text-rose-600 dark:text-rose-400' },
   purple: { bg: 'bg-purple-100 dark:bg-purple-500/20', text: 'text-purple-600 dark:text-purple-400' },
   teal: { bg: 'bg-teal-100 dark:bg-teal-500/20', text: 'text-teal-600 dark:text-teal-400' },
+  indigo: { bg: 'bg-indigo-100 dark:bg-indigo-500/20', text: 'text-indigo-600 dark:text-indigo-400' },
 };
 
 const c = colorMap[props.color ?? 'emerald'];

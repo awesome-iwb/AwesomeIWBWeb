@@ -1,7 +1,11 @@
 import { registerSW } from 'virtual:pwa-register';
+import { promptServiceWorkerUpdate } from './siteReloadGate';
 
 registerSW({
   immediate: true,
+  onNeedRefresh() {
+    promptServiceWorkerUpdate();
+  },
   onRegisteredSW(_swUrl: string, registration?: ServiceWorkerRegistration) {
     if (!registration) return;
     // Poll for updates so users leave stale SW/assets quickly after deploy.

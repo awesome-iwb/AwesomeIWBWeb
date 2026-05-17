@@ -1,0 +1,80 @@
+<h2>当前权限体系 vs 你的目标</h2>
+<p class="subtitle">从现有架构到三层权限两个后台的演进</p>
+
+<div class="split">
+  <div class="mockup">
+    <div class="mockup-header">🔴 现状：扁平权限</div>
+    <div class="mockup-body" style="padding: 20px; font-size: 13px;">
+      <div style="display: flex; gap: 12px; margin-bottom: 16px;">
+        <div style="flex:1; background: #e0f2fe; border-radius: 8px; padding: 12px; text-align: center;">
+          <div style="font-weight: 700; color: #0369a1;">user</div>
+          <div style="font-size: 11px; color: #64748b; margin-top: 4px;">评论、头像、反馈</div>
+          <div style="font-size: 11px; color: #94a3b8; margin-top: 2px;">❌ 无后台</div>
+        </div>
+        <div style="flex:1; background: #fef3c7; border-radius: 8px; padding: 12px; text-align: center;">
+          <div style="font-weight: 700; color: #92400e;">dev</div>
+          <div style="font-size: 11px; color: #64748b; margin-top: 4px;">查看项目、查看提交</div>
+          <div style="font-size: 11px; color: #94a3b8; margin-top: 2px;">⚠️ 后台为空占位</div>
+        </div>
+        <div style="flex:1; background: #fce7f3; border-radius: 8px; padding: 12px; text-align: center;">
+          <div style="font-weight: 700; color: #9d174d;">ops</div>
+          <div style="font-size: 11px; color: #64748b; margin-top: 4px;">全局管理一切</div>
+          <div style="font-size: 11px; color: #94a3b8; margin-top: 2px;">✅ 完整后台</div>
+        </div>
+      </div>
+      <div style="background: #f8fafc; border-radius: 8px; padding: 12px;">
+        <div style="font-weight: 600; margin-bottom: 8px;">⚙️ 后台入口</div>
+        <div style="display: flex; gap: 8px;">
+          <div style="flex:1; border: 2px dashed #cbd5e1; border-radius: 6px; padding: 8px; text-align: center; color: #94a3b8; font-size: 11px;">/dev<br>（空页面）</div>
+          <div style="flex:1; border: 2px solid #f472b6; border-radius: 6px; padding: 8px; text-align: center; color: #9d174d; font-size: 11px;">/admin<br>（完整后台）</div>
+        </div>
+      </div>
+      <div style="margin-top: 12px; background: #fef2f2; border-radius: 8px; padding: 10px; font-size: 11px; color: #991b1b;">
+        <strong>问题：</strong>dev 角色权限太弱，且能力是全局的（有 project:update 就能改所有项目）
+      </div>
+    </div>
+  </div>
+
+  <div class="mockup">
+    <div class="mockup-header">🟢 目标：三层权限两个后台</div>
+    <div class="mockup-body" style="padding: 20px; font-size: 13px;">
+      <div style="display: flex; gap: 12px; margin-bottom: 16px;">
+        <div style="flex:1; background: #dcfce7; border-radius: 8px; padding: 12px; text-align: center;">
+          <div style="font-weight: 700; color: #166534;">用户权限</div>
+          <div style="font-size: 11px; color: #64748b; margin-top: 4px;">评论、头像、反馈<br>提交项目</div>
+          <div style="font-size: 11px; color: #16a34a; margin-top: 2px;">🏠 前端主站</div>
+        </div>
+        <div style="flex:1; background: #dbeafe; border-radius: 8px; padding: 12px; text-align: center;">
+          <div style="font-weight: 700; color: #1e40af;">开发者权限</div>
+          <div style="font-size: 11px; color: #64748b; margin-top: 4px;">管理自己的项目<br>处理自己项目的 Bug/评论</div>
+          <div style="font-size: 11px; color: #2563eb; margin-top: 2px;">🖥️ 开发者后台</div>
+        </div>
+        <div style="flex:1; background: #fce7f3; border-radius: 8px; padding: 12px; text-align: center;">
+          <div style="font-weight: 700; color: #9d174d;">运维权限</div>
+          <div style="font-size: 11px; color: #64748b; margin-top: 4px;">全局管理<br>用户、内容、系统</div>
+          <div style="font-size: 11px; color: #db2777; margin-top: 2px;">🛡️ 运维后台</div>
+        </div>
+      </div>
+      <div style="background: #f8fafc; border-radius: 8px; padding: 12px;">
+        <div style="font-weight: 600; margin-bottom: 8px;">⚙️ 两个后台</div>
+        <div style="display: flex; gap: 8px;">
+          <div style="flex:1; border: 2px solid #3b82f6; border-radius: 6px; padding: 8px; text-align: center; color: #1e40af; font-size: 11px;">/dev<br>开发者后台<br>（只看自己的项目）</div>
+          <div style="flex:1; border: 2px solid #ec4899; border-radius: 6px; padding: 8px; text-align: center; color: #9d174d; font-size: 11px;">/admin<br>运维后台<br>（全局管理）</div>
+        </div>
+      </div>
+      <div style="margin-top: 12px; background: #f0fdf4; border-radius: 8px; padding: 10px; font-size: 11px; color: #166534;">
+        <strong>核心变化：</strong>权限从"全局能力"升级为"资源级能力"，开发者只能管自己的项目
+      </div>
+    </div>
+  </div>
+</div>
+
+<div style="margin-top: 24px; background: #fffbeb; border-radius: 12px; padding: 16px; border: 1px solid #fbbf24;">
+  <h3 style="margin: 0 0 8px 0; color: #92400e;">🔑 关键设计决策（待讨论）</h3>
+  <ol style="margin: 0; padding-left: 20px; font-size: 13px; color: #78350f; line-height: 1.8;">
+    <li><strong>项目归属</strong>：一个项目可以有多少个开发者？如何建立"项目-开发者"关联？</li>
+    <li><strong>权限叠加</strong>：一个用户能否同时拥有多个角色？（如既是开发者又是运维）</li>
+    <li><strong>开发者后台范围</strong>：开发者在后台能做哪些操作？只能看自己的项目吗？</li>
+    <li><strong>用户权限显式化</strong>：是否需要把用户权限也纳入 capability 体系？</li>
+  </ol>
+</div>

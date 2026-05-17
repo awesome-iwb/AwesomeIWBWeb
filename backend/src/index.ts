@@ -11,6 +11,8 @@ import {
   createProject,
   deleteCategory,
   deleteProject,
+  extractDevProjectBaselinePatch,
+  extractDevProjectOwnerAdminPatch,
   findCategoryIdByName,
   getCatalog,
   getProjectById,
@@ -55,19 +57,31 @@ import {
 import { authPlugin, requireAuth, requireCapability } from "./plugins/auth";
 import { casdoorAuthPlugin } from "./plugins/casdoorAuth";
 import { localAuthPlugin } from "./plugins/localAuth";
-import { listUsers, setUserRole, setUserActive, updateUserLogin, findUserByName, deleteUser, findUserById, bumpUserTokenVersion, createUser } from "./services/users";
+import { listUsers, setUserRole, setUserActive, updateUserLogin, updateUserAvatarPreference, findUserByName, deleteUser, findUserById, bumpUserTokenVersion, createUser, getUserPublicProfile, getUserPublicComments, getUserPublicProjects, getUserPublicOrganizations, renameUser } from "./services/users";
 import { ensureSuperadminInitialized, SUPERADMIN_INITIAL_USERNAME, setLocalAccountPassword, validateSuperadminPassword } from "./services/localAccounts";
-import { listCapabilities, getUserCapabilitiesWithInfo, setUserCapabilities, isSuperadmin as isSuperadminUser } from "./services/capabilities";
+import { listCapabilities, getUserCapabilitiesWithInfo, setUserCapabilities, isSuperadmin as isSuperadminUser, userHasCapability } from "./services/capabilities";
 import { getRoleTemplates } from "./services/capabilities";
 import { getDashboardData } from "./services/dashboard";
 import { createOrGetMediaAssetFromUpload, getMediaReferences, listMediaAssets, restoreMedia, softDeleteMedia, getMediaTags, setMediaTags, batchTagMedia, batchSoftDeleteMedia, upsertMediaReference, upsertMediaReferencesForEntity } from "./services/media";
 import { buildKey, writeFile as storageWriteFile, readFile as storageReadFile, publicUrl as storagePublicUrl, ensureRoot } from "./services/storage";
 import { appConfig } from "./config";
 import { checkRateLimit } from "./plugins/rateLimit";
-import { addProjectMember, removeProjectMember, removeProjectOrgMember, getProjectMembers, getUserProjects, isProjectMember, isProjectOwner } from "./services/projectMembers";
+import {
+  addProjectMember,
+  removeProjectMember,
+  removeProjectOrgMember,
+  getProjectMembers,
+  getUserProjects,
+  isProjectMember,
+  isProjectOwner,
+  transferProjectUserOwnership,
+  ensureUserProjectOwnerMembership,
+} from "./services/projectMembers";
 import { createOrganization, findOrganizationById, findOrganizationBySlug, listOrganizations, updateOrganization, updateOrganizationStatus, deleteOrganization, getOrganizationMembers, addOrganizationMember, removeOrganizationMember, updateOrganizationMemberRole, getUserOrganizations, isOrgMember, isOrgAdminOrAbove, generateOrgSlug, validateOrgName, type OrganizationStatus } from "./services/organizations";
 import { createProjectClaim, listProjectClaims, approveProjectClaim, rejectProjectClaim, type ClaimStatus } from "./services/projectClaims";
 import { promoteToDev, demoteFromDev } from "./services/rolePromotion";
+import { listDevelopers, getDeveloperDetail } from "./services/developers";
+import { recordPageView, recordClickEvent, recordSearchQuery, getAnalyticsOverview, clampAnalyticsDays } from "./services/analytics";
 import { sql } from "./db/client";
 
 /**
@@ -216,6 +230,19 @@ async function checkCap(user: any, set: any, capabilityId: string): Promise<any>
   return false;
 }
 
+async function checkCapAny(user: any, set: any, capabilityIds: string[]): Promise<any> {
+  if (!dbEnabled) return false;
+  if (!user) return apiUnauthorized(set);
+  if (isSuperadminUser(user.name)) return false;
+  const { userHasCapability } = await import("./services/capabilities");
+  for (const capabilityId of capabilityIds) {
+    const has = await userHasCapability(user.id, user.name, capabilityId);
+    if (has) return false;
+  }
+  return apiForbidden(set);
+}
+
+
 const storyIdPattern = /^[a-zA-Z0-9_-]{1,64}$/;
 const storyFilePattern = /^[a-zA-Z0-9._-]{1,128}$/;
 const storyFileAllowlist = new Set(["meta.json", "content.md"]);
@@ -323,7 +350,42 @@ const app = new Elysia()
     return { error: { code: "INTERNAL", message: error.message, traceId, path: request.url } };
   })
   .get("/", () => "Welcome to Awesome-IWB API")
-  .get("/api/health", () => ({ status: "ok", db: dbEnabled, timestamp: new Date().toISOString() }))
+  .get("/api/health", () => ({
+    status: "ok",
+    db: dbEnabled,
+    timestamp: new Date().toISOString(),
+    buildId: appConfig.deployBuildId
+  }))
+  .post("/api/track/pageview", async ({ body, headers, set }) => {
+    if (checkRateLimit({ headers, path: "/api/track/pageview", set })) return apiError(set, 429, "RATE_LIMITED", "Too Many Requests");
+    const payload: any = body as any;
+    const path = String(payload?.path ?? "").trim();
+    if (!path) { set.status = 400; return apiBadRequest(set, "path is required"); }
+    const ip = (headers["x-forwarded-for"] ?? headers["x-real-ip"] ?? "unknown").toString().split(",")[0].trim();
+    const ua = String(headers["user-agent"] ?? "");
+    setTimeout(() => { void recordPageView({ path, referrer: String(payload?.referrer ?? ""), userAgent: ua, ip }); }, 0);
+    return { ok: true };
+  })
+  .post("/api/track/click", async ({ body, headers, set }) => {
+    if (checkRateLimit({ headers, path: "/api/track/click", set })) return apiError(set, 429, "RATE_LIMITED", "Too Many Requests");
+    const payload: any = body as any;
+    const projectSlug = String(payload?.projectSlug ?? "").trim();
+    if (!projectSlug) { set.status = 400; return apiBadRequest(set, "projectSlug is required"); }
+    const ip = (headers["x-forwarded-for"] ?? headers["x-real-ip"] ?? "unknown").toString().split(",")[0].trim();
+    const ua = String(headers["user-agent"] ?? "");
+    setTimeout(() => { void recordClickEvent({ projectSlug, eventType: String(payload?.eventType ?? "click"), referrer: String(payload?.referrer ?? ""), userAgent: ua, ip }); }, 0);
+    return { ok: true };
+  })
+  .post("/api/track/search", async ({ body, headers, set }) => {
+    if (checkRateLimit({ headers, path: "/api/track/search", set })) return apiError(set, 429, "RATE_LIMITED", "Too Many Requests");
+    const payload: any = body as any;
+    const query = String(payload?.query ?? "").trim();
+    if (!query) { set.status = 400; return apiBadRequest(set, "query is required"); }
+    const ip = (headers["x-forwarded-for"] ?? headers["x-real-ip"] ?? "unknown").toString().split(",")[0].trim();
+    const ua = String(headers["user-agent"] ?? "");
+    setTimeout(() => { void recordSearchQuery({ query, resultsCount: Number(payload?.resultsCount ?? 0), userAgent: ua, ip }); }, 0);
+    return { ok: true };
+  })
   .get("/api/categories", async () => {
     if (!dbEnabled) {
       return data.categories.map((c: any) => ({ id: c.id ?? c.name, name: c.name, description: c.description ?? "" }));
@@ -374,7 +436,12 @@ const app = new Elysia()
       return apiNotFound(set, "Project not found");
     }
     const members = dbEnabled ? await getProjectMembers(project.id) : [];
-    return { ...project, developers: members };
+    let organizationName: string | null = null;
+    if (project.organization_id) {
+      const orgs = await sql()`SELECT name FROM organizations WHERE id = ${project.organization_id}`;
+      organizationName = orgs[0]?.name ?? null;
+    }
+    return { ...project, developers: members, organization_name: organizationName };
   })
   .get("/api/stats", async () => {
     if (!dbEnabled) {
@@ -875,7 +942,25 @@ const app = new Elysia()
     const project = await getProjectById(id);
     if (!project) return apiNotFound(set, "Project not found");
     const members = await getProjectMembers(id);
-    return { ...project, members };
+    let orgName: string | null = null;
+    let devUserName: string | null = null;
+    if (project.organization_id) {
+      const org = await findOrganizationById(project.organization_id);
+      orgName = org?.name ?? null;
+    }
+    if (project.developer_user_id) {
+      const devUser = await findUserById(project.developer_user_id);
+      devUserName = devUser?.name ?? null;
+    }
+    return { ...project, members, organization_name: orgName, developer_user_name: devUserName };
+  })
+  .get("/api/admin/projects/:id/members", async ({ params: { id }, set, user }) => {
+    const capErr = await checkCap(user, set, "project:read");
+    if (capErr) return capErr;
+    if (!dbEnabled) return apiNotFound(set, "Project not found");
+    const project = await getProjectById(id);
+    if (!project) return apiNotFound(set, "Project not found");
+    return getProjectMembers(id);
   })
   .get("/api/admin/projects/export.json", async ({ set, user }) => {
     const capErr = await checkCap(user, set, "project:export");
@@ -1153,10 +1238,16 @@ const app = new Elysia()
     const data = await getDashboardData(String(user!.id), user!.name);
     return data;
   })
+  .get("/api/admin/analytics", async ({ query, user, set }) => {
+    const capErr = await checkCapAny(user, set, ["analytics:read", "admin_panel_access"]);
+    if (capErr) return capErr;
+    const days = clampAnalyticsDays(Number(query.days) || 7);
+    return await getAnalyticsOverview(days);
+  })
   .get("/api/admin/role-templates", async ({ user, set }) => {
     const capErr = await checkCap(user, set, "user:manage");
     if (capErr) return capErr;
-    return getRoleTemplates();
+    return { templates: getRoleTemplates() };
   })
   .get("/api/admin/audit-logs", async ({ query, set, user }) => {
     const capErr = await checkCap(user, set, "audit:read");
@@ -1229,15 +1320,8 @@ const app = new Elysia()
       await logAuditCompat({ action: "submit", entity_type: "submission", entity_id: created.id });
       return { success: true, submissionId: created.id };
     }
-    const created = await createSubmission(payload);
+    const created = await createSubmission(payload, { submitter_user_id: user?.id ?? null });
     await logAuditCompat({ action: "submit", entity_type: "submission", entity_id: created.id });
-    if (dbEnabled && user) {
-      const newProject = await sql()<Array<{ id: string }>>`select id from projects where slug = ${payload.name ?? payload.slug} order by created_at desc limit 1`;
-      if (newProject.length) {
-        await addProjectMember({ project_id: newProject[0].id, user_id: user.id, role: "owner" });
-        await promoteToDev(user.id);
-      }
-    }
     return { success: true, submissionId: created.id };
   })
   .post("/api/dev/submissions", async ({ body, set, user, headers }) => {
@@ -1263,7 +1347,7 @@ const app = new Elysia()
       return { success: true, submissionId: created.id };
     }
 
-    const created = await createSubmission(payload);
+    const created = await createSubmission(payload, { submitter_user_id: user.id });
     await logAuditCompat({ action: "submit", entity_type: "submission", entity_id: created.id, diff: { kind: "project_update" } });
     return { success: true, submissionId: created.id };
   })
@@ -1294,6 +1378,20 @@ const app = new Elysia()
     const members = await getProjectMembers(id);
     return { ...project, members };
   })
+  .get("/api/dev/projects/:id/users/search", async ({ params: { id }, user, set, query }) => {
+    const capErr = await checkCap(user, set, "dev:project_admin");
+    if (capErr) return capErr;
+    if (!user) return apiUnauthorized(set);
+    const owner = await isProjectOwner(id, user.id);
+    if (!owner) return apiForbidden(set, "Only project owner can search users");
+    const q = typeof (query as any)?.q === "string" ? String((query as any).q).trim() : "";
+    if (q.length < 1) return { items: [] as Array<{ id: string; name: string; avatar_url: string }> };
+    const pageSize = Math.min(50, Math.max(1, Number((query as any)?.pageSize) || 15));
+    const { items } = await listUsers({ q, page: 1, pageSize });
+    return {
+      items: items.map((u) => ({ id: u.id, name: u.name, avatar_url: u.avatar_url || "" })),
+    };
+  })
   .patch("/api/dev/projects/:id", async ({ params: { id }, body, user, set }) => {
     const capErr = await checkCap(user, set, "dev:project_edit");
     if (capErr) return capErr;
@@ -1301,19 +1399,56 @@ const app = new Elysia()
     const member = await isProjectMember(id, user.id);
     if (!member) return apiForbidden(set, "Not a project member");
     const payload = body as any;
-    const allowedFields = ["name", "description", "icon", "banner", "github_url", "language", "status", "version", "keywords"];
-    const updates: Record<string, any> = {};
-    for (const field of allowedFields) {
-      if (payload?.[field] !== undefined) updates[field] = payload[field];
+    const baseline = extractDevProjectBaselinePatch(payload);
+    const ownerAdminPatch = extractDevProjectOwnerAdminPatch(payload);
+    const owner = await isProjectOwner(id, user.id);
+    const hasProjectAdminCap = await userHasCapability(user.id, user.name, "dev:project_admin");
+    const allowOwnerAdminFields = (owner && hasProjectAdminCap) || isSuperadminUser(user.name);
+    if (Object.keys(ownerAdminPatch).length > 0 && !allowOwnerAdminFields) {
+      return apiForbidden(set, "Only project owner with dev:project_admin can update media and extended fields");
+    }
+    const updates: Record<string, any> = { ...baseline, ...(allowOwnerAdminFields ? ownerAdminPatch : {}) };
+    if (payload?.organization_id !== undefined) {
+      if (payload.organization_id !== null) {
+        const membership = await sql()`SELECT 1 FROM organization_members WHERE org_id = ${payload.organization_id} AND user_id = ${user.id}`;
+        if (membership.length === 0) {
+          return apiForbidden(set, 'You are not a member of this organization');
+        }
+      }
+      updates.organization_id = payload.organization_id;
+    }
+    if (payload?.developer_user_id !== undefined) {
+      const isOwner = await isProjectOwner(id, user.id);
+      if (!isOwner) return apiForbidden(set, "Only project owner can change primary developer");
+      updates.developer_user_id =
+        typeof payload.developer_user_id === "string" ? payload.developer_user_id : null;
+      if (updates.developer_user_id) {
+        const devUser = await findUserById(updates.developer_user_id);
+        if (devUser) updates.developer = devUser.name;
+      } else {
+        updates.developer = "";
+      }
     }
     if (Object.keys(updates).length === 0) return apiBadRequest(set, "No valid fields to update");
     const updated = await updateProject(id, updates);
     if (!updated) return apiNotFound(set, "Project not found");
+    if (
+      dbEnabled &&
+      ("icon" in updates || "banner" in updates || "avatar" in updates)
+    ) {
+      await upsertMediaReferencesForEntity({
+        entityType: "project",
+        entityId: id,
+        fields: buildProjectMediaFields(updated),
+      });
+    }
     await logAuditCompat({ actor: user.name, action: "update", entity_type: "project", entity_id: id, diff: updates });
-    return updated;
+    const full = await getProjectById(id);
+    const members = await getProjectMembers(id);
+    return { ...(full ?? updated), members };
   })
   .get("/api/dev/projects/:id/members", async ({ params: { id }, user, set }) => {
-    const capErr = await checkCap(user, set, "dev:member_manage");
+    const capErr = await checkCap(user, set, "dev:project_admin");
     if (capErr) return capErr;
     if (!user) return apiUnauthorized(set);
     const member = await isProjectMember(id, user.id);
@@ -1321,7 +1456,7 @@ const app = new Elysia()
     return getProjectMembers(id);
   })
   .post("/api/dev/projects/:id/members", async ({ params: { id }, body, user, set }) => {
-    const capErr = await checkCap(user, set, "dev:member_manage");
+    const capErr = await checkCap(user, set, "dev:project_admin");
     if (capErr) return capErr;
     if (!user) return apiUnauthorized(set);
     const isOwner = await isProjectOwner(id, user.id);
@@ -1334,7 +1469,7 @@ const app = new Elysia()
     return result;
   })
   .delete("/api/dev/projects/:id/members/:userId", async ({ params: { id, userId }, user, set }) => {
-    const capErr = await checkCap(user, set, "dev:member_manage");
+    const capErr = await checkCap(user, set, "dev:project_admin");
     if (capErr) return capErr;
     if (!user) return apiUnauthorized(set);
     const isOwner = await isProjectOwner(id, user.id);
@@ -1343,6 +1478,22 @@ const app = new Elysia()
     if (!removed) return apiBadRequest(set, "Cannot remove member");
     await demoteFromDev(userId);
     await logAuditCompat({ actor: user.name, action: "remove_member", entity_type: "project", entity_id: id, diff: { user_id: userId } });
+    return { ok: true };
+  })
+  .patch("/api/dev/projects/:id/members/:userId", async ({ params: { id, userId }, body, user, set }) => {
+    const capErr = await checkCap(user, set, "dev:project_admin");
+    if (capErr) return capErr;
+    if (!user) return apiUnauthorized(set);
+    const payload = body as any;
+    if (payload?.role !== "owner") return apiBadRequest(set, "role must be owner");
+    const result = await transferProjectUserOwnership(id, user.id, userId);
+    if (!result.ok) {
+      if (result.error === "NOT_OWNER") return apiForbidden(set, "Only project owner can transfer ownership");
+      if (result.error === "NOT_COLLABORATOR") return apiBadRequest(set, "Target must be an existing collaborator");
+      if (result.error === "SAME_USER") return apiBadRequest(set, "Invalid target");
+      return apiBadRequest(set, "Transfer failed");
+    }
+    await logAuditCompat({ actor: user.name, action: "transfer_ownership", entity_type: "project", entity_id: id, diff: { new_owner_user_id: userId } });
     return { ok: true };
   })
   .get("/api/dev/feedback", async ({ user, set, query }) => {
@@ -1445,11 +1596,21 @@ const app = new Elysia()
     const [{ total_comments }] = await sql().unsafe(`select count(*)::text as total_comments from feedback_entries where project_name in (${nameList}) and kind = 'comment'`) as Array<{ total_comments: string }>;
     return { projects: projectIds.length, totalBugs: Number(total_bugs), openBugs: Number(open_bugs), totalComments: Number(total_comments) };
   })
-  .get("/api/dev/organizations", async ({ user, set }) => {
+  .get("/api/dev/organizations", async ({ user, set, query }) => {
     const capErr = await checkCap(user, set, "dev_panel_access");
     if (capErr) return capErr;
     if (!user) return apiUnauthorized(set);
-    return getUserOrganizations(user.id);
+    const rows = await getUserOrganizations(user.id);
+    const qRaw = typeof (query as any)?.q === "string" ? String((query as any).q).trim().toLowerCase() : "";
+    let filtered = rows;
+    if (qRaw) {
+      filtered = rows.filter(
+        (o) => o.name.toLowerCase().includes(qRaw) || o.slug.toLowerCase().includes(qRaw)
+      );
+    }
+    const pageSize = Math.min(100, Math.max(1, Number((query as any)?.pageSize) || 100));
+    const items = qRaw ? filtered.slice(0, pageSize) : filtered;
+    return { items, page: 1, pageSize: items.length, total: filtered.length };
   })
   .post("/api/dev/organizations", async ({ body, user, set }) => {
     const capErr = await checkCap(user, set, "user:create_org");
@@ -1478,7 +1639,7 @@ const app = new Elysia()
     return { ...org, members, is_admin: isAdmin };
   })
   .patch("/api/dev/organizations/:id", async ({ params: { id }, body, user, set }) => {
-    const capErr = await checkCap(user, set, "dev:member_manage");
+    const capErr = await checkCap(user, set, "dev:org_manage");
     if (capErr) return capErr;
     if (!user) return apiUnauthorized(set);
     const isAdmin = await isOrgAdminOrAbove(id, user.id);
@@ -1497,7 +1658,7 @@ const app = new Elysia()
     return getOrganizationMembers(id);
   })
   .post("/api/dev/organizations/:id/members", async ({ params: { id }, body, user, set }) => {
-    const capErr = await checkCap(user, set, "dev:member_manage");
+    const capErr = await checkCap(user, set, "dev:org_manage");
     if (capErr) return capErr;
     if (!user) return apiUnauthorized(set);
     const isAdmin = await isOrgAdminOrAbove(id, user.id);
@@ -1509,7 +1670,7 @@ const app = new Elysia()
     return result;
   })
   .delete("/api/dev/organizations/:id/members/:userId", async ({ params: { id, userId }, user, set }) => {
-    const capErr = await checkCap(user, set, "dev:member_manage");
+    const capErr = await checkCap(user, set, "dev:org_manage");
     if (capErr) return capErr;
     if (!user) return apiUnauthorized(set);
     const isAdmin = await isOrgAdminOrAbove(id, user.id);
@@ -1520,7 +1681,7 @@ const app = new Elysia()
     return { ok: true };
   })
   .patch("/api/dev/organizations/:id/members/:userId", async ({ params: { id, userId }, body, user, set }) => {
-    const capErr = await checkCap(user, set, "dev:member_manage");
+    const capErr = await checkCap(user, set, "dev:org_manage");
     if (capErr) return capErr;
     if (!user) return apiUnauthorized(set);
     const isOrgOwner = await sql()<Array<{ role: string }>>`select role from organization_members where org_id = ${id} and user_id = ${user.id} and role = 'owner'`;
@@ -1550,7 +1711,7 @@ const app = new Elysia()
     const pageSize = Math.min(100, Math.max(1, Number((query as any)?.pageSize) || 20));
     return listProjectClaims({ user_id: user.id, page, pageSize });
   })
-  .post("/api/submit", async ({ body, set, headers }) => {
+  .post("/api/submit", async ({ body, set, headers, user }) => {
     if (checkRateLimit({ headers, path: "/api/submit", set })) return apiError(set, 429, "RATE_LIMITED", "Too Many Requests");
     const payload: any = body as any;
     if (!payload?.name || !payload?.developer || !payload?.github_url) {
@@ -1564,7 +1725,7 @@ const app = new Elysia()
       await logAuditCompat({ action: "submit", entity_type: "submission", entity_id: created.id });
       return { success: true, submissionId: created.id };
     }
-    const created = await createSubmission(payload);
+    const created = await createSubmission(payload, { submitter_user_id: user?.id ?? null });
     await logAuditCompat({ action: "submit", entity_type: "submission", entity_id: created.id });
     return { success: true, submissionId: created.id };
   })
@@ -1800,8 +1961,53 @@ const app = new Elysia()
       return JSON.stringify({ success: true, project_id: projectId });
       }
 
-      const createdProject = await createProject({ ...projectInput, category_id: categoryId });
+      const bodyProject = input?.project as Record<string, unknown> | undefined;
+      const submissionPayload = submission.payload as Record<string, unknown> | undefined;
+      const metaRaw = (submission as { submitter_meta?: unknown }).submitter_meta;
+      const metaObj =
+        metaRaw && typeof metaRaw === "object" && metaRaw !== null && !Array.isArray(metaRaw)
+          ? (metaRaw as Record<string, unknown>)
+          : {};
+      const submitterRaw = metaObj.submitter_user_id;
+      const submitterId =
+        typeof submitterRaw === "string" && submitterRaw.trim() ? submitterRaw.trim() : null;
+
+      const hasExplicitDevInBody =
+        !!bodyProject && Object.prototype.hasOwnProperty.call(bodyProject, "developer_user_id");
+      const hasExplicitDevInPayload =
+        !bodyProject &&
+        !!submissionPayload &&
+        Object.prototype.hasOwnProperty.call(submissionPayload, "developer_user_id");
+      let devUserForCreate: string | null;
+      if (hasExplicitDevInBody) {
+        const v = bodyProject!.developer_user_id;
+        devUserForCreate = typeof v === "string" ? v : null;
+      } else if (hasExplicitDevInPayload) {
+        const v = submissionPayload!.developer_user_id;
+        devUserForCreate = typeof v === "string" ? v : null;
+      } else {
+        devUserForCreate = submitterId;
+      }
+
+      const createdProject = await createProject({
+        ...projectInput,
+        category_id: categoryId,
+        developer_user_id: devUserForCreate,
+      });
       await upsertMediaReferencesForEntity({ entityType: "project", entityId: createdProject.id, fields: buildProjectMediaFields(projectInput) });
+      if (submitterId) {
+        await ensureUserProjectOwnerMembership(createdProject.id, submitterId);
+        await promoteToDev(submitterId);
+      }
+      if (devUserForCreate && devUserForCreate !== submitterId) {
+        const already = await sql()<Array<{ user_id: string }>>`
+          select user_id from project_members where project_id = ${createdProject.id} and user_id = ${devUserForCreate} and org_id is null limit 1
+        `;
+        if (already.length === 0) {
+          await addProjectMember({ project_id: createdProject.id, user_id: devUserForCreate, role: "collaborator" });
+        }
+        await promoteToDev(devUserForCreate);
+      }
       await updateSubmissionStatus(id, "approved", "");
       await logAuditCompat({ action: "approve", entity_type: "submission", entity_id: id, diff: { project_id: createdProject.id } });
       await logAuditCompat({ action: "create", entity_type: "project", entity_id: createdProject.id, diff: { from_submission: id } });
@@ -1986,6 +2192,7 @@ const app = new Elysia()
       await updateUserLogin(user.id, {
         avatar_url: avatarUrl,
         avatar_source: "upload",
+        upload_avatar_url: avatarUrl,
       });
     }
 
@@ -2003,6 +2210,35 @@ const app = new Elysia()
     body: t.Object({
       image: t.File()
     })
+  })
+  .patch("/api/user/avatar-source", async ({ body, user, set }) => {
+    const authErr = checkAuth(user, set);
+    if (authErr) return authErr;
+    const raw = (body as any)?.source ?? (body as any)?.avatar_source;
+    const source = String(raw ?? "").trim().toLowerCase();
+    if (source !== "casdoor" && source !== "upload") {
+      return apiBadRequest(set, "无效的头像来源");
+    }
+    if (!user?.id || String(user.id).startsWith("local:")) {
+      return apiBadRequest(set, "当前账户不支持设置头像来源");
+    }
+    try {
+      const updated = await updateUserAvatarPreference(String(user.id), source as "casdoor" | "upload");
+      return { avatar_url: updated.avatar_url, avatar_source: updated.avatar_source };
+    } catch (e: any) {
+      if (e?.message === "MISSING_EXTERNAL_AVATAR") {
+        return apiBadRequest(set, "暂无已缓存的联盟头像，请先重新登录以从智教联盟同步");
+      }
+      if (e?.message === "MISSING_UPLOAD_AVATAR") {
+        return apiBadRequest(set, "请先在本地图床上传过头像后再选择本站头像");
+      }
+      throw e;
+    }
+  }, {
+    body: t.Object({
+      source: t.Optional(t.String()),
+      avatar_source: t.Optional(t.String()),
+    }),
   })
   .get("/api/admin/media", async ({ query, set, user }) => {
     const capErr = await checkCap(user, set, "media:read");
@@ -2137,6 +2373,10 @@ const app = new Elysia()
       return apiBadRequest(set, "Password does not meet requirements");
     }
     const created = await createUser({ name, email });
+    if (created) {
+      const { grantDefaultUserCapabilities } = await import("./services/capabilities");
+      await grantDefaultUserCapabilities(created.id);
+    }
     if (password) {
       await setLocalAccountPassword(name, password, true);
     }
@@ -2375,7 +2615,24 @@ const app = new Elysia()
     const page = Math.max(1, Number(query?.page) || 1);
     const pageSize = Math.min(100, Math.max(1, Number(query?.pageSize) || 20));
     const status = query?.status as OrganizationStatus | undefined;
-    return listOrganizations({ status, page, pageSize });
+    const q = typeof query?.q === "string" ? query.q : undefined;
+    return listOrganizations({ q, status, page, pageSize });
+  })
+  .get("/api/admin/developers", async ({ user, set, query }) => {
+    const capErr = await checkCap(user, set, "dev:developer_manage");
+    if (capErr) return capErr;
+    const q = typeof query.q === "string" ? query.q : undefined;
+    const page = Number(query.page) || 1;
+    const pageSize = Number(query.pageSize) || 20;
+    const result = await listDevelopers({ q, page, pageSize });
+    return result;
+  })
+  .get("/api/admin/developers/:id", async ({ params: { id }, set, user }) => {
+    const capErr = await checkCap(user, set, "dev:developer_manage");
+    if (capErr) return capErr;
+    const detail = await getDeveloperDetail(id);
+    if (!detail) return apiNotFound(set, "Developer not found");
+    return detail;
   })
   .get("/api/admin/organizations/:id", async ({ params: { id }, user, set }) => {
     const capErr = await checkCap(user, set, "org:review");
@@ -2384,6 +2641,36 @@ const app = new Elysia()
     if (!org) return apiNotFound(set, "Organization not found");
     const members = await getOrganizationMembers(id);
     return { ...org, members };
+  })
+  .get("/api/admin/organizations/:id/member-search", async ({ params: { id }, user, set, query }) => {
+    const capErr = await checkCap(user, set, "org:manage");
+    if (capErr) return capErr;
+    const org = await findOrganizationById(id);
+    if (!org) return apiNotFound(set, "Organization not found");
+    const q = typeof query?.q === "string" ? query.q.trim() : "";
+    if (!q) return { items: [], page: 1, pageSize: 15, total: 0 };
+    return listUsers({ q, page: 1, pageSize: 15 });
+  })
+  .post("/api/admin/organizations/:id/members", async ({ params: { id }, body, user, set }) => {
+    const capErr = await checkCap(user, set, "org:manage");
+    if (capErr) return capErr;
+    const org = await findOrganizationById(id);
+    if (!org) return apiNotFound(set, "Organization not found");
+    const payload = body as any;
+    const userId = typeof payload?.user_id === "string" ? payload.user_id.trim() : "";
+    if (!userId) return apiBadRequest(set, "user_id is required");
+    const target = await findUserById(userId);
+    if (!target) return apiBadRequest(set, "User not found");
+    const existing = await getOrganizationMembers(id);
+    const prior = existing.find((m) => m.user_id === userId);
+    if (prior?.role === "owner") return apiBadRequest(set, "Cannot change organization owner here");
+    const role = payload?.role === "admin" ? "admin" : "member";
+    await addOrganizationMember({ org_id: id, user_id: userId, role });
+    await promoteToDev(userId);
+    const members = await getOrganizationMembers(id);
+    const row = members.find((m) => m.user_id === userId);
+    await logAuditCompat({ actor: user?.name, action: "add_org_member", entity_type: "organization", entity_id: id, diff: { user_id: userId, role } });
+    return row ?? { org_id: id, user_id: userId, role, joined_at: new Date().toISOString() };
   })
   .post("/api/admin/organizations/:id/approve", async ({ params: { id }, body, user, set }) => {
     const capErr = await checkCap(user, set, "org:review");
@@ -2478,6 +2765,61 @@ const app = new Elysia()
     if (!removed) return apiBadRequest(set, "Cannot remove member");
     await logAuditCompat({ actor: user?.name, action: "remove_project_member", entity_type: "project", entity_id: id });
     return { ok: true };
+  })
+  .get("/api/users/:name/profile", async ({ params: { name }, set }) => {
+    const profile = await getUserPublicProfile(decodeURIComponent(name));
+    if (!profile) return apiNotFound(set, "用户不存在");
+    return profile;
+  })
+  .get("/api/users/:name/comments", async ({ params: { name }, query, set }) => {
+    const page = Math.max(1, Number(query?.page) || 1);
+    const pageSize = Math.min(100, Math.max(1, Number(query?.pageSize) || 20));
+    const profile = await getUserPublicProfile(decodeURIComponent(name));
+    if (!profile) return apiNotFound(set, "用户不存在");
+    return getUserPublicComments(decodeURIComponent(name), page, pageSize);
+  })
+  .get("/api/users/:name/projects", async ({ params: { name }, set }) => {
+    const profile = await getUserPublicProfile(decodeURIComponent(name));
+    if (!profile) return apiNotFound(set, "用户不存在");
+    return getUserPublicProjects(decodeURIComponent(name));
+  })
+  .get("/api/users/:name/organizations", async ({ params: { name }, set }) => {
+    const profile = await getUserPublicProfile(decodeURIComponent(name));
+    if (!profile) return apiNotFound(set, "用户不存在");
+    return getUserPublicOrganizations(decodeURIComponent(name));
+  })
+  .patch("/api/user/name", async ({ body, user, set }) => {
+    const capErr = await checkCap(user, set, "user:rename");
+    if (capErr) return capErr;
+    const payload = body as any;
+    const newName = String(payload?.name ?? "").trim();
+    if (!newName) return apiBadRequest(set, "用户名不能为空");
+    try {
+      const updated = await renameUser({ userId: user.id, newName, source: "self" });
+      return { name: updated.name, avatar_url: updated.avatar_url };
+    } catch (e: any) {
+      if (e?.message === "INVALID_NAME_FORMAT") return apiBadRequest(set, "用户名格式不正确，仅支持2-30位中文、英文、数字、下划线、连字符");
+      if (e?.message === "NAME_ALREADY_TAKEN") return apiBadRequest(set, "该用户名已被占用");
+      if (e?.message === "RENAME_COOLDOWN") return apiBadRequest(set, "30天内只能修改一次用户名");
+      throw e;
+    }
+  })
+  .patch("/api/admin/users/:id/name", async ({ params: { id }, body, user, set }) => {
+    const capErr = await checkCap(user, set, "user:manage");
+    if (capErr) return capErr;
+    const payload = body as any;
+    const newName = String(payload?.name ?? "").trim();
+    if (!newName) return apiBadRequest(set, "用户名不能为空");
+    try {
+      const updated = await renameUser({ userId: id, newName, changedBy: user?.id, source: "admin" });
+      await logAuditCompat({ actor: user?.name, action: "rename_user", entity_type: "user", entity_id: id, diff: { new_name: newName } });
+      return { id: updated.id, name: updated.name, avatar_url: updated.avatar_url };
+    } catch (e: any) {
+      if (e?.message === "INVALID_NAME_FORMAT") return apiBadRequest(set, "用户名格式不正确，仅支持2-30位中文、英文、数字、下划线、连字符");
+      if (e?.message === "NAME_ALREADY_TAKEN") return apiBadRequest(set, "该用户名已被占用");
+      if (e?.message === "USER_NOT_FOUND") return apiNotFound(set, "用户不存在");
+      throw e;
+    }
   })
   .listen(Number(process.env.PORT ?? 8081));
 

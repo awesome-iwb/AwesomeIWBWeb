@@ -1,0 +1,22 @@
+- [x] 侧边栏在桌面端固定不动，内容区域滚动时侧边栏保持原位
+- [x] 侧边栏导航项过多时可在侧边栏内部独立滚动
+- [x] 侧边栏折叠/展开功能正常，过渡动画流畅
+- [x] AdminShell 使用 h-dvh 替代 h-screen，移动端视口高度正确
+- [x] router-view 不再有 min-h-full，子视图高度由自身控制
+- [x] main 容器移除了 overscroll-contain，滚动行为正常
+- [x] 移动端显示 BottomNav 底部导航，包含主要导航项和"更多"按钮
+- [x] 移动端内容区域底部有足够 padding，不被 BottomNav 遮挡
+- [x] ListDetailLayout 桌面端列表面板和详情面板各自独立滚动
+- [x] ListDetailLayout 移动端列表和详情堆叠显示，各自可滚动
+- [x] UsersView、ProjectsView、StoriesView 等视图无硬编码 max-height 限制
+- [x] AnalyticsView 等流式布局视图在内容区域可正常滚动
+- [x] design-tokens.css 包含新增的 --radius-2xl、--radius-3xl、--blur-glass、三层阴影变量
+- [x] 侧边栏品牌名使用渐变文字效果
+- [x] 侧边栏、顶部栏、底部导航均使用毛玻璃效果（backdrop-blur-xl + 半透明背景）
+- [x] 卡片和面板使用统一圆角（rounded-2xl/3xl）
+- [x] 选中态导航项有品牌色阴影
+- [x] 导航项有 active:scale-[0.98] 微动效
+- [x] AdminSidebar.vue、AdminBottomNav.vue、DevSidebar.vue、DevBottomNav.vue 已删除
+- [x] 全局搜索确认无文件引用已删除的旧组件
+- [x] vite build 构建成功，无编译错误
+- [x] TypeScript 类型检查通过，无类型错误

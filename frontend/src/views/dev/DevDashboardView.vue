@@ -1,8 +1,6 @@
 <template>
   <div class="space-y-4 lg:space-y-6 max-w-full overflow-x-hidden">
-    <div v-if="loading" class="flex items-center justify-center py-20">
-      <div class="w-8 h-8 border-3 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-    </div>
+    <ui-LoadingSpinner v-if="loading" brand="dev" />
 
     <template v-else>
       <div class="flex gap-2 overflow-x-auto pb-1 -webkit-overflow-scrolling-touch lg:hidden max-w-full">
@@ -21,7 +19,7 @@
       </div>
 
       <div class="hidden lg:grid lg:grid-cols-4 gap-4">
-        <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-5 flex items-center gap-4">
+        <div class="bg-white/72 dark:bg-slate-900/62 backdrop-blur-lg rounded-3xl border border-white/70 dark:border-slate-700/70 shadow-xl shadow-slate-900/8 dark:shadow-black/30 p-5 flex items-center gap-4">
           <div class="w-12 h-12 rounded-xl bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center flex-shrink-0">
             <Building2 class="w-6 h-6 text-blue-500" />
           </div>
@@ -30,7 +28,7 @@
             <div class="text-xs text-slate-500 dark:text-slate-400">我的组织</div>
           </div>
         </div>
-        <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-5 flex items-center gap-4">
+        <div class="bg-white/72 dark:bg-slate-900/62 backdrop-blur-lg rounded-3xl border border-white/70 dark:border-slate-700/70 shadow-xl shadow-slate-900/8 dark:shadow-black/30 p-5 flex items-center gap-4">
           <div class="w-12 h-12 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
             <Package class="w-6 h-6 text-emerald-500" />
           </div>
@@ -39,7 +37,7 @@
             <div class="text-xs text-slate-500 dark:text-slate-400">参与项目</div>
           </div>
         </div>
-        <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-5 flex items-center gap-4">
+        <div class="bg-white/72 dark:bg-slate-900/62 backdrop-blur-lg rounded-3xl border border-white/70 dark:border-slate-700/70 shadow-xl shadow-slate-900/8 dark:shadow-black/30 p-5 flex items-center gap-4">
           <div class="w-12 h-12 rounded-xl bg-rose-50 dark:bg-rose-500/10 flex items-center justify-center flex-shrink-0">
             <Bug class="w-6 h-6 text-rose-500" />
           </div>
@@ -48,7 +46,7 @@
             <div class="text-xs text-slate-500 dark:text-slate-400">待处理 Bug</div>
           </div>
         </div>
-        <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-5 flex items-center gap-4">
+        <div class="bg-white/72 dark:bg-slate-900/62 backdrop-blur-lg rounded-3xl border border-white/70 dark:border-slate-700/70 shadow-xl shadow-slate-900/8 dark:shadow-black/30 p-5 flex items-center gap-4">
           <div class="w-12 h-12 rounded-xl bg-purple-50 dark:bg-purple-500/10 flex items-center justify-center flex-shrink-0">
             <MessageSquare class="w-6 h-6 text-purple-500" />
           </div>
@@ -59,7 +57,7 @@
         </div>
       </div>
 
-      <div v-if="recentProjects.length > 0" class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+      <div v-if="recentProjects.length > 0" class="bg-white/72 dark:bg-slate-900/62 backdrop-blur-lg rounded-3xl border border-white/70 dark:border-slate-700/70 shadow-xl shadow-slate-900/8 dark:shadow-black/30 overflow-hidden">
         <div class="px-4 lg:px-5 py-3 lg:py-4 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
           <h3 class="font-bold text-sm lg:text-base flex items-center gap-2"><Package class="w-4 h-4 text-emerald-500" />我的项目</h3>
           <router-link to="/dev/projects" class="text-xs text-blue-600 dark:text-blue-400 font-medium">全部 →</router-link>
@@ -79,11 +77,7 @@
         </div>
       </div>
 
-      <div v-if="recentProjects.length === 0 && !loading" class="text-center py-20 text-slate-400">
-        <LayoutDashboard class="w-12 h-12 mx-auto mb-3 opacity-30" />
-        <p class="text-sm">暂无参与的项目</p>
-        <p class="text-xs mt-1">提交项目或申请认领后即可在此管理</p>
-      </div>
+      <ui-EmptyState v-if="recentProjects.length === 0 && !loading" :icon="LayoutDashboard" title="暂无参与的项目" description="提交项目或申请认领后即可在此管理" containerClass="py-20" />
     </template>
   </div>
 </template>
@@ -93,6 +87,7 @@ import { ref, onMounted } from 'vue';
 import { adminFetch } from '../../composables/useAdminFetch';
 import { API } from '../../api/endpoints';
 import { Building2, Package, Bug, MessageSquare, LayoutDashboard } from 'lucide-vue-next';
+import { LoadingSpinner as uiLoadingSpinner, EmptyState as uiEmptyState } from '../../components/ui';
 
 const stats = ref<{ projects: number; totalBugs: number; openBugs: number; totalComments: number; organizations?: number }>({
   projects: 0, totalBugs: 0, openBugs: 0, totalComments: 0, organizations: 0,

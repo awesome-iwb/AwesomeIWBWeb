@@ -1,5 +1,6 @@
 import { sql } from "../db/client";
 import { userHasCapability, isSuperadmin } from "./capabilities";
+import { getAnalyticsSummary } from "./analytics";
 import fs from "fs";
 import path from "path";
 
@@ -15,6 +16,12 @@ export type DashboardData = {
   media?: { total: number; totalSize: number; recent: Array<{ id: string; url: string; mime: string; size: number; uploader_id: string; created_at: string }> };
   stories?: { total: number; recent: Array<{ id: string; title: string; cover: string; author: string; created_at: string }> };
   recentActivity?: Array<{ action: string; entity_type: string; entity_id: string; actor: string; created_at: string }>;
+  analytics?: {
+    pvToday: number;
+    pvThisWeek: number;
+    topProject: { slug: string; clicks: number } | null;
+    topSearchQuery: string | null;
+  };
 };
 
 export async function getDashboardData(userId: string, username: string): Promise<DashboardData> {
@@ -117,6 +124,12 @@ export async function getDashboardData(userId: string, username: string): Promis
       limit 10
     `;
     data.recentActivity = rows;
+  }
+
+  if (await hasCap("analytics:read")) {
+    try {
+      data.analytics = await getAnalyticsSummary();
+    } catch {}
   }
 
   return data;

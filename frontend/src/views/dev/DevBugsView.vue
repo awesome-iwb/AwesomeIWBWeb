@@ -18,13 +18,10 @@
       </select>
     </div>
 
-    <div v-if="loading" class="flex items-center justify-center py-20">
-      <div class="w-8 h-8 border-3 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-    </div>
+    <ui-LoadingSpinner v-if="loading" brand="dev" />
 
-    <div v-else-if="bugs.length === 0" class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-10 text-center">
-      <Bug class="w-12 h-12 mx-auto mb-3 text-slate-300 dark:text-slate-600" />
-      <p class="text-slate-500 dark:text-slate-400 text-sm">暂无 Bug 反馈</p>
+    <div v-else-if="bugs.length === 0" class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
+      <ui-EmptyState :icon="Bug" title="暂无 Bug 反馈" containerClass="p-10" />
     </div>
 
     <div v-else class="space-y-3">
@@ -39,7 +36,7 @@
                 <span> · {{ formatTime(bug.created_at) }}</span>
               </div>
             </div>
-            <span class="text-[10px] px-1.5 py-0.5 rounded-full font-medium flex-shrink-0" :class="statusClass(bug.status)">{{ statusLabel(bug.status) }}</span>
+            <ui-StatusBadge :status="badgeStatus(bug.status)" :label="badgeLabel(bug.status)" />
           </div>
           <p v-if="bug.body && bug.title" class="text-xs text-slate-500 dark:text-slate-400 mt-2 line-clamp-2">{{ bug.body }}</p>
           <div class="flex items-center gap-2 mt-3">
@@ -61,11 +58,7 @@
       </div>
     </div>
 
-    <div v-if="totalPages > 1" class="flex items-center justify-between text-sm pt-2">
-      <button @click="prevPage" :disabled="page <= 1" class="px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed">上一页</button>
-      <div class="text-slate-500 dark:text-slate-300">{{ page }} / {{ totalPages }}</div>
-      <button @click="nextPage" :disabled="page >= totalPages" class="px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed">下一页</button>
-    </div>
+    <ui-Pagination v-model:page="page" :total="total" :page-size="20" />
 
     <div v-if="showReplyModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
       <div class="w-full max-w-lg bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-2xl overflow-hidden">
@@ -90,10 +83,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, watch } from 'vue';
 import { adminFetch, formatAdminError } from '../../composables/useAdminFetch';
 import { API } from '../../api/endpoints';
 import { Bug } from 'lucide-vue-next';
+import { Pagination as uiPagination, LoadingSpinner as uiLoadingSpinner, EmptyState as uiEmptyState, StatusBadge as uiStatusBadge } from '../../components/ui';
 
 const bugs = ref<any[]>([]);
 const page = ref(1);
@@ -109,8 +103,6 @@ const replyBugId = ref('');
 const replyBody = ref('');
 const isReplying = ref(false);
 
-const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize.value)));
-
 const formatTime = (v: string) => {
   try {
     const d = new Date(v);
@@ -119,19 +111,14 @@ const formatTime = (v: string) => {
   } catch { return v; }
 };
 
-const statusLabel = (s: string) => {
-  const map: Record<string, string> = { open: '待处理', doing: '处理中', done: '已完成', closed: '已关闭' };
+const badgeStatus = (s: string) => {
+  const map: Record<string, string> = { doing: 'pending', done: 'resolved' };
   return map[s] ?? s;
 };
 
-const statusClass = (s: string) => {
-  const map: Record<string, string> = {
-    open: 'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-400',
-    doing: 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400',
-    done: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400',
-    closed: 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-400',
-  };
-  return map[s] ?? 'bg-slate-100 text-slate-500';
+const badgeLabel = (s: string) => {
+  const map: Record<string, string> = { doing: '处理中', done: '已完成' };
+  return map[s] ?? undefined;
 };
 
 const fetchBugs = async () => {
@@ -200,8 +187,7 @@ const submitReply = async () => {
   }
 };
 
-const prevPage = () => { if (page.value > 1) { page.value--; fetchBugs(); } };
-const nextPage = () => { if (page.value < totalPages.value) { page.value++; fetchBugs(); } };
+watch(page, fetchBugs);
 
 onMounted(fetchBugs);
 </script>

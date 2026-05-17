@@ -35,6 +35,12 @@ export function normalizeProjectInput(p: any) {
     return normalizeDevelopers(obj.platform_developers);
   };
 
+  const readMediaField = (obj: any, canonicalKey: string, legacyKey: string) => {
+    if (typeof obj?.[canonicalKey] === "string") return obj[canonicalKey];
+    if (typeof obj?.[legacyKey] === "string") return obj[legacyKey];
+    return undefined;
+  };
+
   return {
     slug: typeof p.slug === "string" ? p.slug.trim() : undefined,
     name: typeof p.name === "string" ? p.name.trim() : undefined,
@@ -48,16 +54,18 @@ export function normalizeProjectInput(p: any) {
     recommendation: Object.prototype.hasOwnProperty.call(p, "recommendation") ? (typeof p.recommendation === 'string' ? p.recommendation.trim() : normalizeList(p.recommendation)) : undefined,
     github_url: typeof p.github_url === "string" ? p.github_url : undefined,
     platform_developers: readDevelopersField(p),
-    avatar: typeof p.avatar === "string" ? p.avatar : undefined,
-    icon: typeof p.icon === "string" ? p.icon : undefined,
-    banner: typeof p.banner === "string" ? p.banner : undefined,
+    avatar: readMediaField(p, "avatar", "avatar_url"),
+    icon: readMediaField(p, "icon", "icon_url"),
+    banner: readMediaField(p, "banner", "banner_url"),
     stars: Object.prototype.hasOwnProperty.call(p, "stars") ? (typeof p.stars === "number" && !Number.isNaN(p.stars) ? p.stars : 0) : undefined,
     language: typeof p.language === "string" ? p.language : undefined,
     last_update: typeof p.last_update === "string" ? p.last_update : undefined,
     github_is_fork: Object.prototype.hasOwnProperty.call(p, "github_is_fork") ? (typeof p.github_is_fork === "boolean" ? p.github_is_fork : false) : undefined,
     github_parent_url: typeof p.github_parent_url === "string" ? p.github_parent_url : undefined,
     github_source_url: typeof p.github_source_url === "string" ? p.github_source_url : undefined,
-    extra: Object.prototype.hasOwnProperty.call(p, "extra") ? (typeof p.extra === "object" && p.extra ? p.extra : {}) : undefined
+    extra: Object.prototype.hasOwnProperty.call(p, "extra") ? (typeof p.extra === "object" && p.extra ? p.extra : {}) : undefined,
+    organization_id: Object.prototype.hasOwnProperty.call(p, "organization_id") ? (typeof p.organization_id === "string" ? p.organization_id : null) : undefined,
+    developer_user_id: Object.prototype.hasOwnProperty.call(p, "developer_user_id") ? (typeof p.developer_user_id === "string" ? p.developer_user_id : null) : undefined
   };
 }
 

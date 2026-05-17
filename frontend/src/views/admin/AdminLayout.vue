@@ -1,47 +1,48 @@
 <template>
-  <div class="min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white flex overflow-x-hidden">
-    <AdminSidebar @logout="handleLogout" />
-
-    <div class="flex-1 flex flex-col min-h-screen min-w-0 overflow-x-hidden">
-      <header class="sticky top-0 z-40 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-4 lg:px-6 py-2.5 lg:py-3 flex items-center justify-between">
-        <div class="flex items-center gap-3">
-          <h2 class="text-base lg:text-lg font-bold text-slate-900 dark:text-white">{{ currentTitle }}</h2>
-        </div>
-        <div class="flex items-center gap-2">
-          <span v-if="authUser" class="text-sm text-slate-500 dark:text-slate-400 hidden sm:inline">{{ authUser.name }}</span>
-          <button @click="router.push('/')" class="px-3 py-1.5 rounded-lg text-sm font-medium border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
-            返回首页
-          </button>
-          <button @click="handleLogout" class="px-3 py-1.5 rounded-lg text-sm font-medium bg-rose-500 hover:bg-rose-600 text-white transition-colors">
-            退出
-          </button>
-        </div>
-      </header>
-
-      <main class="flex-1 p-4 lg:p-6 pb-20 lg:pb-6">
-        <router-view />
-      </main>
-    </div>
-
-    <AdminBottomNav />
-  </div>
+  <AdminShell
+    brand="admin"
+    brand-name="Awesome 后台"
+    :sidebar-items="adminNavItems"
+    :user="authUser ? { name: authUser.name, avatar_url: authUser.avatar_url } : undefined"
+    @logout="handleLogout"
+    @go-home="router.push('/')"
+  />
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
-import { useRouter, useRoute } from 'vue-router';
+import { useRouter } from 'vue-router';
 import { useAuth } from '../../composables/useAuth';
-import AdminSidebar from '../../components/admin/AdminSidebar.vue';
-import AdminBottomNav from '../../components/admin/AdminBottomNav.vue';
+import { AdminShell } from '../../components/ui';
+import {
+  LayoutDashboard, FileText, Package, ClipboardCheck,
+  Users, UserCog, Image, ScrollText, BarChart3,
+} from 'lucide-vue-next';
 
 const router = useRouter();
-const route = useRoute();
 const { user: authUser, logout } = useAuth();
 
-const currentTitle = computed(() => {
-  const meta = route.meta as any;
-  return meta?.title || '管理后台';
-});
+type NavItem = {
+  key: string;
+  label: string;
+  to: string;
+  icon: any;
+  group?: 'primary' | 'secondary';
+  primary?: boolean;
+  cap?: string;
+  anyCaps?: string[];
+};
+
+const adminNavItems: NavItem[] = [
+  { key: 'dashboard', label: '总览', to: '/admin/dashboard', icon: LayoutDashboard, group: 'primary', primary: true, cap: 'admin_panel_access' },
+  { key: 'stories', label: '文章管理', to: '/admin/stories', icon: FileText, group: 'primary', primary: true, cap: 'story:manage' },
+  { key: 'projects', label: '项目管理', to: '/admin/projects', icon: Package, group: 'primary', primary: true, cap: 'project:read' },
+  { key: 'review', label: '审核', to: '/admin/review', icon: ClipboardCheck, group: 'primary', primary: true, anyCaps: ['submission:read', 'moderation:read', 'feedback:manage'] },
+  { key: 'users', label: '用户权限', to: '/admin/users', icon: Users, group: 'primary', primary: false, cap: 'user:read' },
+  { key: 'developers', label: '开发者与组织', to: '/admin/developers', icon: UserCog, group: 'secondary', primary: false, anyCaps: ['dev:developer_manage', 'org:review', 'claim:review'] },
+  { key: 'media', label: '图床管理', to: '/admin/media', icon: Image, group: 'secondary', primary: false, cap: 'media:read' },
+  { key: 'audit', label: '审计日志', to: '/admin/audit', icon: ScrollText, group: 'secondary', primary: false, cap: 'audit:read' },
+  { key: 'analytics', label: '数据分析', to: '/admin/analytics', icon: BarChart3, group: 'secondary', primary: false, cap: 'analytics:read' },
+];
 
 const handleLogout = async () => {
   await logout();

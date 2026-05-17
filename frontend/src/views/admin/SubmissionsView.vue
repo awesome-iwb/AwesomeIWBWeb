@@ -1,17 +1,20 @@
 <template>
-  <FloatingPanel
-    ref="panelRef"
-    :selected-label="selectedSubmissionId ? (submissionKind === 'project_update' ? `变更：${submissionDraft?.project_name}` : submissionDraft?.name) : ''"
-    placeholder="选择一个待审核项目"
-    list-label="待审核列表"
-    :count="submissionsPage.total"
-    :prev-enabled="submissionsPage.page > 1"
-    :next-enabled="submissionsPage.page < Math.ceil(submissionsPage.total / submissionsPage.pageSize)"
-    @prev="prevSubmissionPage"
-    @next="nextSubmissionPage"
+  <div class="h-full min-h-0">
+  <ui-ListDetailLayout
+    :selected-id="selectedSubmissionId"
+    :selected-item-label="submissionDraft?.project_name || submissionDraft?.name"
+    :selected-item-icon="ClipboardCheck"
+    :searchable="false"
+    :infinite="true"
+    :has-more="submissionsHasMore"
+    :loading-more="submissionsLoadingMore"
+    list-title="待审核列表"
+    detail-title="审核详情"
+    @load-more="loadMoreSubmissions"
+    @back="selectedSubmissionId = null, submissionDraft = null"
   >
-    <template #content>
-      <div v-if="submissionDraft" class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col">
+    <template #detail>
+      <div v-if="submissionDraft" class="bg-white/72 dark:bg-slate-900/62 backdrop-blur-lg rounded-3xl border border-white/70 dark:border-slate-700/70 shadow-xl shadow-slate-900/8 dark:shadow-black/30 overflow-hidden flex flex-col h-full min-h-0">
         <div class="p-4 lg:p-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50">
           <h2 class="text-lg lg:text-xl font-bold text-slate-800 dark:text-white">审核项目提交</h2>
         </div>
@@ -84,25 +87,31 @@
           <button @click="rejectSubmission" class="flex-1 px-4 py-3 rounded-2xl bg-rose-500 hover:bg-rose-600 text-white font-bold transition-colors">驳回</button>
         </div>
       </div>
-      <div v-else class="flex items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl min-h-[400px]">
+    </template>
+
+    <template #empty-detail>
+      <div class="h-full min-h-0 flex items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-3xl bg-white/50 dark:bg-slate-900/35 backdrop-blur-sm">
         <div class="text-center">
-          <p class="text-slate-400 mb-2">点击下方悬浮栏选择待审核项目</p>
-          <button @click="openPanel" class="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold transition-colors">打开列表</button>
+          <p class="text-slate-400 mb-2">从列表选择待审核项目</p>
+        </div>
+      </div>
+    </template>
+
+    <template #list-toolbar>
+      <div class="space-y-3">
+        <div class="flex gap-2">
+          <input v-model="submissionQuery.q" @keyup.enter="resetAndFetchSubmissions" type="text" class="flex-1 px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-emerald-500 text-sm" placeholder="搜索（名称/GitHub）" />
+          <button @click="resetAndFetchSubmissions" class="px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold transition-colors">搜索</button>
         </div>
       </div>
     </template>
 
     <template #list>
-      <div class="space-y-3">
-        <div class="flex gap-2">
-          <input v-model="submissionQuery.q" @keyup.enter="fetchSubmissions" type="text" class="flex-1 px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-emerald-500 text-sm" placeholder="搜索（名称/GitHub）" />
-          <button @click="submissionQuery.page = 1; fetchSubmissions()" class="px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold transition-colors">搜索</button>
-        </div>
-        <div class="space-y-2">
+      <div class="space-y-2">
           <div
             v-for="s in submissionsPage.items"
             :key="s.id"
-            @click="selectSubmission(s); closePanel()"
+            @click="selectSubmission(s)"
             class="p-3 rounded-xl border cursor-pointer transition-all duration-200"
             :class="selectedSubmissionId === s.id ? 'bg-emerald-500 text-white border-emerald-500 shadow-md shadow-emerald-500/20' : 'bg-slate-50 dark:bg-slate-900/50 border-transparent hover:border-emerald-300'"
           >
@@ -115,26 +124,18 @@
               <span v-else>{{ s.payload?.github_url || '' }}</span>
             </div>
           </div>
-          <div v-if="submissionsPage.items.length === 0" class="text-sm text-slate-400 text-center py-10">暂无待审核</div>
-        </div>
-        <div class="flex items-center justify-between text-sm pt-2 border-t border-slate-100 dark:border-slate-700">
-          <button @click="prevSubmissionPage" :disabled="submissionsPage.page <= 1" class="px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed">上一页</button>
-          <div class="text-slate-500 dark:text-slate-300">{{ submissionsPage.page }} / {{ Math.max(1, Math.ceil(submissionsPage.total / submissionsPage.pageSize)) }}</div>
-          <button @click="nextSubmissionPage" :disabled="submissionsPage.page >= Math.ceil(submissionsPage.total / submissionsPage.pageSize)" class="px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed">下一页</button>
-        </div>
+          <ui-EmptyState v-if="submissionsPage.items.length === 0" :icon="ClipboardCheck" title="暂无待审核" />
       </div>
     </template>
-  </FloatingPanel>
+  </ui-ListDetailLayout>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { adminFetch, formatAdminError } from '../../composables/useAdminFetch';
-import FloatingPanel from '../../components/admin/FloatingPanel.vue';
-
-const panelRef = ref<InstanceType<typeof FloatingPanel> | null>(null);
-const openPanel = () => { if (panelRef.value) panelRef.value.expanded = true; };
-const closePanel = () => { panelRef.value?.close(); };
+import { ListDetailLayout as uiListDetailLayout, EmptyState as uiEmptyState } from '../../components/ui';
+import { ClipboardCheck } from 'lucide-vue-next';
 
 const adminCategories = ref<any[]>([]);
 
@@ -149,8 +150,11 @@ const fetchAdminCategories = async () => {
   } catch {}
 };
 
-const submissionsPage = ref<{ items: any[]; page: number; pageSize: number; total: number }>({ items: [], page: 1, pageSize: 20, total: 0 });
-const submissionQuery = ref<{ q: string; page: number; pageSize: number }>({ q: '', page: 1, pageSize: 20 });
+const submissionsPage = ref<{ items: any[]; page: number; pageSize: number; total: number }>({ items: [], page: 1, pageSize: 30, total: 0 });
+const submissionQuery = ref<{ q: string; page: number; pageSize: number }>({ q: '', page: 1, pageSize: 30 });
+const submissionsLoading = ref(true);
+const submissionsLoadingMore = ref(false);
+const submissionsHasMore = computed(() => submissionsPage.value.items.length < submissionsPage.value.total);
 const selectedSubmissionId = ref<string | null>(null);
 const submissionDraft = ref<any | null>(null);
 const submissionKind = ref<'new_project' | 'project_update'>('new_project');
@@ -172,7 +176,9 @@ const normalizeProjectDraft = (p: any) => {
   return clone;
 };
 
-const fetchSubmissions = async () => {
+const fetchSubmissions = async (append = false) => {
+  if (append) submissionsLoadingMore.value = true;
+  else submissionsLoading.value = true;
   try {
     const qs = new URLSearchParams();
     if (submissionQuery.value.q) qs.set('q', submissionQuery.value.q);
@@ -181,8 +187,30 @@ const fetchSubmissions = async () => {
     qs.set('pageSize', String(submissionQuery.value.pageSize));
     const res = await adminFetch(`/api/admin/submissions?${qs.toString()}`);
     if (!res.ok) return;
-    submissionsPage.value = await res.json();
-  } catch {}
+    const json = await res.json();
+    const incoming = Array.isArray(json.items) ? json.items : [];
+    submissionsPage.value = {
+      items: append ? [...submissionsPage.value.items, ...incoming] : incoming,
+      page: Number(json.page ?? submissionQuery.value.page ?? 1),
+      pageSize: Number(json.pageSize ?? submissionQuery.value.pageSize ?? 30),
+      total: Number(json.total ?? (append ? submissionsPage.value.items.length : incoming.length) ?? 0),
+    };
+  } catch {} finally {
+    submissionsLoading.value = false;
+    submissionsLoadingMore.value = false;
+  }
+};
+
+const resetAndFetchSubmissions = async () => {
+  submissionQuery.value.page = 1;
+  submissionsPage.value = { items: [], page: 1, pageSize: submissionQuery.value.pageSize, total: 0 };
+  await fetchSubmissions(false);
+};
+
+const loadMoreSubmissions = async () => {
+  if (submissionsLoadingMore.value || submissionsLoading.value || !submissionsHasMore.value) return;
+  submissionQuery.value.page += 1;
+  await fetchSubmissions(true);
 };
 
 const selectSubmission = (s: any) => {
@@ -241,9 +269,6 @@ const rejectSubmission = async () => {
   submissionDraft.value = null; selectedSubmissionId.value = null;
   await fetchSubmissions();
 };
-
-const prevSubmissionPage = async () => { if (submissionsPage.value.page <= 1) return; submissionQuery.value.page -= 1; await fetchSubmissions(); };
-const nextSubmissionPage = async () => { const maxPage = Math.max(1, Math.ceil(submissionsPage.value.total / submissionsPage.value.pageSize)); if (submissionsPage.value.page >= maxPage) return; submissionQuery.value.page += 1; await fetchSubmissions(); };
 
 onMounted(() => { fetchAdminCategories(); fetchSubmissions(); });
 </script>

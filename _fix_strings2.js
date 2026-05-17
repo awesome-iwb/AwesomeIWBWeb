@@ -1,0 +1,16 @@
+﻿const fs = require('fs');
+const path = 'd:/github/AwesomeIWBWeb/frontend/src/views/admin/MediaView.vue';
+let s = fs.readFileSync(path, 'utf8');
+s = s.replace(/const ok = confirm\('确认软删除该媒体文件[^;]*;/, "const ok = confirm('确认软删除该媒体文件？');");
+s = s.replace(/alert\('软删除成[^;]*;/, "alert('软删除成功');");
+s = s.replace(/formatAdminError\(\{ message: err instanceof Error \? err\.message : '' \}, '软删除失[^)]*\)/, "formatAdminError({ message: err instanceof Error ? err.message : '' }, '软删除失败')");
+s = s.replace(/alert\('批量打标签成[^;]*;/, "alert('批量打标签成功');");
+s = s.replace(/formatAdminError\(\{ message: err instanceof Error \? err\.message : '' \}, '批量打标签失[^)]*\)/, "formatAdminError({ message: err instanceof Error ? err.message : '' }, '批量打标签失败')");
+fs.writeFileSync(path, s);
+console.log('fixed media');
+const dv = 'd:/github/AwesomeIWBWeb/frontend/src/views/admin/DevelopersView.vue';
+let d = fs.readFileSync(dv,'utf8');
+d = d.replace(/title="暂无开发[^"]*"\s*\/>/, 'title="暂无开发者" />');
+d = d.replace(/\n\/\/ used in template\nvoid AdminOrganizationsView; void AdminClaimsView;\n/, '\n');
+fs.writeFileSync(dv, d);
+console.log('fixed dev');

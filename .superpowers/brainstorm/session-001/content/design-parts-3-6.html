@@ -1,0 +1,266 @@
+<h2>完整设计：第三至六部分</h2>
+<p class="subtitle">前端路由/组件 · 权限流程 · 迁移方案 · 实施阶段</p>
+
+<div class="section">
+  <h3>🖥️ Part 3：前端路由设计</h3>
+  <div style="background: #1e293b; border-radius: 12px; padding: 16px; color: #e2e8f0; font-family: monospace; font-size: 11px; line-height: 1.9;">
+    <span style="color: #60a5fa;">── 开发者后台 /dev ──</span> <span style="color: #94a3b8;">requiresCapability: dev_panel_access</span><br>
+    /dev &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #94a3b8;">→ redirect /dev/dashboard</span><br>
+    /dev/dashboard &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #94a3b8;">→ DevDashboardView</span><br>
+    /dev/organizations &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #94a3b8;">→ DevOrganizationsView</span><br>
+    /dev/organizations/:id &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #94a3b8;">→ DevOrgDetailView</span><br>
+    /dev/organizations/create &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #94a3b8;">→ DevOrgCreateView</span><br>
+    /dev/projects &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #94a3b8;">→ DevProjectsView</span><br>
+    /dev/projects/:id &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #94a3b8;">→ DevProjectDetailView</span><br>
+    /dev/bugs &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #94a3b8;">→ DevBugsView</span><br>
+    /dev/comments &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #94a3b8;">→ DevCommentsView</span><br>
+    <br>
+    <span style="color: #f472b6;">── 运维后台 /admin（新增路由）──</span><br>
+    /admin/organizations &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #94a3b8;">→ AdminOrganizationsView</span> <span style="color: #fbbf24;">cap: org:review</span><br>
+    /admin/claims &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #94a3b8;">→ AdminClaimsView</span> <span style="color: #fbbf24;">cap: claim:review</span><br>
+    <br>
+    <span style="color: #4ade80;">── 前端主站（新增）──</span><br>
+    /project/:name &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #94a3b8;">→ ProjectDetailView（增加开发者列表展示）</span><br>
+    /me &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #94a3b8;">→ MeView（增加我的组织/项目入口）</span>
+  </div>
+</div>
+
+<div class="section">
+  <h3>🧩 Part 3 续：组件设计</h3>
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+    
+    <div style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px;">
+      <div style="font-weight: 600; margin-bottom: 8px; color: #1e40af;">开发者后台布局</div>
+      <div style="font-size: 12px; color: #475569; line-height: 1.8;">
+        <strong>DevLayout.vue</strong> — 复用 AdminLayout 结构<br>
+        ├─ <strong>DevSidebar.vue</strong> — 侧边栏（复用 AdminSidebar 样式）<br>
+        ├─ <strong>DevBottomNav.vue</strong> — 移动端底部导航<br>
+        └─ 主内容区<br>
+        <br>
+        <strong>复用策略：</strong><br>
+        • 侧边栏样式直接复用 AdminSidebar<br>
+        • 改标题为 "Dev 后台"<br>
+        • 导航项按开发者权限过滤
+      </div>
+    </div>
+
+    <div style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px;">
+      <div style="font-weight: 600; margin-bottom: 8px; color: #6d28d9;">新增共享组件</div>
+      <div style="font-size: 12px; color: #475569; line-height: 1.8;">
+        <strong>MemberManager.vue</strong> — 成员管理通用组件<br>
+        ├─ 成员列表（头像、名称、角色）<br>
+        ├─ 邀请成员（搜索用户）<br>
+        ├─ 移除成员<br>
+        └─ 修改角色<br>
+        <br>
+        <strong>OrgCard.vue</strong> — 组织卡片组件<br>
+        <strong>ProjectCard.vue</strong> — 项目卡片组件<br>
+        <strong>ClaimStatusBadge.vue</strong> — 认领状态标签
+      </div>
+    </div>
+
+    <div style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; grid-column: span 2;">
+      <div style="font-weight: 600; margin-bottom: 8px; color: #9d174d;">运维后台新增组件</div>
+      <div style="font-size: 12px; color: #475569; line-height: 1.8;">
+        <strong>AdminOrganizationsView.vue</strong> — 组织审核列表（pending/approved/rejected/suspended 筛选）<br>
+        <strong>AdminClaimsView.vue</strong> — 项目认领审核列表<br>
+        <strong>ProjectsView.vue 改造</strong> — 项目编辑页新增"指定开发者"功能（搜索用户 → 添加为 owner/collaborator）<br>
+        <strong>AdminSidebar.vue 改造</strong> — 新增"组织审核"和"认领审核"导航项
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="section">
+  <h3>🔐 Part 4：权限流程详解</h3>
+  
+  <div style="background: #f8fafc; border-radius: 12px; padding: 16px; font-size: 12px; line-height: 2;">
+    <div style="margin-bottom: 12px;">
+      <strong style="color: #166534;">🟢 用户权限流程</strong><br>
+      <span style="padding-left: 16px; color: #475569;">
+        注册 → 自动授予 user:* 能力 → 前端主站正常使用<br>
+        运维可在后台撤销某个 user:* 能力（如禁止某用户评论）
+      </span>
+    </div>
+    
+    <div style="margin-bottom: 12px;">
+      <strong style="color: #1e40af;">🔵 开发者权限流程</strong><br>
+      <span style="padding-left: 16px; color: #475569;">
+        路径 A：提交项目 → 自动创建 project_members(owner) → 自动提权为 dev → 获得 dev:* 能力<br>
+        路径 B：被邀请为协作者 → project_members(collaborator) → 自动提权为 dev<br>
+        路径 C：加入组织 → organization_members → 组织下项目自动获得权限 → 自动提权为 dev<br>
+        路径 D：申请认领项目 → 运维审核通过 → project_members(owner) → 自动提权为 dev<br>
+        路径 E：运维在后台指定 → project_members → 自动提权为 dev
+      </span>
+    </div>
+    
+    <div>
+      <strong style="color: #9d174d;">🟣 运维权限流程</strong><br>
+      <span style="padding-left: 16px; color: #475569;">
+        超级管理员在后台手动分配 → 授予 admin_panel_access + 对应能力<br>
+        新增：org:review → 审核组织申请<br>
+        新增：claim:review → 审核项目认领<br>
+        新增：org:manage → 管理组织状态（暂停/恢复）
+      </span>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>🔄 Part 4 续：自动提权/降权逻辑</h3>
+  <div style="background: #1e293b; border-radius: 12px; padding: 16px; color: #e2e8f0; font-family: monospace; font-size: 11px; line-height: 1.8;">
+    <span style="color: #4ade80;">// 提权：user → dev</span><br>
+    async function promoteToDev(userId: string) {<br>
+    &nbsp;&nbsp;<span style="color: #94a3b8;">// 1. 更新 users.role</span><br>
+    &nbsp;&nbsp;UPDATE users SET role = 'dev' WHERE id = userId AND role = 'user';<br>
+    &nbsp;&nbsp;<span style="color: #94a3b8;">// 2. 授予开发者能力</span><br>
+    &nbsp;&nbsp;INSERT dev_panel_access, dev:* capabilities INTO user_capabilities;<br>
+    &nbsp;&nbsp;<span style="color: #94a3b8;">// 3. 发送通知</span><br>
+    &nbsp;&nbsp;CREATE notification (type: role_promoted, title: '已升级为开发者');<br>
+    }
+    <br><br>
+    <span style="color: #f87171;">// 降权：dev → user</span><br>
+    async function demoteFromDev(userId: string) {<br>
+    &nbsp;&nbsp;<span style="color: #94a3b8;">// 前提：用户不再是任何项目的成员，也不属于任何组织</span><br>
+    &nbsp;&nbsp;const hasProjects = await checkProjectMembership(userId);<br>
+    &nbsp;&nbsp;const hasOrgs = await checkOrgMembership(userId);<br>
+    &nbsp;&nbsp;if (hasProjects || hasOrgs) return; <span style="color: #94a3b8;">// 仍有归属，不降权</span><br>
+    &nbsp;&nbsp;<span style="color: #94a3b8;">// 检查是否有运维手动授予的 dev 能力</span><br>
+    &nbsp;&nbsp;const manualDevCaps = await getManualDevCapabilities(userId);<br>
+    &nbsp;&nbsp;if (manualDevCaps.length > 0) return; <span style="color: #94a3b8;">// 运维手动给的，不降</span><br>
+    &nbsp;&nbsp;<span style="color: #94a3b8;">// 执行降权</span><br>
+    &nbsp;&nbsp;UPDATE users SET role = 'user' WHERE id = userId;<br>
+    &nbsp;&nbsp;DELETE dev:* capabilities FROM user_capabilities;<br>
+    &nbsp;&nbsp;CREATE notification (type: role_demoted, title: '开发者权限已回收');<br>
+    }
+  </div>
+</div>
+
+<div class="section">
+  <h3>📦 Part 5：数据库迁移方案</h3>
+  <div style="background: #1e293b; border-radius: 12px; padding: 16px; color: #e2e8f0; font-family: monospace; font-size: 11px; line-height: 1.8;">
+    <span style="color: #fbbf24;">-- Migration 0020: organizations</span><br>
+    CREATE TABLE organizations (...);<br>
+    CREATE TABLE organization_members (...);<br>
+    <br>
+    <span style="color: #fbbf24;">-- Migration 0021: project_members</span><br>
+    CREATE TABLE project_members (...);<br>
+    <br>
+    <span style="color: #fbbf24;">-- Migration 0022: project_claims</span><br>
+    CREATE TABLE project_claims (...);<br>
+    <br>
+    <span style="color: #fbbf24;">-- Migration 0023: new capabilities</span><br>
+    INSERT INTO capabilities (id, name, category, description, sort_index) VALUES<br>
+    &nbsp;&nbsp;('user:comment', '发表评论', 'user', '发表项目评论', 10),<br>
+    &nbsp;&nbsp;('user:avatar', '上传头像', 'user', '上传和更改头像', 20),<br>
+    &nbsp;&nbsp;('user:feedback', '提交反馈', 'user', '提交 Bug 反馈', 30),<br>
+    &nbsp;&nbsp;('user:submit_project', '提交项目', 'user', '提交新项目申请', 40),<br>
+    &nbsp;&nbsp;('user:profile', '修改资料', 'user', '修改个人资料', 50),<br>
+    &nbsp;&nbsp;('user:create_org', '创建组织', 'user', '申请创建组织', 60),<br>
+    &nbsp;&nbsp;('dev:project_edit', '编辑项目', 'dev', '编辑自己参与的项目', 2100),<br>
+    &nbsp;&nbsp;('dev:bug_manage', '管理 Bug', 'dev', '处理自己项目的 Bug 反馈', 2200),<br>
+    &nbsp;&nbsp;('dev:comment_manage', '管理评论', 'dev', '管理自己项目的评论', 2300),<br>
+    &nbsp;&nbsp;('dev:stats_view', '查看数据', 'dev', '查看自己项目的统计数据', 2400),<br>
+    &nbsp;&nbsp;('dev:member_manage', '管理成员', 'dev', '管理项目/组织成员', 2500),<br>
+    &nbsp;&nbsp;('org:review', '审核组织', 'org', '审核组织创建申请', 2600),<br>
+    &nbsp;&nbsp;('claim:review', '审核认领', 'claim', '审核项目认领申请', 2700),<br>
+    &nbsp;&nbsp;('org:manage', '管理组织', 'org', '管理组织状态', 2800);<br>
+    <br>
+    <span style="color: #fbbf24;">-- Migration 0024: grant user caps to all existing users</span><br>
+    INSERT INTO user_capabilities (user_id, capability_id)<br>
+    SELECT u.id, c.id FROM users u, capabilities c<br>
+    WHERE c.id LIKE 'user:%'<br>
+    ON CONFLICT DO NOTHING;<br>
+    <br>
+    <span style="color: #fbbf24;">-- Migration 0025: grant dev caps to existing dev/ops users</span><br>
+    INSERT INTO user_capabilities (user_id, capability_id)<br>
+    SELECT u.id, c.id FROM users u, capabilities c<br>
+    WHERE u.role IN ('dev', 'ops') AND c.id LIKE 'dev:%'<br>
+    ON CONFLICT DO NOTHING;<br>
+    <br>
+    <span style="color: #fbbf24;">-- Migration 0026: grant new ops caps to existing ops users</span><br>
+    INSERT INTO user_capabilities (user_id, capability_id)<br>
+    SELECT u.id, c.id FROM users u, capabilities c<br>
+    WHERE u.role = 'ops' AND c.id IN ('org:review', 'claim:review', 'org:manage')<br>
+    ON CONFLICT DO NOTHING;
+  </div>
+</div>
+
+<div class="section">
+  <h3>🏗️ Part 6：实施阶段</h3>
+  <div style="display: flex; flex-direction: column; gap: 12px;">
+    
+    <div style="background: linear-gradient(135deg, #dcfce7, #bbf7d0); border-radius: 10px; padding: 14px;">
+      <div style="font-weight: 700; color: #166534;">Phase 1：数据基础（1-2天）</div>
+      <div style="font-size: 12px; color: #166534; line-height: 1.8; margin-top: 6px;">
+        • 数据库迁移 0020-0026<br>
+        • 后端 organizations / project_members / project_claims 服务层<br>
+        • capabilities.ts 扩展新能力定义和角色模板<br>
+        • 自动提权/降权逻辑
+      </div>
+    </div>
+
+    <div style="background: linear-gradient(135deg, #dbeafe, #bfdbfe); border-radius: 10px; padding: 14px;">
+      <div style="font-weight: 700; color: #1e40af;">Phase 2：开发者后台 API（2-3天）</div>
+      <div style="font-size: 12px; color: #1e40af; line-height: 1.8; margin-top: 6px;">
+        • /api/dev/projects 系列（CRUD + 成员管理）<br>
+        • /api/dev/feedback 系列（Bug 管理）<br>
+        • /api/dev/comments 系列（评论管理）<br>
+        • /api/dev/organizations 系列（组织管理）<br>
+        • /api/dev/project-claims 系列（项目认领）<br>
+        • requireProjectMember() 中间件<br>
+        • 现有 API 改造（提权逻辑、能力校验）
+      </div>
+    </div>
+
+    <div style="background: linear-gradient(135deg, #ede9fe, #ddd6fe); border-radius: 10px; padding: 14px;">
+      <div style="font-weight: 700; color: #6d28d9;">Phase 3：运维后台扩展（1-2天）</div>
+      <div style="font-size: 12px; color: #6d28d9; line-height: 1.8; margin-top: 6px;">
+        • /api/admin/organizations 系列（组织审核）<br>
+        • /api/admin/project-claims 系列（认领审核）<br>
+        • /api/admin/projects/:id/members（指定开发者）<br>
+        • AdminSidebar 新增导航项<br>
+        • AdminOrganizationsView + AdminClaimsView 页面<br>
+        • ProjectsView 改造（指定开发者功能）
+      </div>
+    </div>
+
+    <div style="background: linear-gradient(135deg, #fce7f3, #fbcfe8); border-radius: 10px; padding: 14px;">
+      <div style="font-weight: 700; color: #9d174d;">Phase 4：开发者后台前端（3-4天）</div>
+      <div style="font-size: 12px; color: #9d174d; line-height: 1.8; margin-top: 6px;">
+        • DevLayout + DevSidebar + DevBottomNav<br>
+        • DevDashboardView（总览）<br>
+        • DevOrganizationsView + DevOrgDetailView + DevOrgCreateView<br>
+        • DevProjectsView + DevProjectDetailView<br>
+        • DevBugsView<br>
+        • DevCommentsView<br>
+        • 共享组件：MemberManager、OrgCard、ProjectCard
+      </div>
+    </div>
+
+    <div style="background: linear-gradient(135deg, #fef3c7, #fde68a); border-radius: 10px; padding: 14px;">
+      <div style="font-weight: 700; color: #92400e;">Phase 5：前端主站改造 + 收尾（1-2天）</div>
+      <div style="font-size: 12px; color: #92400e; line-height: 1.8; margin-top: 6px;">
+        • ProjectDetailView 增加开发者列表展示<br>
+        • MeView 增加"我的组织""我的项目"入口<br>
+        • useAuth 扩展（组织信息、项目成员判断）<br>
+        • 用户权限校验接入（评论、头像等）<br>
+        • 全链路测试 + Bug 修复
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div style="margin-top: 20px; background: #f0fdf4; border-radius: 12px; padding: 16px; border: 1px solid #86efac;">
+  <h3 style="margin: 0 0 8px 0; color: #166534; font-size: 14px;">📋 完整设计清单</h3>
+  <div style="font-size: 12px; color: #166534; line-height: 2;">
+    ✅ Part 1：整体架构（三层权限 + 两个后台 + 组织体系）<br>
+    ✅ Part 2：数据模型（4 张新表 + 能力扩展 + API 设计）<br>
+    ✅ Part 3：前端路由与组件设计<br>
+    ✅ Part 4：权限流程与自动提权/降权逻辑<br>
+    ✅ Part 5：数据库迁移方案（0020-0026）<br>
+    ✅ Part 6：实施阶段（5 个 Phase，约 8-13 天）
+  </div>
+</div>

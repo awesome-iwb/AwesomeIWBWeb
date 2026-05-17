@@ -18,7 +18,8 @@ describe('capabilities', () => {
     expect(ids).toContain('dev:bug_manage');
     expect(ids).toContain('dev:comment_manage');
     expect(ids).toContain('dev:stats_view');
-    expect(ids).toContain('dev:member_manage');
+    expect(ids).toContain('dev:project_admin');
+    expect(ids).toContain('dev:org_manage');
   });
 
   test('includes org/claim capabilities', () => {
@@ -48,11 +49,16 @@ describe('capabilities', () => {
     expect(userCaps).toContain('user:create_org');
   });
 
-  test('reviewer template includes org:review and claim:review', () => {
+  test('editor role template includes publishing and review capabilities', () => {
     const templates = getRoleTemplates();
-    const reviewerCaps = templates.reviewer.capabilityIds;
-    expect(reviewerCaps).toContain('org:review');
-    expect(reviewerCaps).toContain('claim:review');
+    const editorCaps = templates.editor.capabilityIds;
+    expect(editorCaps).toContain('story:manage');
+    expect(editorCaps).toContain('submission:read');
+    expect(editorCaps).toContain('submission:approve');
+    expect(editorCaps).toContain('submission:reject');
+    expect(editorCaps).toContain('moderation:read');
+    expect(editorCaps).toContain('moderation:approve');
+    expect(editorCaps).toContain('moderation:reject');
   });
 
   test('isSuperadmin checks username case-insensitively', () => {

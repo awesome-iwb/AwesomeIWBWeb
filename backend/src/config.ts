@@ -1,6 +1,25 @@
 import crypto from "crypto";
+import fs from "fs";
+import path from "path";
 
 type NodeEnv = "development" | "test" | "production";
+
+function resolveDeployBuildId(): string {
+  const fromEnv =
+    process.env.BUILD_ID?.trim() ||
+    process.env.DEPLOY_BUILD_ID?.trim() ||
+    process.env.GITHUB_SHA?.trim()?.slice(0, 12);
+  if (fromEnv) return fromEnv;
+  try {
+    const pkgPath = path.join(import.meta.dir, "../package.json");
+    const raw = fs.readFileSync(pkgPath, "utf-8");
+    const version = JSON.parse(raw)?.version;
+    if (typeof version === "string" && version.trim()) return `backend@${version.trim()}`;
+  } catch {
+    /* ignore */
+  }
+  return "local";
+}
 
 function asNodeEnv(raw: string | undefined): NodeEnv {
   if (raw === "production" || raw === "test") return raw;
@@ -106,6 +125,8 @@ ensureCookieConfigConsistency(cookieSecure);
 export const appConfig = {
   nodeEnv,
   isProduction: nodeEnv === "production",
+  /** Set BUILD_ID (or DEPLOY_BUILD_ID / GITHUB_SHA) in deploy env so clients can prompt refresh after releases. */
+  deployBuildId: resolveDeployBuildId(),
   dbEnabled,
   jwtSecret,
   jwtIssuer: process.env.JWT_ISSUER?.trim() || "awesome-iwb-backend",
@@ -130,5 +151,10 @@ export const appConfig = {
     redirectUri: process.env.CASDOOR_REDIRECT_URI?.trim() || "http://localhost:5173/api/auth/callback",
     allowedRedirectOrigins: parseList(process.env.AUTH_REDIRECT_ALLOWLIST || process.env.ALLOWED_ORIGINS)
   },
-  cookieSecure
+  cookieSecure,
+  storage: {
+    root: process.env.STORAGE_ROOT?.trim() || "",
+    publicPrefix: process.env.STORAGE_PUBLIC_PREFIX?.trim() || "/api/uploads",
+    grouping: (process.env.STORAGE_GROUPING?.trim() || "flat") as "flat" | "dated" | "entity",
+  }
 } as const;

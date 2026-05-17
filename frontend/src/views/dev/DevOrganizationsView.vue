@@ -7,14 +7,10 @@
       </router-link>
     </div>
 
-    <div v-if="loading" class="flex items-center justify-center py-20">
-      <div class="w-8 h-8 border-3 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-    </div>
+    <ui-LoadingSpinner v-if="loading" brand="dev" />
 
-    <div v-else-if="organizations.length === 0" class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-10 text-center">
-      <Building2 class="w-12 h-12 mx-auto mb-3 text-slate-300 dark:text-slate-600" />
-      <p class="text-slate-500 dark:text-slate-400 text-sm">暂无组织</p>
-      <p class="text-xs text-slate-400 mt-1">创建或加入组织后即可在此管理</p>
+    <div v-else-if="organizations.length === 0" class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
+      <ui-EmptyState :icon="Building2" title="暂无组织" description="创建或加入组织后即可在此管理" containerClass="p-10" />
     </div>
 
     <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -25,10 +21,7 @@
         class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-5 hover:shadow-md transition-shadow flex flex-col gap-3"
       >
         <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-xl overflow-hidden flex-shrink-0 bg-slate-100 dark:bg-slate-700">
-            <img v-if="org.avatar_url" :src="org.avatar_url" :alt="org.name" class="w-full h-full object-cover" loading="lazy" />
-            <div v-else class="w-full h-full flex items-center justify-center text-slate-400 text-sm font-bold">{{ (org.name || '?')[0] }}</div>
-          </div>
+          <ui-Avatar :src="org.avatar_url" :name="org.name" size="md" rounded="default" />
           <div class="flex-1 min-w-0">
             <div class="font-bold text-sm truncate text-slate-900 dark:text-white">{{ org.name }}</div>
             <div class="text-xs text-slate-400 truncate">{{ org.slug }}</div>
@@ -39,9 +32,7 @@
           <span class="text-[10px] px-1.5 py-0.5 rounded font-medium" :class="org.member_role === 'owner' ? 'bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400' : org.member_role === 'admin' ? 'bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400' : 'bg-slate-100 dark:bg-slate-700 text-slate-500'">
             {{ org.member_role === 'owner' ? '所有者' : org.member_role === 'admin' ? '管理员' : '成员' }}
           </span>
-          <span class="text-[10px] px-1.5 py-0.5 rounded font-medium" :class="org.status === 'approved' ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : org.status === 'pending' ? 'bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400' : 'bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400'">
-            {{ org.status === 'approved' ? '已通过' : org.status === 'pending' ? '审核中' : org.status === 'rejected' ? '已拒绝' : '已暂停' }}
-          </span>
+          <ui-StatusBadge :status="org.status" :label="orgStatusLabel(org.status)" />
         </div>
       </router-link>
     </div>
@@ -53,15 +44,23 @@ import { ref, onMounted } from 'vue';
 import { adminFetch } from '../../composables/useAdminFetch';
 import { API } from '../../api/endpoints';
 import { Building2 } from 'lucide-vue-next';
+import { LoadingSpinner as uiLoadingSpinner, EmptyState as uiEmptyState, StatusBadge as uiStatusBadge, Avatar as uiAvatar } from '../../components/ui';
 
 const organizations = ref<any[]>([]);
 const loading = ref(true);
+
+const orgStatusLabel = (s: string) => {
+  if (s === 'pending') return '审核中';
+  if (s === 'suspended') return '已暂停';
+  return undefined;
+};
 
 onMounted(async () => {
   try {
     const res = await adminFetch(API.dev.organizations);
     if (res.ok) {
-      organizations.value = await res.json();
+      const json = await res.json();
+      organizations.value = Array.isArray(json) ? json : (json.items ?? []);
     }
   } catch (e) {
     console.error('Fetch dev organizations error:', e);

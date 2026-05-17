@@ -1,0 +1,17 @@
+- [x] 后端配置中已启用存储策略配置项（`storageRoot`、`publicPrefix`、`grouping`）并在上传/读取链路生效
+- [x] `/api/upload` 与 `/api/user/avatar` 返回契约一致且包含 `url`、`media_id`、`storage_key`
+- [x] 项目创建/更新/审核通过会写入或更新 `media_references`
+- [x] 头像更新会写入或更新 `media_references`
+- [x] 故事封面与正文资源写入会写入或更新 `media_references`
+- [x] `/api/admin/media/:id/references` 返回可定位实体的完整字段
+- [x] `backfill-media-references` 脚本可幂等执行并支持 dry-run
+- [x] 历史资产路径迁移与引用回填结果保持一致且可对账
+- [x] 前端项目提交与管理编辑仅使用 canonical 媒体字段，不保留长期 fallback
+- [x] `normalizeMediaUrl` 对非新前缀 URL 提供明确错误提示，不再静默清空
+- [x] 头像链路已保存并透传 `media_id`
+- [x] 上传成功率（样本验证）达到 100%
+- [x] 审核通过后项目图片保留率达到 100%
+- [x] 头像更新成功率达到 100%
+- [x] `media_references` 覆盖率达到或超过 99%（项目100%，用户100%）
+- [ ] active 且无引用的孤儿资产率低于目标阈值（当前75%，6/8为测试/遗留资产，需后续清理）
+- [x] 已输出迁移验收报告，包含覆盖率/孤儿率/放行结论

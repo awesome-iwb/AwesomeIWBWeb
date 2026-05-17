@@ -126,3 +126,74 @@ export async function hasAnyProjectMembership(userId: string): Promise<boolean> 
   `;
   return Number(orgRows[0]?.count ?? 0) > 0;
 }
+
+/** User row in project_members (not org delegation). */
+export async function isDirectUserProjectOwner(projectId: string, userId: string): Promise<boolean> {
+  if (!dbEnabled) return false;
+  const rows = await sql()<Array<{ project_id: string }>>`
+    select project_id from project_members
+    where project_id = ${projectId} and user_id = ${userId} and org_id is null and role = 'owner'
+  `;
+  return rows.length > 0;
+}
+
+/** Insert or upgrade a user row to owner (user-targeted membership only). */
+export async function ensureUserProjectOwnerMembership(projectId: string, userId: string): Promise<void> {
+  if (!dbEnabled) return;
+  const existing = await sql()<Array<{ role: string }>>`
+    select role from project_members
+    where project_id = ${projectId} and user_id = ${userId} and org_id is null
+    limit 1
+  `;
+  if (existing.length === 0) {
+    await addProjectMember({ project_id: projectId, user_id: userId, role: "owner" });
+  } else if (existing[0].role !== "owner") {
+    await sql()`
+      update project_members set role = 'owner'
+      where project_id = ${projectId} and user_id = ${userId} and org_id is null
+    `;
+  }
+}
+
+export type TransferOwnershipResult =
+  | { ok: true }
+  | { ok: false; error: "NOT_OWNER" | "NOT_COLLABORATOR" | "SAME_USER" | "NO_DB" };
+
+/**
+ * Current user must be direct (user_id) owner. Target must be an existing collaborator on the same project.
+ * Runs in a single transaction: old owner → collaborator, new owner → owner; updates projects.developer_user_id.
+ */
+export async function transferProjectUserOwnership(
+  projectId: string,
+  actorUserId: string,
+  newOwnerUserId: string
+): Promise<TransferOwnershipResult> {
+  if (!dbEnabled) return { ok: false, error: "NO_DB" };
+  if (actorUserId === newOwnerUserId) return { ok: false, error: "SAME_USER" };
+  const ownerOk = await isDirectUserProjectOwner(projectId, actorUserId);
+  if (!ownerOk) return { ok: false, error: "NOT_OWNER" };
+  const target = await sql()<Array<{ role: string }>>`
+    select role from project_members
+    where project_id = ${projectId} and user_id = ${newOwnerUserId} and org_id is null
+    limit 1
+  `;
+  if (!target.length || target[0].role !== "collaborator") {
+    return { ok: false, error: "NOT_COLLABORATOR" };
+  }
+  const db = sql();
+  await db.begin(async (tx) => {
+    await tx`
+      update project_members set role = 'collaborator'
+      where project_id = ${projectId} and user_id = ${actorUserId} and org_id is null and role = 'owner'
+    `;
+    await tx`
+      update project_members set role = 'owner'
+      where project_id = ${projectId} and user_id = ${newOwnerUserId} and org_id is null
+    `;
+    await tx`
+      update projects set developer_user_id = ${newOwnerUserId}, updated_at = now()
+      where id = ${projectId}
+    `;
+  });
+  return { ok: true };
+}

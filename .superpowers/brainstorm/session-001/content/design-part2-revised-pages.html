@@ -1,0 +1,160 @@
+<h2>修正：开发者后台页面结构</h2>
+<p class="subtitle">组织是组织，项目是项目，严格分离</p>
+
+<div class="section">
+  <h3>🖥️ 开发者后台导航结构</h3>
+  <div style="display: flex; gap: 16px;">
+    
+    <div style="width: 200px; background: #1e293b; border-radius: 12px; padding: 16px; color: white; flex-shrink: 0;">
+      <div style="font-weight: 700; font-size: 14px; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #334155;">
+        <span style="color: #60a5fa;">Dev</span> 后台
+      </div>
+      <div style="font-size: 12px; line-height: 2.2;">
+        <div style="padding: 4px 8px; border-radius: 6px; background: #3b82f6; color: white;">📋 总览</div>
+        <div style="padding: 4px 8px; border-radius: 6px; color: #94a3b8;">🏢 组织管理</div>
+        <div style="padding: 4px 8px; border-radius: 6px; color: #94a3b8;">📦 项目管理</div>
+        <div style="padding: 4px 8px; border-radius: 6px; color: #94a3b8;">🐛 Bug 反馈</div>
+        <div style="padding: 4px 8px; border-radius: 6px; color: #94a3b8;">💬 评论管理</div>
+        <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #334155;"></div>
+        <div style="padding: 4px 8px; border-radius: 6px; color: #f87171;">🚪 退出</div>
+      </div>
+    </div>
+
+    <div style="flex: 1; display: flex; flex-direction: column; gap: 12px;">
+      
+      <div style="background: #f0fdf4; border: 1px solid #86efac; border-radius: 10px; padding: 14px;">
+        <div style="font-weight: 700; color: #166534; margin-bottom: 6px;">📋 总览 / Dashboard</div>
+        <div style="font-size: 12px; color: #166534; line-height: 1.8;">
+          • 我参与的组织数量 + 项目数量<br>
+          • 待处理的 Bug 数量 + 待回复的评论数量<br>
+          • 最近活动时间线
+        </div>
+      </div>
+
+      <div style="background: #eff6ff; border: 1px solid #93c5fd; border-radius: 10px; padding: 14px;">
+        <div style="font-weight: 700; color: #1e40af; margin-bottom: 6px;">🏢 组织管理</div>
+        <div style="font-size: 12px; color: #1e40af; line-height: 1.8;">
+          <strong>组织列表页：</strong>我所属的所有组织，显示角色（owner/admin/member）<br>
+          <strong>组织详情页：</strong><br>
+          &nbsp;&nbsp;• 基本信息（名称、头像、描述、网站）<br>
+          &nbsp;&nbsp;• 成员管理（邀请/移除/改角色）← 仅 owner/admin 可操作<br>
+          &nbsp;&nbsp;• 组织下的项目列表<br>
+          <strong>创建组织：</strong>申请创建 → 等待运维审核<br>
+          <br>
+          <em style="color: #92400e;">⚠️ 组织和项目是独立的！组织下可以有项目，但项目不一定属于组织</em>
+        </div>
+      </div>
+
+      <div style="background: #faf5ff; border: 1px solid #c4b5fd; border-radius: 10px; padding: 14px;">
+        <div style="font-weight: 700; color: #6d28d9; margin-bottom: 6px;">📦 项目管理</div>
+        <div style="font-size: 12px; color: #6d28d9; line-height: 1.8;">
+          <strong>项目列表页：</strong>我参与的所有项目（含个人项目 + 组织项目）<br>
+          <strong>项目详情页：</strong><br>
+          &nbsp;&nbsp;• 项目信息编辑<br>
+          &nbsp;&nbsp;• 项目成员管理（邀请/移除协作者）<br>
+          &nbsp;&nbsp;• 项目认领申请（对无主项目）<br>
+          <br>
+          <em style="color: #92400e;">⚠️ 项目的归属来源清晰标注：个人项目 / 属于 XX 组织</em>
+        </div>
+      </div>
+
+      <div style="background: #fff7ed; border: 1px solid #fdba74; border-radius: 10px; padding: 14px;">
+        <div style="font-weight: 700; color: #9a3412; margin-bottom: 6px;">🐛 Bug 反馈</div>
+        <div style="font-size: 12px; color: #9a3412; line-height: 1.8;">
+          <strong>Bug 列表页：</strong>我所有项目的 Bug 反馈，可按项目筛选<br>
+          <strong>Bug 详情页：</strong>修改状态（open→doing→done）、添加标签、回复
+        </div>
+      </div>
+
+      <div style="background: #fdf2f8; border: 1px solid #f9a8d4; border-radius: 10px; padding: 14px;">
+        <div style="font-weight: 700; color: #9d174d; margin-bottom: 6px;">💬 评论管理</div>
+        <div style="font-size: 12px; color: #9d174d; line-height: 1.8;">
+          <strong>评论列表页：</strong>我所有项目的用户评论，可按项目筛选<br>
+          <strong>评论操作：</strong>删除不当评论、回复评论
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>📐 组织 vs 项目：关系明确化</h3>
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+    
+    <div style="background: white; border: 2px solid #3b82f6; border-radius: 12px; padding: 16px;">
+      <div style="font-weight: 700; color: #1e40af; font-size: 14px; margin-bottom: 10px;">🏢 组织</div>
+      <div style="font-size: 12px; color: #475569; line-height: 1.8;">
+        <strong>是什么：</strong>团队/工作室/公司等集体实体<br>
+        <strong>谁创建：</strong>用户申请 → 运维审核<br>
+        <strong>内部层级：</strong>owner → admin → member<br>
+        <strong>能做什么：</strong><br>
+        &nbsp;&nbsp;• 管理组织信息<br>
+        &nbsp;&nbsp;• 管理组织成员<br>
+        &nbsp;&nbsp;• 组织下的项目自动继承成员<br>
+        <strong>独立页面：</strong>/dev/organizations
+      </div>
+    </div>
+
+    <div style="background: white; border: 2px solid #7c3aed; border-radius: 12px; padding: 16px;">
+      <div style="font-weight: 700; color: #6d28d9; font-size: 14px; margin-bottom: 10px;">📦 项目</div>
+      <div style="font-size: 12px; color: #475569; line-height: 1.8;">
+        <strong>是什么：</strong>一个具体的软件/工具/资源<br>
+        <strong>谁创建：</strong>用户提交 / 运维收录<br>
+        <strong>归属模式：</strong><br>
+        &nbsp;&nbsp;• 个人项目 → 直接关联用户<br>
+        &nbsp;&nbsp;• 组织项目 → 关联组织<br>
+        &nbsp;&nbsp;• 也可以两者都有<br>
+        <strong>能做什么：</strong><br>
+        &nbsp;&nbsp;• 编辑项目信息<br>
+        &nbsp;&nbsp;• 管理项目成员<br>
+        &nbsp;&nbsp;• 处理 Bug 和评论<br>
+        <strong>独立页面：</strong>/dev/projects
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="section">
+  <h3>🔗 组织-项目关联方式</h3>
+  <div style="background: #f8fafc; border-radius: 12px; padding: 16px; font-size: 12px; line-height: 2;">
+    <div style="margin-bottom: 8px;"><strong>场景 1：个人独立开发</strong></div>
+    <div style="padding-left: 16px; color: #64748b; margin-bottom: 12px;">
+      张三提交项目 A → project_members: (project_A, user_张三, owner)<br>
+      项目 A 不属于任何组织，张三一个人管理
+    </div>
+    
+    <div style="margin-bottom: 8px;"><strong>场景 2：组织项目</strong></div>
+    <div style="padding-left: 16px; color: #64748b; margin-bottom: 12px;">
+      组织 X 创建项目 B → project_members: (project_B, org_X, owner)<br>
+      组织 X 的所有成员自动获得项目 B 的管理权限
+    </div>
+    
+    <div style="margin-bottom: 8px;"><strong>场景 3：组织项目 + 外部协作者</strong></div>
+    <div style="padding-left: 16px; color: #64748b; margin-bottom: 12px;">
+      组织 X 的项目 B + 邀请李四协助 → <br>
+      project_members: (project_B, org_X, owner) + (project_B, user_李四, collaborator)<br>
+      李四不是组织成员，但可以管理这个项目
+    </div>
+    
+    <div style="margin-bottom: 8px;"><strong>场景 4：多组织开发者</strong></div>
+    <div style="padding-left: 16px; color: #64748b;">
+      王五属于组织 X 和组织 Y → <br>
+      organization_members: (org_X, user_王五, member) + (org_Y, user_王五, admin)<br>
+      王五在开发者后台能看到两个组织的项目
+    </div>
+  </div>
+</div>
+
+<div style="margin-top: 16px; background: #fef3c7; border-radius: 12px; padding: 16px; border: 1px solid #fbbf24;">
+  <h3 style="margin: 0 0 8px 0; color: #92400e; font-size: 14px;">📌 关键原则</h3>
+  <div style="font-size: 12px; color: #78350f; line-height: 2;">
+    ✅ 组织和项目在后台是两个独立的顶级导航项，不嵌套<br>
+    ✅ 组织页面只管组织相关的事（信息、成员）<br>
+    ✅ 项目页面只管项目相关的事（信息、成员、Bug、评论）<br>
+    ✅ Bug 和评论也是独立的顶级导航项，跨项目聚合展示<br>
+    ✅ 组织下的项目在"项目管理"页面里用标签标注归属<br>
+    ✅ 权限传递：组织成员 → 自动获得组织下项目的管理权限
+  </div>
+</div>

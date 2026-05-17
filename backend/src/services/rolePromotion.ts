@@ -7,7 +7,7 @@ const dbEnabled = Boolean(process.env.DATABASE_URL);
 const DEV_CAPABILITY_IDS = [
   "dev_panel_access",
   "dev:project_edit", "dev:bug_manage", "dev:comment_manage",
-  "dev:stats_view", "dev:member_manage",
+  "dev:stats_view", "dev:project_admin", "dev:org_manage",
 ];
 
 const USER_CAPABILITY_IDS = [

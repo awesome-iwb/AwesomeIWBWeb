@@ -2,15 +2,17 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useHead } from '@unhead/vue';
-import { Search, MessageCircle, Sparkles, Zap, Plus, Star, Tag, Code2, Award, Flame, Scale, ShieldCheck } from 'lucide-vue-next';
+import { Search, MessageCircle, Sparkles, Zap, Plus, Star, Tag, Code2, Award, Flame, Scale, ShieldCheck, ChevronRight, Grid3X3 } from 'lucide-vue-next';
 import HeroCarousel from '../components/HeroCarousel.vue';
 import { useProjects } from '../composables/useProjects';
 import type { Project } from '../composables/useProjects';
+import { useAnalytics } from '../composables/useAnalytics';
 import { globalState } from '../store';
 import { includesNormalized } from '../utils/search';
 
 const router = useRouter();
 const { categories, loading, fetchProjects, allProjects } = useProjects();
+const { trackClick, trackSearch } = useAnalytics();
 
 useHead({
   title: 'Awesome IWB - 交互式白板软件合集',
@@ -58,7 +60,7 @@ useHead({
   ]
 })
 
-const getOrg = (project: any) => project?.organization || project?.extra?.feishu?.organization || '';
+const getOrg = (project: any) => project?.organization_name || project?.organization || project?.extra?.feishu?.organization || '';
 
 const searchTerm = ref('');
 const activeCategory = ref('all');
@@ -67,23 +69,22 @@ const activeLanguage = ref('all');
 const hasBadges = ref(false);
 const isScrolledPastSearch = ref(false);
 
-const isCardsExpanded = ref(false);
-const fanCardsRef = ref<HTMLElement | null>(null);
-let cardsObserver: IntersectionObserver | null = null;
-
 const comparisonList = ref<Project[]>([]);
 
-const activeHeroSlide = ref(0);
+const activeHeroSlide = ref(1);
+const transitionEnabled = ref(true);
 let touchStartX = 0;
 let touchStartY = 0;
 let touchDeltaX = 0;
 let isSwiping = false;
+let autoPlayTimer: ReturnType<typeof setInterval> | null = null;
 
 const onTouchStart = (e: TouchEvent) => {
   touchStartX = e.touches[0].clientX;
   touchStartY = e.touches[0].clientY;
   touchDeltaX = 0;
   isSwiping = false;
+  stopAutoPlay();
 };
 
 const onTouchMove = (e: TouchEvent) => {
@@ -98,19 +99,71 @@ const onTouchMove = (e: TouchEvent) => {
   }
 };
 
+const loopCards = computed(() => {
+  if (heroCards.value.length === 0) return [];
+  const cards = heroCards.value;
+  return [cards[cards.length - 1], ...cards, cards[0]];
+});
+
+const realHeroIndex = computed(() => {
+  const total = heroCards.value.length;
+  if (total === 0) return 0;
+  return ((activeHeroSlide.value - 1) % total + total) % total;
+});
+
+const onHeroTransitionEnd = () => {
+  const total = heroCards.value.length;
+  if (activeHeroSlide.value === 0) {
+    transitionEnabled.value = false;
+    activeHeroSlide.value = total;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        transitionEnabled.value = true;
+      });
+    });
+  } else if (activeHeroSlide.value === total + 1) {
+    transitionEnabled.value = false;
+    activeHeroSlide.value = 1;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        transitionEnabled.value = true;
+      });
+    });
+  }
+};
+
+const startAutoPlay = () => {
+  stopAutoPlay();
+  autoPlayTimer = setInterval(() => {
+    if (!isSwiping) {
+      activeHeroSlide.value++;
+    }
+  }, 5000);
+};
+
+const stopAutoPlay = () => {
+  if (autoPlayTimer) {
+    clearInterval(autoPlayTimer);
+    autoPlayTimer = null;
+  }
+};
+
 const onTouchEnd = () => {
   if (!isSwiping) return;
   const threshold = 50;
-  if (touchDeltaX < -threshold && activeHeroSlide.value < heroCards.value.length - 1) {
+  if (touchDeltaX < -threshold) {
     activeHeroSlide.value++;
-  } else if (touchDeltaX > threshold && activeHeroSlide.value > 0) {
+  } else if (touchDeltaX > threshold) {
     activeHeroSlide.value--;
   }
   touchDeltaX = 0;
   isSwiping = false;
+  stopAutoPlay();
+  setTimeout(startAutoPlay, 8000);
 };
 
 const onCardClick = (project: Project) => {
+  trackClick(project.slug || project.name, 'click');
   router.push({ name: 'project-detail', params: { name: project.name } });
 };
 
@@ -188,6 +241,7 @@ const typeWriterTick = () => {
 onMounted(async () => {
   await fetchProjects();
   typeWriterTimer = setTimeout(typeWriterTick, 200);
+  startAutoPlay();
   
   const handleScroll = () => {
     if (mainSearchInput.value) {
@@ -206,6 +260,7 @@ onMounted(async () => {
     if (typeWriterTimer) {
       clearTimeout(typeWriterTimer);
     }
+    stopAutoPlay();
   });
 });
 
@@ -245,6 +300,17 @@ const filteredCategories = computed(() => {
     }
     return { ...cat, projects: sortedProjects };
   });
+});
+
+let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+watch(searchTerm, (newVal) => {
+  if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+  if (newVal.trim()) {
+    searchDebounceTimer = setTimeout(() => {
+      const resultCount = filteredCategories.value.reduce((acc, cat) => acc + (cat.projects?.length || 0), 0);
+      trackSearch(newVal, resultCount);
+    }, 500);
+  }
 });
 
 // 计算总数
@@ -439,92 +505,119 @@ watch(heroCards, (cards) => {
         </div>
       </div>
 
-      <!-- Mobile: Full-screen Immersive Card Experience -->
-      <div class="lg:hidden" v-if="heroCards.length >= 4">
-        <div class="relative h-[100dvh] flex flex-col" @touchstart="onTouchStart" @touchmove="onTouchMove" @touchend="onTouchEnd">
-          <div class="flex-1 relative overflow-hidden">
+      <!-- Mobile: Rounded Card Carousel -->
+      <div class="lg:hidden" v-if="heroCards.length >= 2">
+        <div class="pt-4 pb-2 px-4" @touchstart="onTouchStart" @touchmove="onTouchMove" @touchend="onTouchEnd">
+          <div class="relative overflow-hidden rounded-3xl shadow-lg shadow-slate-200/50 dark:shadow-slate-900/50 bg-white dark:bg-[#0B1120]">
             <div 
-              class="flex h-full transition-transform duration-300 ease-out"
+              class="flex"
+              :class="transitionEnabled ? 'transition-transform duration-300 ease-out' : ''"
               :style="{ transform: `translateX(-${activeHeroSlide * 100}%)` }"
+              @transitionend="onHeroTransitionEnd"
             >
               <div 
-                v-for="card in heroCards" 
-                :key="card.name"
-                class="w-full flex-shrink-0 h-full relative"
-                @click="router.push({ name: 'project-detail', params: { name: card.name } })"
+                v-for="(card, idx) in loopCards" 
+                :key="'loop-' + idx"
+                class="w-full flex-shrink-0 relative flex flex-col"
               >
-                <div class="absolute inset-0">
-                  <img v-if="card.banner" :src="card.banner" class="w-full h-full object-cover" alt="Banner" loading="lazy" decoding="async" />
-                  <div v-else class="w-full h-full flex items-center justify-center" :style="{ backgroundColor: cardColors[card.name] ? `rgba(${cardColors[card.name]}, 0.15)` : 'rgba(16, 185, 129, 0.1)' }">
-                    <Sparkles class="w-20 h-20" :style="{ color: cardColors[card.name] ? `rgba(${cardColors[card.name]}, 0.3)` : 'rgba(16, 185, 129, 0.3)' }" />
+                <!-- Fixed 16:9 Image Area -->
+                <div class="relative w-full aspect-[16/9] overflow-hidden">
+                  <template v-if="card.banner">
+                    <img 
+                      :src="card.banner" 
+                      class="w-full h-full object-cover" 
+                      alt="Banner"
+                      loading="lazy"
+                      decoding="async"
+                    />
+                    <div class="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-transparent"></div>
+                  </template>
+                  <template v-else>
+                    <div 
+                      class="w-full h-full flex items-center justify-center"
+                      :style="{ 
+                        background: cardColors[card.name] 
+                          ? `linear-gradient(135deg, rgba(${cardColors[card.name]}, 0.2) 0%, rgba(${cardColors[card.name]}, 0.05) 100%)`
+                          : 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(16, 185, 129, 0.02) 100%)'
+                      }"
+                    >
+                      <div class="relative">
+                        <div 
+                          class="absolute inset-0 rounded-full blur-2xl opacity-30 scale-150"
+                          :style="{ backgroundColor: cardColors[card.name] ? `rgb(${cardColors[card.name]})` : 'rgb(16, 185, 129)' }"
+                        ></div>
+                        <img 
+                          :src="card.icon || card.avatar" 
+                          class="w-20 h-20 object-contain relative z-10 drop-shadow-lg"
+                          @error="(e) => { (e.target as HTMLImageElement).src = getFallbackImage(card.name) }"
+                        />
+                      </div>
+                    </div>
+                  </template>
+                  
+                  <!-- Indicators -->
+                  <div class="absolute top-3 right-3 flex items-center gap-1.5 z-10">
+                    <button
+                      v-for="(_, i) in heroCards" 
+                      :key="i" 
+                      @click.stop="activeHeroSlide = i + 1"
+                      class="h-1.5 rounded-full transition-all duration-200"
+                      :class="i === realHeroIndex ? 'bg-white w-5 shadow-sm' : 'bg-white/50 w-1.5'"
+                    ></button>
                   </div>
-                  <div class="absolute inset-0 bg-gradient-to-b from-black/30 via-black/10 to-black/70"></div>
                 </div>
 
-                <div class="absolute inset-0 flex flex-col justify-between p-5 pb-8">
-                  <div class="flex items-center justify-between">
-                    <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/20 backdrop-blur-sm text-white text-xs font-bold">
-                      <Sparkles class="w-3 h-3" />
-                      精选推荐
+                <!-- Content Area -->
+                <div class="px-5 pt-4 pb-4" @click="router.push({ name: 'project-detail', params: { name: card.name } })">
+                  <div class="flex items-center gap-3 mb-2">
+                    <div class="w-11 h-11 rounded-xl bg-slate-100 dark:bg-slate-800 p-1.5 flex items-center justify-center shadow-sm shrink-0">
+                      <img :src="card.icon || card.avatar" class="w-full h-full object-contain" @error="(e) => { (e.target as HTMLImageElement).src = getFallbackImage(card.name) }" />
                     </div>
-                    <div class="flex items-center gap-1">
-                      <button
-                        v-for="(_, i) in heroCards" 
-                        :key="i" 
-                        @click.stop="activeHeroSlide = i"
-                        class="h-1 rounded-full transition-all duration-200"
-                        :class="i === activeHeroSlide ? 'bg-white w-5' : 'bg-white/40 w-1.5'"
-                      ></button>
+                    <div class="flex-1 min-w-0">
+                      <h2 class="text-lg font-bold text-slate-900 dark:text-white truncate">{{ card.name }}</h2>
+                      <p class="text-xs text-slate-500 dark:text-slate-400 truncate">{{ card.developer }}</p>
                     </div>
+                    <span class="shrink-0 inline-flex items-center justify-center w-8 h-8 rounded-full bg-emerald-500 text-white">
+                      <ChevronRight class="w-4 h-4" />
+                    </span>
                   </div>
-
-                  <div>
-                    <div class="flex items-center gap-3 mb-3">
-                      <div class="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur-sm p-2 flex items-center justify-center">
-                        <img :src="card.icon || card.avatar" class="w-full h-full object-contain" @error="(e) => { (e.target as HTMLImageElement).src = getFallbackImage(card.name) }" />
-                      </div>
-                      <div class="flex-1 min-w-0">
-                        <h2 class="text-2xl font-extrabold text-white drop-shadow-lg truncate">{{ card.name }}</h2>
-                        <p class="text-sm text-white/70 truncate">{{ card.developer }}</p>
-                      </div>
-                    </div>
-                    <p class="text-sm text-white/80 leading-relaxed line-clamp-2 mb-4">{{ card.description }}</p>
-                    <div class="flex items-center gap-3">
-                      <span v-if="card.stars" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/15 backdrop-blur-sm text-white text-xs font-bold">
-                        ⭐ {{ card.stars }}
-                      </span>
-                      <span v-if="card.language" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/15 backdrop-blur-sm text-white text-xs font-bold font-mono">
-                        {{ card.language }}
-                      </span>
-                      <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/80 text-white text-xs font-bold">
-                        查看详情 →
-                      </span>
-                    </div>
+                  <p class="text-sm text-slate-600 dark:text-slate-300 leading-relaxed line-clamp-2 mb-3">{{ card.description }}</p>
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <span v-if="card.stars" class="inline-flex items-center gap-1 text-xs font-bold text-amber-600 dark:text-amber-400">
+                      <Star class="w-3 h-3 fill-current" /> {{ card.stars > 1000 ? (card.stars/1000).toFixed(1) + 'k' : card.stars }}
+                    </span>
+                    <span v-if="card.language" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 text-[10px] font-bold font-mono">
+                      {{ card.language }}
+                    </span>
                   </div>
                 </div>
               </div>
             </div>
           </div>
-
-          <div class="flex-shrink-0 px-5 pb-6 -mt-4 relative z-10">
-            <button
-              @click="globalState.isSearchOpen = true"
-              class="w-full flex items-center gap-3 pl-5 pr-6 py-3.5 rounded-2xl border border-white/20 dark:border-slate-700/50 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm shadow-lg text-left group cursor-pointer active:scale-[0.98] transition-transform"
-            >
-              <Search class="h-4.5 w-4.5 text-slate-400 shrink-0" />
-              <span class="text-slate-400 dark:text-slate-500 text-sm">搜索画板、课表、倒计时等工具...</span>
-            </button>
-          </div>
         </div>
+
+        <!-- Search Button -->
+        <div class="px-4 pb-3">
+          <button
+            @click.stop="globalState.isSearchOpen = true"
+            class="w-full flex items-center gap-3 pl-4 pr-5 py-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-left group cursor-pointer active:scale-[0.98] transition-transform shadow-sm"
+          >
+            <Search class="h-4 w-4 text-slate-400 shrink-0" />
+            <span class="text-slate-400 dark:text-slate-500 text-sm">搜索画板、课表、倒计时等工具...</span>
+          </button>
+        </div>
+
+        <!-- Gradient Transition to Category List -->
+        <div class="h-6 bg-gradient-to-b from-white/80 to-[#F8FAFC] dark:from-[#0B1120]/80 dark:to-[#0B1120]"></div>
       </div>
     </header>
 
     <!-- Hero Carousel -->
-    <div class="max-w-7xl mx-auto px-6 mb-12">
+    <div class="hidden md:block max-w-7xl mx-auto px-6 mb-12">
       <HeroCarousel :projects="allProjects" />
     </div>
 
-    <main class="max-w-7xl mx-auto px-6 pb-24 flex flex-col md:flex-row gap-12 relative items-start">
+    <main class="max-w-7xl mx-auto px-6 pb-8 md:pb-24 flex flex-col md:flex-row gap-12 relative items-start">
       
       <!-- Sticky Sidebar Navigation -->
       <aside class="w-full md:w-64 shrink-0 md:sticky top-24 hidden md:block">
@@ -560,45 +653,31 @@ watch(heroCards, (cards) => {
         </div>
       </aside>
 
-      <!-- Mobile Categories (Horizontal Scroll) -->
-      <div class="md:hidden w-full overflow-x-auto pb-4 -mx-6 px-6 flex gap-2 no-scrollbar">
-        <button
-          @click="activeCategory = 'all'"
-          :class="[
-            'shrink-0 px-5 py-2 rounded-full text-sm font-medium transition-all border whitespace-nowrap',
-            activeCategory === 'all'
-              ? 'bg-slate-900 text-white border-slate-900 dark:bg-white dark:text-slate-900 dark:border-white'
-              : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-800'
-          ]"
-        >
-          🌟 全部
-        </button>
-        <button
-          v-for="cat in categories"
-          :key="cat.id"
-          @click="activeCategory = cat.id"
-          :class="[
-            'shrink-0 px-5 py-2 rounded-full text-sm font-medium transition-all border whitespace-nowrap',
-            activeCategory === cat.id
-              ? 'bg-slate-900 text-white border-slate-900 dark:bg-white dark:text-slate-900 dark:border-white'
-              : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-800'
-          ]"
-        >
-          {{ cat.name.replace(/^[^\s]+\s/, '') }}
-        </button>
-      </div>
+      <!-- Mobile: Browse Categories Shortcut -->
+      <router-link to="/categories" class="md:hidden w-full mb-4">
+        <div class="flex items-center justify-between px-5 py-3 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/20 active:scale-[0.98] transition-transform">
+          <div class="flex items-center gap-3">
+            <Grid3X3 class="w-5 h-5" />
+            <span class="font-bold text-sm">浏览全部分类</span>
+          </div>
+          <div class="flex items-center gap-1 text-emerald-100 text-xs">
+            <span>{{ categories.length }} 个分类</span>
+            <ChevronRight class="w-4 h-4" />
+          </div>
+        </div>
+      </router-link>
 
       <!-- Main Content Area --> 
       <div class="flex-1 min-w-0">
         <!-- Advanced Filters -->
-        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 bg-white dark:bg-[#111827] p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm">
-          <div class="flex flex-wrap items-center gap-3">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 bg-white dark:bg-[#111827] p-3 md:p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm">
+          <div class="hidden md:flex flex-wrap items-center gap-3">
             <label class="flex items-center gap-2 cursor-pointer text-sm font-medium text-slate-700 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">
               <input type="checkbox" v-model="hasBadges" class="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 dark:border-slate-600 dark:bg-slate-700 dark:checked:bg-emerald-500" />
               <Award class="w-4 h-4 text-amber-500" />
               仅显示获奖应用
             </label>
-            <div class="h-4 w-px bg-slate-200 dark:bg-slate-700 hidden sm:block"></div>
+            <div class="h-4 w-px bg-slate-200 dark:bg-slate-700"></div>
             <select v-model="activeLanguage" class="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-1.5 text-sm font-medium text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all cursor-pointer">
               <option value="all">所有语言</option>
               <option v-for="lang in availableLanguages" :key="lang" :value="lang">{{ lang }}</option>
@@ -676,11 +755,11 @@ watch(heroCards, (cards) => {
 
                 <div class="h-full flex flex-col">
                 <!-- Banner Image -->
-                <div v-if="project.banner" class="h-32 w-full shrink-0 overflow-hidden bg-slate-100 dark:bg-slate-800 border-b border-slate-100 dark:border-slate-800">
+                <div v-if="project.banner" class="hidden md:block h-32 w-full shrink-0 overflow-hidden bg-slate-100 dark:bg-slate-800 border-b border-slate-100 dark:border-slate-800">
                   <img loading="lazy" :src="project.banner" :alt="`${project.name} Banner`" class="w-full h-full object-cover" />
                 </div>
 
-                <div class="relative z-10 flex-grow flex flex-col p-6">
+                <div class="relative z-10 flex-grow flex flex-col p-4 md:p-6">
                   <!-- Badges / Achievements -->
                   <div class="absolute -top-3 right-4 flex flex-col gap-2 z-20">
                     <div v-if="project.stars && project.stars >= 1000" class="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-yellow-400 to-amber-600 text-white shadow-lg shadow-amber-500/30" title="千星俱乐部 (1000+ Stars)">
@@ -715,7 +794,7 @@ watch(heroCards, (cards) => {
                             <img loading="lazy" :src="project.avatar" :alt="project.developer" class="w-5 h-5 rounded-full border border-slate-200 dark:border-slate-700 shrink-0 object-cover" @error="(e) => { (e.target as HTMLImageElement).src = getFallbackImage(project.developer) }" />
                             <span class="text-slate-600 dark:text-slate-300 font-semibold truncate max-w-[160px]">{{ project.developer }}</span>
                           </div>
-                          <div v-if="getOrg(project)" class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-50/90 dark:bg-slate-900/40 border border-slate-200/60 dark:border-slate-700/60 w-fit">
+                          <div v-if="getOrg(project)" class="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-50/90 dark:bg-slate-900/40 border border-slate-200/60 dark:border-slate-700/60 w-fit">
                             <span class="text-slate-600 dark:text-slate-300 font-semibold truncate max-w-[220px]">{{ getOrg(project) }}</span>
                           </div>
                         </div>
@@ -762,13 +841,13 @@ watch(heroCards, (cards) => {
                     >
                       <ShieldCheck class="w-3 h-3" /> {{ project.recommendation }}
                     </span>
-                    <span v-if="project.version" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider bg-sky-50 text-sky-600 border border-sky-200/50 dark:bg-sky-500/10 dark:text-sky-400 dark:border-sky-500/20">
+                    <span v-if="project.version" class="hidden md:inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider bg-sky-50 text-sky-600 border border-sky-200/50 dark:bg-sky-500/10 dark:text-sky-400 dark:border-sky-500/20">
                       <Tag class="w-3 h-3" /> {{ project.version }}
                     </span>
                     <span 
                       v-for="kw in project.keywords.slice(0, project.version ? 1 : 2)" 
                       :key="kw"
-                      class="px-2 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-xs font-medium border border-slate-200/50 dark:border-slate-700 truncate max-w-[100px]"
+                      class="hidden md:inline-block px-2 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-xs font-medium border border-slate-200/50 dark:border-slate-700 truncate max-w-[100px]"
                       :title="`功能特性: ${kw}`"
                     >
                       {{ kw }}
@@ -776,7 +855,7 @@ watch(heroCards, (cards) => {
                   </div>
 
                   <!-- Footer / Actions -->
-                  <div class="mt-auto pt-5 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between">
+                  <div class="hidden md:flex mt-auto pt-5 border-t border-slate-100 dark:border-slate-800/80 items-center justify-between">
                     <!-- Reviews snippet if exists -->
                     <div class="flex-1 min-w-0 pr-4">
                       <div v-if="project.reviews && project.reviews.length > 0" class="flex items-center gap-2 group/review cursor-help">

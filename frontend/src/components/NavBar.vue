@@ -3,12 +3,13 @@ import { ref, onMounted, onUnmounted, watch, computed } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { Sun, Moon, Search, Github, Plus, Menu, X, ArrowLeft, LogIn, LogOut, Shield, Wrench } from 'lucide-vue-next';
 import BrandMark from './BrandMark.vue';
-import { useAuth } from '../composables/useAuth';
+import { useAuth, getAvatarDisplaySrc } from '../composables/useAuth';
 
 const props = defineProps<{
   title?: string;
   showBack?: boolean;
   hideSearch?: boolean;
+  transparent?: boolean;
 }>();
 
 const emit = defineEmits(['openSearch']);
@@ -145,7 +146,8 @@ onMounted(() => {
 </script>
 
 <template>
-  <nav class="sticky top-0 z-40 w-full border-b border-slate-200/50 dark:border-slate-800/50 bg-white/70 dark:bg-[#0B1120]/70 backdrop-blur-xl backdrop-saturate-150 transition-colors duration-300">
+  <nav class="sticky top-0 z-40 w-full transition-colors duration-300"
+    :class="transparent ? 'bg-transparent border-b-0' : 'border-b border-slate-200/50 dark:border-slate-800/50 bg-white/70 dark:bg-[#0B1120]/70 backdrop-blur-xl backdrop-saturate-150'">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
       
       <!-- Left: Logo & Links -->
@@ -184,7 +186,7 @@ onMounted(() => {
       </div>
 
       <!-- Right: Actions -->
-      <div class="flex items-center gap-2 sm:gap-4 text-sm font-medium text-slate-600 dark:text-slate-300">
+      <div class="flex items-center gap-2 sm:gap-4 text-sm font-medium" :class="transparent ? 'text-white' : 'text-slate-600 dark:text-slate-300'">
         <!-- Search Button -->
         <div class="overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)]" :class="[hideSearch ? 'w-0 opacity-0 translate-x-4' : 'w-auto opacity-100 translate-x-0']">
           <button 
@@ -199,7 +201,7 @@ onMounted(() => {
           </button>
 
           <!-- Search Icon Mobile -->
-          <button @click="emit('openSearch')" class="sm:hidden p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg">
+          <button @click="emit('openSearch')" class="sm:hidden p-2 rounded-lg transition-colors" :class="transparent ? 'hover:bg-white/10' : 'hover:bg-slate-100 dark:hover:bg-slate-800'">
             <Search class="w-5 h-5 shrink-0" />
           </button>
         </div>
@@ -231,7 +233,7 @@ onMounted(() => {
             @click="isUserMenuOpen = !isUserMenuOpen"
             aria-label="User menu"
           >
-            <img v-if="user" :src="user.avatarUrl" class="h-full w-full object-cover" />
+            <img v-if="user" :src="getAvatarDisplaySrc(user)" class="h-full w-full object-cover" />
             <span v-else class="text-sm font-extrabold text-slate-600 dark:text-slate-200">{{ userInitial }}</span>
           </button>
 
@@ -243,7 +245,7 @@ onMounted(() => {
           >
             <div class="p-4 flex items-center gap-3">
               <div class="h-10 w-10 rounded-full bg-slate-200/70 dark:bg-slate-700/70 overflow-hidden shrink-0">
-                <img v-if="user" :src="user.avatarUrl" class="h-full w-full object-cover" />
+                <img v-if="user" :src="getAvatarDisplaySrc(user)" class="h-full w-full object-cover" />
               </div>
               <div class="min-w-0">
                 <div class="text-sm font-extrabold text-slate-800 dark:text-slate-100 truncate">
@@ -303,15 +305,16 @@ onMounted(() => {
         <!-- Mobile Menu Toggle -->
         <button
           @click="router.push('/me')"
-          class="sm:hidden p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+          class="sm:hidden p-2 rounded-lg transition-colors"
+          :class="transparent ? 'hover:bg-white/10' : 'hover:bg-slate-100 dark:hover:bg-slate-800'"
           aria-label="Me"
         >
-          <div class="h-6 w-6 rounded-full bg-slate-200/70 dark:bg-slate-700/70 overflow-hidden flex items-center justify-center">
-            <img v-if="user" :src="user.avatarUrl" class="h-full w-full object-cover" />
+          <div class="h-6 w-6 rounded-full overflow-hidden flex items-center justify-center" :class="transparent ? 'bg-white/20 border border-white/30' : 'bg-slate-200/70 dark:bg-slate-700/70'">
+            <img v-if="user" :src="getAvatarDisplaySrc(user)" class="h-full w-full object-cover" />
             <span v-else class="text-[10px] font-extrabold text-slate-600 dark:text-slate-200">{{ userInitial }}</span>
           </div>
         </button>
-        <button @click="isMobileMenuOpen = !isMobileMenuOpen" class="md:hidden p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors">
+        <button @click="isMobileMenuOpen = !isMobileMenuOpen" class="md:hidden p-2 rounded-lg transition-colors" :class="transparent ? 'hover:bg-white/10' : 'hover:bg-slate-100 dark:hover:bg-slate-800'">
           <Menu v-if="!isMobileMenuOpen" class="w-5 h-5" />
           <X v-else class="w-5 h-5" />
         </button>
@@ -320,9 +323,6 @@ onMounted(() => {
 
     <!-- Mobile Dropdown Menu -->
     <div v-if="isMobileMenuOpen" class="md:hidden absolute top-16 left-0 w-full bg-white dark:bg-[#0B1120] border-b border-slate-200 dark:border-slate-800 shadow-xl py-4 px-6 flex flex-col gap-4">
-      <router-link @click="isMobileMenuOpen = false" to="/" class="text-lg font-bold text-slate-800 dark:text-slate-200">应用商场</router-link>
-      <router-link @click="isMobileMenuOpen = false" to="/today" class="text-lg font-bold text-slate-800 dark:text-slate-200">Today 精选</router-link>
-      <router-link @click="isMobileMenuOpen = false" to="/about" class="text-lg font-bold text-slate-800 dark:text-slate-200">关于我们</router-link>
       <router-link @click="isMobileMenuOpen = false" to="/me" class="text-lg font-bold text-slate-800 dark:text-slate-200">个人中心</router-link>
       <div class="h-px w-full bg-slate-100 dark:bg-slate-800 my-2"></div>
       <button 

@@ -17,6 +17,7 @@
     "cropperjs": "^1.6.2",
     "dompurify": "^3.4.1",
     "echarts": "^6.0.0",
+    "echarts-wordcloud": "^2.1.0",
     "lucide-vue-next": "^1.0.0",
     "markdown-it": "^14.1.1",
     "vite-ssg": "^28.3.0",

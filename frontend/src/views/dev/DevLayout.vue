@@ -1,47 +1,42 @@
 <template>
-  <div class="min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white flex overflow-x-hidden">
-    <DevSidebar @logout="handleLogout" />
-
-    <div class="flex-1 flex flex-col min-h-screen min-w-0 overflow-x-hidden">
-      <header class="sticky top-0 z-40 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-4 lg:px-6 py-2.5 lg:py-3 flex items-center justify-between">
-        <div class="flex items-center gap-3">
-          <h2 class="text-base lg:text-lg font-bold text-slate-900 dark:text-white">{{ currentTitle }}</h2>
-        </div>
-        <div class="flex items-center gap-2">
-          <span v-if="authUser" class="text-sm text-slate-500 dark:text-slate-400 hidden sm:inline">{{ authUser.name }}</span>
-          <button @click="router.push('/')" class="px-3 py-1.5 rounded-lg text-sm font-medium border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
-            返回首页
-          </button>
-          <button @click="handleLogout" class="px-3 py-1.5 rounded-lg text-sm font-medium bg-rose-500 hover:bg-rose-600 text-white transition-colors">
-            退出
-          </button>
-        </div>
-      </header>
-
-      <main class="flex-1 p-4 lg:p-6">
-        <router-view />
-      </main>
-    </div>
-
-    <DevBottomNav />
-  </div>
+  <AdminShell
+    brand="dev"
+    brand-name="Dev 后台"
+    :sidebar-items="devNavItems"
+    :user="authUser ? { name: authUser.name, avatar_url: authUser.avatar_url } : undefined"
+    @logout="handleLogout"
+    @go-home="router.push('/')"
+  />
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
-import { useRouter, useRoute } from 'vue-router';
+import { useRouter } from 'vue-router';
 import { useAuth } from '../../composables/useAuth';
-import DevSidebar from '../../components/dev/DevSidebar.vue';
-import DevBottomNav from '../../components/dev/DevBottomNav.vue';
+import { AdminShell } from '../../components/ui';
+import {
+  LayoutDashboard, Building2, Package, Bug, MessageSquare,
+} from 'lucide-vue-next';
 
 const router = useRouter();
-const route = useRoute();
 const { user: authUser, logout } = useAuth();
 
-const currentTitle = computed(() => {
-  const meta = route.meta as any;
-  return meta?.title || 'Dev 后台';
-});
+type NavItem = {
+  key: string;
+  label: string;
+  to: string;
+  icon: any;
+  group?: 'primary' | 'secondary';
+  primary?: boolean;
+  cap?: string;
+};
+
+const devNavItems: NavItem[] = [
+  { key: 'dashboard', label: '总览', to: '/dev/dashboard', icon: LayoutDashboard, group: 'primary', primary: true, cap: 'dev_panel_access' },
+  { key: 'organizations', label: '组织管理', to: '/dev/organizations', icon: Building2, group: 'primary', primary: true, cap: 'dev_panel_access' },
+  { key: 'projects', label: '项目管理', to: '/dev/projects', icon: Package, group: 'primary', primary: true, cap: 'dev_panel_access' },
+  { key: 'bugs', label: 'Bug 反馈', to: '/dev/bugs', icon: Bug, group: 'primary', primary: true, cap: 'dev:bug_manage' },
+  { key: 'comments', label: '评论管理', to: '/dev/comments', icon: MessageSquare, group: 'secondary', primary: false, cap: 'dev:comment_manage' },
+];
 
 const handleLogout = async () => {
   await logout();

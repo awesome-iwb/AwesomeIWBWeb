@@ -1,10 +1,13 @@
 <script setup lang="ts">
-import { computed, ref, onMounted } from 'vue';
+import { computed, ref, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useHead } from '@unhead/vue';
-import { Github, LogIn, LogOut, Shield, Wrench, AlertCircle, Camera, Building2, FolderKanban, ArrowRight } from 'lucide-vue-next';
-import { useAuth } from '../composables/useAuth';
+import { Github, LogIn, LogOut, Shield, Wrench, AlertCircle, Camera, Pencil } from 'lucide-vue-next';
+import { useAuth, getAvatarDisplaySrc } from '../composables/useAuth';
+import { useApi } from '../composables/useApi';
+import { API } from '../api/endpoints';
 import ImageCropper from '../components/ImageCropper.vue';
+import { inferDisplayRole, displayRoleLabel } from '../utils/displayRole';
 
 useHead({
   title: '个人中心 - Awesome IWB',
@@ -15,7 +18,8 @@ useHead({
 
 const router = useRouter();
 const route = useRoute();
-const { user, isAuthenticated, logout, getCasdoorAuthorizeUrl, uploadAvatar, hasCapability, fetchUser, organizations } = useAuth();
+const { user, isAuthenticated, logout, getCasdoorAuthorizeUrl, uploadAvatar, hasCapability, fetchUser, setAvatarSource } = useAuth();
+const { apiFetch } = useApi();
 
 const redirectTo = computed(() => {
   const q = route.query.redirect;
@@ -24,9 +28,9 @@ const redirectTo = computed(() => {
 
 const roleLabel = computed(() => {
   if (!user.value) return '';
-  if (hasCapability('admin_panel_access')) return '运维';
-  if (hasCapability('dev_panel_access')) return '开发者';
-  return '用户';
+  const caps = user.value.capabilities ?? [];
+  const role = inferDisplayRole(caps, { isSuperadmin: user.value.is_superadmin });
+  return displayRoleLabel(role);
 });
 
 const goNext = () => router.push(redirectTo.value);
@@ -39,6 +43,38 @@ const popupStatus = ref('');
 const isUploadingAvatar = ref(false);
 const avatarUploadError = ref('');
 const fileInputRef = ref<HTMLInputElement | null>(null);
+
+const pendingAvatarSource = ref<'casdoor' | 'upload'>('casdoor');
+const savingAvatarSource = ref(false);
+const avatarSourceError = ref('');
+
+watch(
+  user,
+  (u) => {
+    if (!u) return;
+    pendingAvatarSource.value = u.avatar_source === 'upload' ? 'upload' : 'casdoor';
+  },
+  { immediate: true }
+);
+
+const saveAvatarSourcePref = async () => {
+  if (!user.value) return;
+  const currentIsUpload = user.value.avatar_source === 'upload';
+  const pendingIsUpload = pendingAvatarSource.value === 'upload';
+  if (currentIsUpload === pendingIsUpload) {
+    avatarSourceError.value = '';
+    return;
+  }
+  savingAvatarSource.value = true;
+  avatarSourceError.value = '';
+  const r = await setAvatarSource(pendingAvatarSource.value);
+  savingAvatarSource.value = false;
+  if (!r.ok) {
+    avatarSourceError.value = r.message;
+    return;
+  }
+  avatarSourceError.value = '';
+};
 
 const showEmergencyLocalLogin = computed(() => !import.meta.env.PROD);
 
@@ -228,6 +264,52 @@ const handleCropCancel = () => {
   cropperImageSrc.value = '';
 };
 
+const showRenameForm = ref(false);
+const renameValue = ref('');
+const isRenaming = ref(false);
+const renameError = ref('');
+
+const startRename = () => {
+  renameValue.value = user.value?.name ?? '';
+  renameError.value = '';
+  showRenameForm.value = true;
+};
+
+const cancelRename = () => {
+  showRenameForm.value = false;
+  renameValue.value = '';
+  renameError.value = '';
+};
+
+const submitRename = async () => {
+  const newName = renameValue.value.trim();
+  if (!newName) {
+    renameError.value = '用户名不能为空';
+    return;
+  }
+  isRenaming.value = true;
+  renameError.value = '';
+  try {
+    const res = await apiFetch(API.auth.userRename, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: newName }),
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      renameError.value = json?.error ?? json?.message ?? '修改失败';
+      return;
+    }
+    showRenameForm.value = false;
+    renameValue.value = '';
+    await fetchUser();
+  } catch (e: any) {
+    renameError.value = e?.message ?? '修改失败';
+  } finally {
+    isRenaming.value = false;
+  }
+};
+
 const handleLogout = async () => {
   logoutError.value = '';
   const ok = await logout();
@@ -253,7 +335,7 @@ const handleLogout = async () => {
           <!-- Avatar with upload overlay -->
           <div class="relative group shrink-0">
             <div class="h-20 w-20 rounded-full bg-slate-200/70 dark:bg-slate-700/70 overflow-hidden">
-              <img v-if="user" :src="user.avatarUrl" class="h-full w-full object-cover" />
+              <img v-if="user" :src="getAvatarDisplaySrc(user)" class="h-full w-full object-cover" />
               <div v-else class="h-full w-full flex items-center justify-center">
                 <span class="text-2xl font-extrabold text-slate-400">?</span>
               </div>
@@ -352,11 +434,64 @@ const handleLogout = async () => {
           </div>
           <!-- Profile info card -->
           <div class="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/40 p-4 space-y-3">
-            <div class="flex items-center justify-between">
-              <span class="text-sm text-slate-500 dark:text-slate-400">头像来源</span>
-              <span class="text-sm font-medium text-slate-700 dark:text-slate-200">
-                {{ user?.avatar_source === 'upload' ? '自定义上传' : user?.avatar_source === 'casdoor' ? '智教联盟同步' : '默认' }}
-              </span>
+            <div class="space-y-3 border-t border-slate-200/80 dark:border-slate-800/80 pt-3">
+              <div class="text-sm font-semibold text-slate-700 dark:text-slate-200">头像显示偏好</div>
+              <p class="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                选择使用智教联盟（OAuth）同步的头像，或本站图床上传的自定义头像；保存后刷新或换设备仍会保持你的选择。
+              </p>
+              <div class="space-y-2">
+                <label class="flex items-start gap-3 cursor-pointer group">
+                  <input
+                    v-model="pendingAvatarSource"
+                    type="radio"
+                    value="casdoor"
+                    class="mt-1 h-4 w-4 text-emerald-600 border-slate-300 focus:ring-emerald-500"
+                  />
+                  <span class="text-sm text-slate-700 dark:text-slate-200 group-hover:text-emerald-700 dark:group-hover:text-emerald-300">使用智教联盟同步头像</span>
+                </label>
+                <label class="flex items-start gap-3 cursor-pointer group">
+                  <input
+                    v-model="pendingAvatarSource"
+                    type="radio"
+                    value="upload"
+                    class="mt-1 h-4 w-4 text-emerald-600 border-slate-300 focus:ring-emerald-500"
+                  />
+                  <span class="text-sm text-slate-700 dark:text-slate-200 group-hover:text-emerald-700 dark:group-hover:text-emerald-300">使用本站图床上传头像</span>
+                </label>
+              </div>
+              <div v-if="avatarSourceError" class="text-sm text-rose-600 dark:text-rose-400">{{ avatarSourceError }}</div>
+              <button
+                type="button"
+                @click="saveAvatarSourcePref"
+                :disabled="savingAvatarSource"
+                class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-bold transition-colors"
+              >
+                <span v-if="savingAvatarSource" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                {{ savingAvatarSource ? '保存中...' : '保存头像偏好' }}
+              </button>
+            </div>
+            <div v-if="hasCapability('user:rename')" class="flex items-center justify-between">
+              <span class="text-sm text-slate-500 dark:text-slate-400">用户名</span>
+              <div v-if="!showRenameForm" class="flex items-center gap-2">
+                <span class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ user?.name }}</span>
+                <button @click="startRename" class="p-1 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400">
+                  <Pencil class="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+            <div v-if="showRenameForm" class="space-y-3 pt-1">
+              <div class="text-xs text-slate-500 dark:text-slate-400">2-30 位中文、英文、数字、下划线、连字符，30天内只能修改一次</div>
+              <input
+                v-model="renameValue"
+                class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-emerald-500 text-base"
+                placeholder="输入新用户名"
+                @keyup.enter="submitRename"
+              />
+              <div v-if="renameError" class="text-sm text-rose-600 dark:text-rose-400">{{ renameError }}</div>
+              <div class="flex gap-2">
+                <button @click="submitRename" :disabled="isRenaming" class="flex-1 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-sm transition-colors">{{ isRenaming ? '修改中...' : '确认修改' }}</button>
+                <button @click="cancelRename" class="px-4 py-2.5 rounded-xl bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold text-sm hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors">取消</button>
+              </div>
             </div>
             <div v-if="user?.email" class="flex items-center justify-between">
               <span class="text-sm text-slate-500 dark:text-slate-400">邮箱</span>
@@ -375,69 +510,6 @@ const handleLogout = async () => {
               </button>
             </div>
           </div>
-
-          <!-- My Organizations & Projects -->
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <button
-              @click="router.push('/dev/organizations')"
-              class="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/40 p-4 text-left hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors group"
-            >
-              <div class="flex items-center gap-3 mb-3">
-                <div class="w-10 h-10 rounded-xl bg-blue-100 dark:bg-blue-500/20 flex items-center justify-center">
-                  <Building2 class="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                </div>
-                <div>
-                  <div class="text-sm font-extrabold text-slate-900 dark:text-white">我的组织</div>
-                  <div class="text-xs text-slate-500 dark:text-slate-400">{{ organizations.length }} 个组织</div>
-                </div>
-              </div>
-              <div v-if="organizations.length > 0" class="space-y-1.5">
-                <div v-for="org in organizations.slice(0, 3)" :key="org.id" class="flex items-center gap-2">
-                  <img
-                    :src="org.avatar_url || ''"
-                    :alt="org.name"
-                    class="w-5 h-5 rounded object-cover"
-                    @error="(e) => { (e.target as HTMLImageElement).style.display = 'none' }"
-                  />
-                  <span class="text-xs text-slate-600 dark:text-slate-300 truncate">{{ org.name }}</span>
-                  <span class="text-[10px] text-slate-400 dark:text-slate-500 ml-auto shrink-0">{{ org.member_role === 'owner' ? '所有者' : org.member_role === 'admin' ? '管理员' : '成员' }}</span>
-                </div>
-              </div>
-              <div v-else class="text-xs text-slate-400 dark:text-slate-500">暂无组织</div>
-              <div class="flex items-center gap-1 mt-2 text-xs font-medium text-emerald-600 dark:text-emerald-400 group-hover:gap-2 transition-all">
-                查看全部 <ArrowRight class="w-3 h-3" />
-              </div>
-            </button>
-
-            <button
-              @click="router.push('/dev/projects')"
-              class="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/40 p-4 text-left hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors group"
-            >
-              <div class="flex items-center gap-3 mb-3">
-                <div class="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-500/20 flex items-center justify-center">
-                  <FolderKanban class="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-                </div>
-                <div>
-                  <div class="text-sm font-extrabold text-slate-900 dark:text-white">我的项目</div>
-                  <div class="text-xs text-slate-500 dark:text-slate-400">管理参与的项目</div>
-                </div>
-              </div>
-              <div class="text-xs text-slate-400 dark:text-slate-500">在开发者后台查看和管理</div>
-              <div class="flex items-center gap-1 mt-2 text-xs font-medium text-emerald-600 dark:text-emerald-400 group-hover:gap-2 transition-all">
-                进入项目 <ArrowRight class="w-3 h-3" />
-              </div>
-            </button>
-          </div>
-
-          <!-- Dev Panel Access Button -->
-          <button
-            v-if="hasCapability('dev_panel_access')"
-            @click="router.push('/dev')"
-            class="w-full inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3.5 rounded-2xl font-extrabold transition-colors shadow-lg shadow-emerald-600/20"
-          >
-            <Wrench class="w-5 h-5" />
-            进入开发者后台
-          </button>
 
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <button

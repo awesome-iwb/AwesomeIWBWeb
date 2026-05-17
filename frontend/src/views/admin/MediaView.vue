@@ -1,17 +1,19 @@
 <template>
-  <FloatingPanel
-    ref="panelRef"
-    :selected-label="selectedLabel"
-    placeholder="选择一个媒体文件"
-    list-label="媒体库"
-    :count="mediaPage.total"
-    :prev-enabled="mediaPage.page > 1 && !mediaLoading"
-    :next-enabled="mediaPage.page < maxPage && !mediaLoading"
-    @prev="prevMediaPage"
-    @next="nextMediaPage"
+  <ui-ListDetailLayout
+    :selected-id="selectedMediaId"
+    :selected-item-label="mediaDraft?.mime || '媒体文件'"
+    :selected-item-icon="ImageIcon"
+    :searchable="false"
+    :page="mediaPage.page"
+    :total="mediaPage.total"
+    :page-size="mediaPage.pageSize"
+    list-title="媒体库"
+    detail-title="媒体详情"
+    @update:page="onPageChange"
+    @back="selectedMediaId = null; mediaDraft = null"
   >
-    <template #content>
-      <div v-if="mediaDraft" class="bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+    <template #detail>
+      <div v-if="mediaDraft" class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col">
         <div class="p-4 lg:p-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50">
           <div class="flex items-center gap-3">
             <div>
@@ -20,7 +22,7 @@
             </div>
           </div>
         </div>
-        <div class="p-4 lg:p-6 space-y-4">
+        <div class="flex-1 overflow-y-auto p-4 lg:p-6 space-y-4">
           <div v-if="mediaError" class="p-3 rounded-xl bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-300 text-sm">{{ mediaError }}</div>
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div class="rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 p-4">
@@ -60,41 +62,23 @@
           </div>
         </div>
       </div>
-      <div v-else class="flex items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-3xl min-h-[300px] lg:min-h-[700px]">
-        <p class="text-slate-400">点击下方悬浮栏选择媒体文件</p>
-      </div>
+    </template>
 
-      <div v-if="showBatchTagDialog" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-        <div class="w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-2xl overflow-hidden">
-          <div class="p-6 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
-            <div class="text-xl font-extrabold text-slate-900 dark:text-white">批量打标签</div>
-            <button @click="showBatchTagDialog = false" class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold">关闭</button>
-          </div>
-          <div class="p-6 space-y-4">
-            <div>
-              <label class="text-sm font-bold text-slate-700 dark:text-slate-300 block mb-1">添加标签</label>
-              <MediaTagInput v-model="batchTagsToAdd" />
-            </div>
-            <div>
-              <label class="text-sm font-bold text-slate-700 dark:text-slate-300 block mb-1">移除标签</label>
-              <MediaTagInput v-model="batchTagsToRemove" />
-            </div>
-            <div v-if="batchTagError" class="p-3 rounded-xl bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-300 text-sm">{{ batchTagError }}</div>
-            <button @click="handleBatchTag" :disabled="batchTagLoading" class="w-full px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-bold transition-colors">
-              {{ batchTagLoading ? '处理中...' : `确认（${selectedIds.length} 项）` }}
-            </button>
-          </div>
+    <template #empty-detail>
+      <div class="flex items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl min-h-[400px]">
+        <div class="text-center">
+          <p class="text-slate-400 mb-2">从列表选择媒体文件</p>
         </div>
       </div>
     </template>
 
-    <template #list>
-      <div class="space-y-3">
+    <template #list-toolbar>
+      <div class="space-y-2">
         <input
           v-model="mediaQuery.q"
           @keyup.enter="mediaQuery.page = 1; fetchMediaList()"
           type="text"
-          class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-emerald-500 text-sm"
+          class="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-emerald-500 text-sm"
           placeholder="搜索 URL / MIME / 文件名"
         />
         <div class="grid grid-cols-2 gap-2">
@@ -132,9 +116,6 @@
           <button @click="mediaQuery.page = 1; fetchMediaList()" class="flex-1 px-3 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold transition-colors">搜索</button>
           <button @click="resetMediaQuery" class="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-sm font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">重置</button>
         </div>
-      </div>
-
-      <div class="mt-3">
         <MediaBatchActions
           :selected-ids="selectedIds"
           @batch-tag="openBatchTagDialog"
@@ -142,9 +123,13 @@
           @clear-selection="clearSelection"
         />
       </div>
+    </template>
 
-      <div class="mt-3 space-y-2">
-        <div v-if="mediaLoading" class="text-sm text-slate-400 text-center py-10">加载中...</div>
+    <template #list>
+      <div class="space-y-2">
+        <div v-if="mediaLoading" class="text-sm text-slate-400 text-center py-10">
+          <ui-LoadingSpinner />
+        </div>
         <div
           v-else
           v-for="m in mediaPage.items"
@@ -160,7 +145,7 @@
           />
           <div @click="selectMedia(m)" class="flex items-center gap-3 flex-1 min-w-0">
             <img v-if="m.url" :src="m.url" class="w-8 h-8 rounded bg-white object-cover shrink-0" />
-            <div v-else class="w-8 h-8 rounded bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-xs font-bold text-slate-500 shrink-0">图</div>
+            <div v-else class="w-8 h-8 rounded bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-xs font-bold text-slate-500 shrink-0">?</div>
             <div class="flex-1 min-w-0">
               <div class="font-medium truncate text-sm">{{ m.mime || '未知类型' }}</div>
               <div class="text-xs opacity-80 truncate">{{ m.url || '-' }}</div>
@@ -181,26 +166,41 @@
             >{{ m._refCount }} 引用</span>
           </div>
         </div>
-        <div v-if="!mediaLoading && mediaPage.items.length === 0" class="text-sm text-slate-400 text-center py-10">暂无数据</div>
-      </div>
-
-      <div class="mt-3 flex items-center justify-between text-sm">
-        <button @click="prevMediaPage" :disabled="mediaPage.page <= 1 || mediaLoading" class="px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed">上一页</button>
-        <div class="text-slate-500 dark:text-slate-300">{{ mediaPage.page }} / {{ maxPage }}</div>
-        <button @click="nextMediaPage" :disabled="mediaPage.page >= maxPage || mediaLoading" class="px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed">下一页</button>
+        <ui-EmptyState v-if="!mediaLoading && mediaPage.items.length === 0" title="暂无数据" />
       </div>
     </template>
-  </FloatingPanel>
+  </ui-ListDetailLayout>
+
+  <div v-if="showBatchTagDialog" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-2xl overflow-hidden">
+      <div class="p-6 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
+        <div class="text-xl font-extrabold text-slate-900 dark:text-white">批量打标签</div>
+        <button @click="showBatchTagDialog = false" class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold">关闭</button>
+      </div>
+      <div class="p-6 space-y-4">
+        <div>
+          <label class="text-sm font-bold text-slate-700 dark:text-slate-300 block mb-1">添加标签</label>
+          <MediaTagInput v-model="batchTagsToAdd" />
+        </div>
+        <div>
+          <label class="text-sm font-bold text-slate-700 dark:text-slate-300 block mb-1">移除标签</label>
+          <MediaTagInput v-model="batchTagsToRemove" />
+        </div>
+        <div v-if="batchTagError" class="p-3 rounded-xl bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-300 text-sm">{{ batchTagError }}</div>
+        <button @click="handleBatchTag" :disabled="batchTagLoading" class="w-full px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-bold transition-colors">
+          {{ batchTagLoading ? '处理中...' : `确认（${selectedIds.length} 项）` }}
+        </button>
+      </div>
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, onMounted, watch } from 'vue';
 import { adminFetch, formatAdminError, formatBytes, formatDateTime } from '../../composables/useAdminFetch';
 import MediaTagInput from '../../components/admin/MediaTagInput.vue';
 import MediaBatchActions from '../../components/admin/MediaBatchActions.vue';
-import FloatingPanel from '../../components/admin/FloatingPanel.vue';
-
-const panelRef = ref<InstanceType<typeof FloatingPanel> | null>(null);
+import { ListDetailLayout as uiListDetailLayout, EmptyState as uiEmptyState, LoadingSpinner as uiLoadingSpinner } from '../../components/ui';
 
 onMounted(() => {
   fetchMediaList();
@@ -243,11 +243,6 @@ const inlineRefCount = ref(0);
 
 const mediaDraftTags = ref<string[]>([]);
 
-const selectedLabel = computed(() => {
-  if (!mediaDraft.value) return '';
-  return mediaDraft.value.url || mediaDraft.value.filename || mediaDraft.value.id || '';
-});
-
 watch(mediaDraft, (draft) => {
   mediaDraftTags.value = Array.isArray(draft?.tags) ? [...draft.tags] : [];
   showInlineRefs.value = false;
@@ -255,7 +250,6 @@ watch(mediaDraft, (draft) => {
   inlineRefCount.value = 0;
 }, { immediate: true });
 
-const maxPage = computed(() => Math.max(1, Math.ceil(mediaPage.value.total / mediaPage.value.pageSize)));
 
 const normalizeMediaPage = (json: any) => {
   const items = Array.isArray(json?.items)
@@ -337,19 +331,11 @@ const selectMedia = (media: any) => {
   selectedMediaId.value = media?.id ?? null;
   mediaDraft.value = media ? { ...media } : null;
   mediaError.value = '';
-  panelRef.value?.close();
 };
 
-const prevMediaPage = async () => {
-  if (mediaPage.value.page <= 1 || mediaLoading.value) return;
-  mediaQuery.value.page -= 1;
-  await fetchMediaList();
-};
-
-const nextMediaPage = async () => {
-  if (mediaLoading.value) return;
-  if (mediaPage.value.page >= maxPage.value) return;
-  mediaQuery.value.page += 1;
+const onPageChange = async (newPage: number) => {
+  mediaQuery.value.page = newPage;
+  mediaPage.value.page = newPage;
   await fetchMediaList();
 };
 

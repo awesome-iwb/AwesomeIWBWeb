@@ -1,0 +1,11 @@
+﻿const fs = require('fs');
+const dv = 'd:/github/AwesomeIWBWeb/frontend/src/views/admin/DevelopersView.vue';
+let d = fs.readFileSync(dv, 'utf8');
+d = d.replace(/<span>\{\{ dev\.project_count \?\? 0 \}\} [\s\S]*?<\/span>/, '<span>{{ dev.project_count ?? 0 }} \u4e2a\u9879\u76ee</span>');
+d = d.replace(/title="\u6682\u65e0\u5f00\u53d1[^"]*"\s*\/>/, 'title="\u6682\u65e0\u5f00\u53d1\u8005" />');
+fs.writeFileSync(dv, d);
+const mv = 'd:/github/AwesomeIWBWeb/frontend/src/views/admin/MediaView.vue';
+let m = fs.readFileSync(mv, 'utf8');
+m = m.replace(/batchTagError\.value = '\u8bf7\u81f3\u5c11\u6dfb\u52a0\u6216\u79fb\u9664\u4e00\u4e2a\u6807[^;]*;/, "batchTagError.value = '\u8bf7\u81f3\u5c11\u6dfb\u52a0\u6216\u79fb\u9664\u4e00\u4e2a\u6807\u7b7e';");
+fs.writeFileSync(mv, m);
+console.log('done');

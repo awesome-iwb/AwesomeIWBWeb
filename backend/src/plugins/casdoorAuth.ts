@@ -316,25 +316,43 @@ export const casdoorAuthPlugin = new Elysia({ prefix: "/api/auth" })
 
     let user = await findUserByCasdoorId(casdoorId);
     if (user) {
-      user = await updateUserLogin(user.id, {
-        name,
-        avatar_url: avatar,
-        avatar_source: avatar ? "casdoor" : user.avatar_source,
-        email: email || null,
-        stcn_user_id: stcnUserId || null,
-        stcn_username: stcnUsername || null,
-      });
+      // Always refresh IdP avatar URL for preference switching; do not overwrite custom uploads.
+      if (user.avatar_source === "upload") {
+        user = await updateUserLogin(user.id, {
+          name,
+          email: email || null,
+          stcn_user_id: stcnUserId || null,
+          stcn_username: stcnUsername || null,
+          external_avatar_url: avatar,
+        });
+      } else {
+        user = await updateUserLogin(user.id, {
+          name,
+          avatar_url: avatar,
+          avatar_source: avatar ? "casdoor" : user.avatar_source,
+          email: email || null,
+          stcn_user_id: stcnUserId || null,
+          stcn_username: stcnUsername || null,
+          external_avatar_url: avatar,
+        });
+      }
     } else {
       user = await createUser({
         casdoor_id: casdoorId,
         name,
         avatar_url: avatar,
         avatar_source: avatar ? "casdoor" : "default",
+        external_avatar_url: avatar,
+        upload_avatar_url: "",
         email: email || null,
         role: "user",
         stcn_user_id: stcnUserId || null,
         stcn_username: stcnUsername || null,
       });
+      if (user) {
+        const { grantDefaultUserCapabilities } = await import("../services/capabilities");
+        await grantDefaultUserCapabilities(user.id);
+      }
     }
 
     if (!user) {
@@ -362,7 +380,7 @@ export const casdoorAuthPlugin = new Elysia({ prefix: "/api/auth" })
       return;
     }
 
-    return { token: jwt, user: { id: user.id, name: user.name, role: user.role, avatar_url: user.avatar_url } };
+    return { token: jwt, user: { id: user.id, name: user.name, role: user.role, avatar_url: user.avatar_url, avatar_source: user.avatar_source } };
   })
   .get("/me", async ({ headers, set }) => {
     const cookies = parseCookieHeader(headers["cookie"]);

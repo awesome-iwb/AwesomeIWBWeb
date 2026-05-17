@@ -1,12 +1,11 @@
 <template>
-  <div class="grid grid-cols-1 lg:grid-cols-4 gap-4 lg:gap-8">
-    <!-- 审核队列列表 -->
-    <div class="lg:col-span-1 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col" :class="{ 'hidden lg:flex': isMobile && mobileView === 'detail' }" style="height: auto; min-height: 400px; max-height: 700px;">
+  <div class="grid grid-cols-1 lg:grid-cols-4 gap-4 lg:gap-8 h-full min-h-0">
+    <div class="lg:col-span-1 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col min-h-0" :class="{ 'hidden lg:flex': isMobile && mobileView === 'detail' }">
       <div class="p-4 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
         <h2 class="font-bold text-lg">内容审核队列</h2>
       </div>
       <div class="p-4 border-b border-slate-100 dark:border-slate-700 space-y-3">
-        <div class="flex gap-2">
+        <div v-if="!lockedKind" class="flex gap-2">
           <button
             @click="moderationKind = 'comment'"
             class="flex-1 px-3 py-3 lg:py-2 rounded-xl text-base lg:text-sm font-bold transition-colors"
@@ -41,21 +40,17 @@
           <div class="text-xs opacity-80 truncate mt-1">{{ m.project_name }} · {{ m.actor_username }}</div>
           <div class="text-xs opacity-60 mt-1">{{ new Date(m.created_at).toLocaleString() }}</div>
         </div>
-        <div v-if="moderationPage.items.length === 0" class="text-sm text-slate-400 text-center py-10">暂无数据</div>
+        <ui-EmptyState v-if="moderationPage.items.length === 0" :icon="Inbox" title="暂无数据" />
       </div>
-      <div class="p-4 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between text-sm">
-        <button @click="prevModerationPage" :disabled="moderationQuery.page <= 1" class="px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed">上一页</button>
-        <div class="text-slate-500 dark:text-slate-300">{{ moderationQuery.page }} / {{ Math.max(1, Math.ceil(moderationPage.total / moderationQuery.pageSize)) }}</div>
-        <button @click="nextModerationPage" :disabled="moderationQuery.page >= Math.ceil(moderationPage.total / moderationQuery.pageSize)" class="px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed">下一页</button>
-      </div>
+      <ui-Pagination :page="moderationQuery.page" :total="moderationPage.total" :page-size="moderationQuery.pageSize" @update:page="onModerationPageChange" />
     </div>
 
     <!-- 审核详情 -->
-    <div class="lg:col-span-3 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col" :class="{ 'hidden': isMobile && mobileView === 'list' }" v-if="moderationDraft">
+    <div class="lg:col-span-3 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col min-h-0" :class="{ 'hidden': isMobile && mobileView === 'list' }" v-if="moderationDraft">
       <div class="p-4 lg:p-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50">
         <h2 class="text-lg lg:text-xl font-bold text-slate-800 dark:text-white">审核{{ moderationKind === 'comment' ? '评论' : 'Bug反馈' }}</h2>
       </div>
-      <div class="flex-1 overflow-y-auto p-4 lg:p-8 space-y-4 lg:space-y-6" style="max-height: 500px;">
+      <div class="flex-1 min-h-0 overflow-y-auto p-4 lg:p-8 space-y-4 lg:space-y-6">
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
           <div class="p-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
             <div class="text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">项目</div>
@@ -103,7 +98,7 @@
         <button @click="rejectModeration" class="flex-1 px-4 py-3 rounded-2xl bg-rose-500 hover:bg-rose-600 text-white font-bold transition-colors">驳回</button>
       </div>
     </div>
-    <div v-else class="lg:col-span-3 flex items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-3xl min-h-[300px] lg:min-h-[700px]" :class="{ 'hidden': isMobile && mobileView === 'list' }">
+    <div v-else class="lg:col-span-3 flex items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-3xl min-h-[300px]" :class="{ 'hidden': isMobile && mobileView === 'list' }">
       <p class="text-slate-400">请在左侧选择一条待审核内容</p>
     </div>
   </div>
@@ -112,6 +107,13 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, onUnmounted } from 'vue';
 import { adminFetch, formatAdminError } from '../../composables/useAdminFetch';
+import { Pagination as uiPagination, EmptyState as uiEmptyState } from '../../components/ui';
+import { Inbox } from 'lucide-vue-next';
+
+const props = withDefaults(
+  defineProps<{ lockedKind?: 'comment' | 'bug' | null }>(),
+  { lockedKind: null }
+);
 
 // 移动端适配
 const isMobile = ref(false);
@@ -121,11 +123,6 @@ const updateIsMobile = () => {
     isMobile.value = window.innerWidth < 1024;
   }
 };
-onMounted(() => {
-  updateIsMobile();
-  window.addEventListener('resize', updateIsMobile);
-  fetchModeration();
-});
 onUnmounted(() => {
   if (typeof window !== 'undefined') {
     window.removeEventListener('resize', updateIsMobile);
@@ -135,7 +132,7 @@ onUnmounted(() => {
 const openDetail = () => { mobileView.value = 'detail'; };
 
 // 审核状态
-const moderationKind = ref<'comment' | 'bug'>('comment');
+const moderationKind = ref<'comment' | 'bug'>(props.lockedKind ?? 'comment');
 const moderationStatus = ref<'pending' | 'approved' | 'rejected'>('pending');
 const moderationPage = ref<{ items: any[]; page: number; pageSize: number; total: number }>({
   items: [],
@@ -207,18 +204,23 @@ const rejectModeration = async () => {
   await fetchModeration();
 };
 
-const prevModerationPage = async () => {
-  if (moderationQuery.value.page <= 1) return;
-  moderationQuery.value.page -= 1;
+const onModerationPageChange = async (newPage: number) => {
+  moderationQuery.value.page = newPage;
   await fetchModeration();
 };
 
-const nextModerationPage = async () => {
-  const maxPage = Math.max(1, Math.ceil(moderationPage.value.total / moderationPage.value.pageSize));
-  if (moderationQuery.value.page >= maxPage) return;
-  moderationQuery.value.page += 1;
-  await fetchModeration();
-};
+onMounted(() => {
+  updateIsMobile();
+  window.addEventListener('resize', updateIsMobile);
+  fetchModeration();
+});
+
+watch(
+  () => props.lockedKind,
+  (k) => {
+    if (k) moderationKind.value = k;
+  }
+);
 
 // 切换评论/Bug类型时重新加载
 watch(moderationKind, () => {

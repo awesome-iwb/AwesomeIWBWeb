@@ -1,22 +1,23 @@
 const { Client } = require("ssh2");
 const conn = new Client();
 
+const HOST = "210.16.165.251";
+const USER = "root";
+const PASS = "8EGZ4jf3vumREH";
+
 conn.on("ready", () => {
   console.log("Connected!");
 
   const commands = [
-    "grep CASDOOR_APPLICATION_NAME /etc/awesomeiwb/backend.env",
-    "grep 'CASDOOR_APPLICATION' /opt/awesomeiwb/backend/src/plugins/casdoorAuth.ts",
-    "grep 'application' /opt/awesomeiwb/backend/src/config.ts | head -3",
-    "curl -s https://aiwb.smart-teach.cn/api/auth/login 2>&1 | head -5",
-    "systemctl status awesomeiwb-backend --no-pager | head -10",
-    "tail -5 /var/log/awesomeiwb/backend.err.log",
+    "cd /opt/awesomeiwb && git remote -v",
+    "cd /opt/awesomeiwb && git status --short | head -10",
+    "cd /opt/awesomeiwb && git log --oneline -3",
   ];
 
   let i = 0;
   function runNext() {
-    if (i >= commands.length) { console.log("\n=== Done ==="); conn.end(); return; }
-    console.log(`\n--- [${i + 1}/${commands.length}] ---`);
+    if (i >= commands.length) { conn.end(); return; }
+    console.log(`\n> ${commands[i]}`);
     conn.exec(commands[i], (err, stream) => {
       if (err) { console.error(err); i++; runNext(); return; }
       stream.on("data", (d) => process.stdout.write(d.toString()));
@@ -27,7 +28,4 @@ conn.on("ready", () => {
   runNext();
 }).on("error", (err) => console.error("Error:", err));
 
-conn.connect({
-  host: "210.16.165.251", port: 22, username: "root", password: "8EGZ4jf3vumREH",
-  readyTimeout: 30000,
-});
+conn.connect({ host: HOST, port: 22, username: USER, password: PASS, readyTimeout: 60000, keepaliveInterval: 10000 });

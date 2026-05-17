@@ -9,5 +9,16 @@ describe('normalizeProjectInput', () => {
     });
     expect(out.platform_developers).toEqual([{ username: 'u', stcn_user_id: 'legacy', hzzc_user_id: '' }]);
   });
+
+  test('accepts legacy media alias fields', () => {
+    const out: any = normalizeProjectInput({
+      icon_url: '/api/uploads/icon.webp',
+      banner_url: '/api/uploads/banner.webp',
+      avatar_url: '/api/uploads/avatar.webp'
+    });
+    expect(out.icon).toBe('/api/uploads/icon.webp');
+    expect(out.banner).toBe('/api/uploads/banner.webp');
+    expect(out.avatar).toBe('/api/uploads/avatar.webp');
+  });
 });
 

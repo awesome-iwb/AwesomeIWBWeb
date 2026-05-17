@@ -1,0 +1,152 @@
+<h2>三种设计方案详细对比</h2>
+<p class="subtitle">结合"项目-组织-开发者"关系的深度思考</p>
+
+<div class="section">
+  <h3>🤔 核心问题：项目归属模型</h3>
+  <div style="background: #fffbeb; border-radius: 12px; padding: 16px; border: 1px solid #fbbf24; font-size: 13px; color: #78350f; line-height: 1.8;">
+    一个项目可能属于<strong>个人</strong>，也可能属于<strong>组织/团队</strong>。<br>
+    如果属于组织，组织下有多个开发者，谁能管理这个项目？<br>
+    在项目页面上如何显示开发者信息？<br>
+    运维如何指定项目的开发者？
+  </div>
+</div>
+
+<div class="section">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)" style="margin-bottom: 16px;">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>方案 A：资源级 Capability（增量扩展）</h3>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px;">
+        <div class="pros-cons">
+          <div class="pros"><h4>优点</h4><ul>
+            <li>改动最小，在现有 capability 体系上扩展</li>
+            <li>向后兼容，现有运维后台不受影响</li>
+            <li>capability 体系保持统一</li>
+          </ul></div>
+          <div class="cons"><h4>缺点</h4><ul>
+            <li>需要区分"全局能力"和"资源级能力"</li>
+            <li>组织概念需要额外处理</li>
+            <li>权限校验逻辑变复杂</li>
+          </ul></div>
+        </div>
+        <div>
+          <div class="mockup" style="font-size: 11px;">
+            <div class="mockup-header">数据模型</div>
+            <div class="mockup-body" style="padding: 10px; font-family: monospace; font-size: 11px; line-height: 1.6;">
+              <strong>capabilities</strong>（现有）<br>
+              ├─ user:comment<br>
+              ├─ user:avatar<br>
+              ├─ dev_panel_access<br>
+              └─ project:update ← 资源级<br>
+              <br>
+              <strong>project_members</strong>（新增）<br>
+              ├─ project_id → projects.id<br>
+              ├─ user_id → users.id<br>
+              └─ role → owner | collaborator<br>
+              <br>
+              <strong>校验逻辑：</strong><br>
+              全局能力 → 查 user_capabilities<br>
+              资源级能力 → 查 project_members
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)" style="margin-bottom: 16px;">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>方案 B：独立角色 + 资源归属（重构角色）</h3>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px;">
+        <div class="pros-cons">
+          <div class="pros"><h4>优点</h4><ul>
+            <li>语义清晰：角色和资源归属分离</li>
+            <li>开发者身份由项目归属隐式获得</li>
+            <li>天然支持"有项目=开发者，无项目=普通用户"</li>
+          </ul></div>
+          <div class="cons"><h4>缺点</h4><ul>
+            <li>需要重构 role 推断逻辑</li>
+            <li>dev 不再是全局角色</li>
+            <li>运维手动分配开发者权限的场景需要特殊处理</li>
+          </ul></div>
+        </div>
+        <div>
+          <div class="mockup" style="font-size: 11px;">
+            <div class="mockup-header">数据模型</div>
+            <div class="mockup-body" style="padding: 10px; font-family: monospace; font-size: 11px; line-height: 1.6;">
+              <strong>users.role</strong> → 只保留 user | ops<br>
+              <em>dev 不再是全局角色</em><br>
+              <br>
+              <strong>project_members</strong>（新增）<br>
+              ├─ project_id → projects.id<br>
+              ├─ user_id → users.id<br>
+              └─ role → owner | collaborator<br>
+              <br>
+              <strong>校验逻辑：</strong><br>
+              有项目成员记录 → 自动获得<br>
+              dev_panel_access + 项目级权限<br>
+              无项目成员记录 → 普通用户
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)" style="margin-bottom: 16px;">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>方案 C：混合方案 + 组织支持（最完整）</h3>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px;">
+        <div class="pros-cons">
+          <div class="pros"><h4>优点</h4><ul>
+            <li>最完整的模型，支持组织概念</li>
+            <li>capability 做全局权限，project_members 做资源级权限</li>
+            <li>保留 dev 作为全局角色，同时支持项目级归属</li>
+            <li>项目可属于个人或组织</li>
+          </ul></div>
+          <div class="cons"><h4>缺点</h4><ul>
+            <li>复杂度最高</li>
+            <li>需要新增 organizations 表</li>
+            <li>开发量最大</li>
+          </ul></div>
+        </div>
+        <div>
+          <div class="mockup" style="font-size: 11px;">
+            <div class="mockup-header">数据模型</div>
+            <div class="mockup-body" style="padding: 10px; font-family: monospace; font-size: 11px; line-height: 1.6;">
+              <strong>users.role</strong> → user | dev | ops<br>
+              <em>保留 dev 全局角色</em><br>
+              <br>
+              <strong>organizations</strong>（新增）<br>
+              ├─ id, name, slug, avatar_url<br>
+              └─ description<br>
+              <br>
+              <strong>organization_members</strong>（新增）<br>
+              ├─ org_id → organizations.id<br>
+              ├─ user_id → users.id<br>
+              └─ role → owner | admin | member<br>
+              <br>
+              <strong>project_members</strong>（新增）<br>
+              ├─ project_id → projects.id<br>
+              ├─ user_id → users.id <em>或</em><br>
+              ├─ org_id → organizations.id<br>
+              └─ role → owner | collaborator
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div style="margin-top: 20px; background: #f0fdf4; border-radius: 12px; padding: 16px; border: 1px solid #86efac;">
+  <h3 style="margin: 0 0 8px 0; color: #166534; font-size: 14px;">💡 关于"组织"的思考</h3>
+  <div style="font-size: 12px; color: #166534; line-height: 1.8;">
+    <p>你提到的"项目可能属于组织"是个很好的点。这引出了两种子模型：</p>
+    <p><strong>子模型 1：扁平模式</strong> — 项目直接关联开发者，不引入组织概念。一个项目有多个成员，简单直接。</p>
+    <p><strong>子模型 2：组织模式</strong> — 引入组织/团队概念，项目可属于组织，组织下有多个成员。类似 GitHub 的 Organization 模型。</p>
+    <p style="color: #92400e;">⚠️ 建议：可以先做扁平模式（MVP），后续再扩展组织模式。组织模式可以渐进式加入，不需要一开始就做。</p>
+  </div>
+</div>

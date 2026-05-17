@@ -1,0 +1,54 @@
+<h2>需求汇总：三层权限两个后台</h2>
+<p class="subtitle">基于讨论确认的核心需求</p>
+
+<div class="section">
+  <h3>🟢 用户权限（默认拥有）</h3>
+  <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px;">
+    <span style="background: #dcfce7; color: #166534; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 500;">评论</span>
+    <span style="background: #dcfce7; color: #166534; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 500;">上传头像</span>
+    <span style="background: #dcfce7; color: #166534; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 500;">更改头像</span>
+    <span style="background: #dcfce7; color: #166534; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 500;">提交反馈</span>
+    <span style="background: #dcfce7; color: #166534; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 500;">提交项目</span>
+    <span style="background: #dcfce7; color: #166534; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 500;">修改个人资料</span>
+  </div>
+  <p style="font-size: 12px; color: #64748b; margin-top: 8px;">📍 操作入口：前端主站（/me、项目详情页）| 新注册用户默认拥有全部用户权限</p>
+</div>
+
+<div class="section">
+  <h3>🔵 开发者权限（获得项目后自动拥有）</h3>
+  <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px;">
+    <span style="background: #dbeafe; color: #1e40af; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 500;">编辑自己的项目</span>
+    <span style="background: #dbeafe; color: #1e40af; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 500;">处理项目 Bug 反馈</span>
+    <span style="background: #dbeafe; color: #1e40af; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 500;">管理项目评论</span>
+    <span style="background: #dbeafe; color: #1e40af; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 500;">查看项目数据</span>
+  </div>
+  <p style="font-size: 12px; color: #64748b; margin-top: 8px;">📍 操作入口：开发者后台（/dev）| 侧边栏风格，复用运维后台控件</p>
+  <div style="background: #eff6ff; border-radius: 8px; padding: 10px; margin-top: 8px; font-size: 12px; color: #1e40af;">
+    <strong>获得开发者权限的三种方式：</strong><br>
+    ① 提交项目 → 自动成为该项目所有者<br>
+    ② 运维主动收录项目 → 开发者注册后认领<br>
+    ③ 运维手动分配 → 将用户添加为项目协作者
+  </div>
+</div>
+
+<div class="section">
+  <h3>🟣 运维权限（手动分配）</h3>
+  <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px;">
+    <span style="background: #fce7f3; color: #9d174d; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 500;">全局项目管理</span>
+    <span style="background: #fce7f3; color: #9d174d; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 500;">用户管理</span>
+    <span style="background: #fce7f3; color: #9d174d; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 500;">内容审核</span>
+    <span style="background: #fce7f3; color: #9d174d; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 500;">系统配置</span>
+    <span style="background: #fce7f3; color: #9d174d; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 500;">审计日志</span>
+  </div>
+  <p style="font-size: 12px; color: #64748b; margin-top: 8px;">📍 操作入口：运维后台（/admin）| 已有完整实现</p>
+</div>
+
+<div style="margin-top: 20px; background: #f8fafc; border-radius: 12px; padding: 16px; border: 1px solid #e2e8f0;">
+  <h3 style="margin: 0 0 12px 0; font-size: 14px;">🔗 关键设计约束</h3>
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 12px;">
+    <div style="background: white; padding: 8px; border-radius: 6px;">✅ 项目 = 所有者 + 协作者</div>
+    <div style="background: white; padding: 8px; border-radius: 6px;">✅ 多角色可叠加</div>
+    <div style="background: white; padding: 8px; border-radius: 6px;">✅ 用户权限纳入 capability</div>
+    <div style="background: white; padding: 8px; border-radius: 6px;">✅ 开发者权限限定在"自己的项目"</div>
+  </div>
+</div>

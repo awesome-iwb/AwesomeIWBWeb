@@ -74,10 +74,19 @@ const submissionId = ref('');
 const uploadImage = async (blob: Blob): Promise<string | null> => {
   const fd = new FormData();
   fd.append('image', blob, 'upload.webp');
-  const res = await apiFetch(API.upload.image, { method: 'POST', body: fd });
-  const json = await res.json();
-  if (!res.ok) throw new Error(json?.error ?? '上传失败');
-  return String(json?.url ?? '');
+  try {
+    const res = await apiFetch(API.upload.image, { method: 'POST', body: fd });
+    const json = await res.json();
+    if (!res.ok) {
+      const msg = json?.error?.message || json?.error || json?.message || '上传失败';
+      throw new Error(typeof msg === 'string' ? msg : '上传失败');
+    }
+    const url = json?.url;
+    if (!url) throw new Error('上传返回无效');
+    return String(url);
+  } catch (e: any) {
+    throw new Error(e?.message || '图片上传失败，请重试');
+  }
 };
 
 const iconInputRef = ref<HTMLInputElement | null>(null);
@@ -155,8 +164,8 @@ const handleSubmit = async () => {
       status: form.value.status,
       recommendation: form.value.recommendation,
     };
-    if (iconUrl.value) payload.icon_url = iconUrl.value;
-    if (bannerUrl.value) payload.banner_url = bannerUrl.value;
+    if (iconUrl.value) payload.icon = iconUrl.value;
+    if (bannerUrl.value) payload.banner = bannerUrl.value;
 
     const response = await apiFetch(API.submissions.list, {
       method: 'POST',
@@ -188,17 +197,16 @@ const handleSubmit = async () => {
       
       <div v-if="!isSubmitted">
         <!-- Live Preview Header -->
-        <div class="flex flex-col sm:flex-row gap-6 sm:gap-8 items-start mb-12 opacity-80 pointer-events-none select-none relative">
+        <div class="flex flex-col sm:flex-row gap-4 sm:gap-6 items-center sm:items-start mb-10 opacity-80 pointer-events-none select-none relative">
           <div class="absolute inset-0 flex items-center justify-center z-20">
-            <div class="bg-white/80 dark:bg-black/80 backdrop-blur-sm px-4 py-2 rounded-full font-bold text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 shadow-lg flex items-center gap-2">
-              <Sparkles class="w-4 h-4" />
-              实时预览效果
+            <div class="bg-white/80 dark:bg-black/80 backdrop-blur-sm px-3 py-1.5 rounded-full font-bold text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 shadow-lg flex items-center gap-1.5 text-xs sm:text-sm">
+              <Sparkles class="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              实时预览
             </div>
           </div>
           
-          <!-- App Icon Preview -->
           <div class="relative shrink-0 group drop-shadow-xl">
-            <div class="w-28 h-28 sm:w-36 sm:h-36 z-10 flex items-center justify-center relative rounded-3xl overflow-hidden bg-slate-100 dark:bg-slate-800">
+            <div class="w-20 h-20 sm:w-36 sm:h-36 z-10 flex items-center justify-center relative rounded-2xl sm:rounded-3xl overflow-hidden bg-slate-100 dark:bg-slate-800">
               <img 
                 v-if="iconUrl"
                 :src="iconUrl" 
@@ -209,17 +217,16 @@ const handleSubmit = async () => {
                 :src="getFallbackImage(form.name)" 
                 class="w-full h-full object-contain opacity-50"
               />
-              <ImageIcon v-else class="w-12 h-12 text-slate-300 dark:text-slate-600 absolute" />
+              <ImageIcon v-else class="w-8 h-8 sm:w-12 sm:h-12 text-slate-300 dark:text-slate-600 absolute" />
             </div>
           </div>
 
-          <!-- Title & Meta Preview -->
-          <div class="flex-1 flex flex-col pt-2 w-full">
-            <h1 class="text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white mb-2 leading-tight">
+          <div class="flex-1 flex flex-col w-full text-center sm:text-left">
+            <h1 class="text-2xl sm:text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white mb-2 leading-tight">
               {{ form.name || '项目名称' }}
             </h1>
             
-            <div class="flex items-center gap-3 mb-4">
+            <div class="flex items-center gap-3 mb-3 justify-center sm:justify-start">
               <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100 dark:bg-slate-800/80 border border-slate-200/50 dark:border-slate-700 w-fit">
                 <img 
                   :src="getFallbackImage(form.developer || '?')" 
@@ -229,11 +236,11 @@ const handleSubmit = async () => {
               </div>
             </div>
             
-            <div class="flex flex-wrap gap-2 mb-6">
-              <span v-for="tag in form.tags.split(/[,，、\s]+/).filter(t => t.trim()).slice(0,3)" :key="tag" class="px-2.5 py-1 rounded-md bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-medium border border-emerald-200/50 dark:border-emerald-500/20">
+            <div class="flex flex-wrap gap-1.5 mb-4 justify-center sm:justify-start">
+              <span v-for="tag in form.tags.split(/[,，、\s]+/).filter(t => t.trim()).slice(0,3)" :key="tag" class="px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-medium border border-emerald-200/50 dark:border-emerald-500/20">
                 {{ tag }}
               </span>
-              <span v-if="!form.tags" class="px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-400 text-xs font-medium border border-dashed border-slate-300 dark:border-slate-700">
+              <span v-if="!form.tags" class="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-400 text-xs font-medium border border-dashed border-slate-300 dark:border-slate-700">
                 功能特性预览
               </span>
             </div>
@@ -241,7 +248,7 @@ const handleSubmit = async () => {
         </div>
 
         <!-- Form Section -->
-        <div class="bg-white dark:bg-[#111827] rounded-3xl p-6 sm:p-10 border border-slate-200/80 dark:border-slate-800/80 shadow-xl shadow-slate-200/50 dark:shadow-none">
+        <div class="bg-white dark:bg-[#111827] rounded-3xl p-4 sm:p-10 border border-slate-200/80 dark:border-slate-800/80 shadow-xl shadow-slate-200/50 dark:shadow-none">
           <h2 class="text-xl font-bold mb-8 flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-4">
             <Layers class="w-5 h-5 text-emerald-500" /> 填写项目信息
           </h2>
@@ -250,10 +257,9 @@ const handleSubmit = async () => {
           <div class="mb-8 space-y-4">
             <div class="text-sm font-bold text-slate-700 dark:text-slate-300">项目图片</div>
             
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <!-- Icon Upload -->
-              <div class="space-y-2">
-                <div class="text-xs font-medium text-slate-500 dark:text-slate-400">应用图标（正方形）</div>
+            <div class="flex gap-4">
+              <div class="w-28 sm:w-36 shrink-0 space-y-1.5">
+                <div class="text-xs font-medium text-slate-500 dark:text-slate-400">图标</div>
                 <div class="relative group">
                   <div 
                     class="w-full aspect-square rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 flex flex-col items-center justify-center cursor-pointer hover:border-emerald-400 dark:hover:border-emerald-500 transition-colors overflow-hidden"
@@ -262,25 +268,23 @@ const handleSubmit = async () => {
                   >
                     <img v-if="iconUrl" :src="iconUrl" class="w-full h-full object-cover" />
                     <template v-else>
-                      <Upload class="w-8 h-8 text-slate-300 dark:text-slate-600 mb-2" />
-                      <div class="text-sm font-medium text-slate-400 dark:text-slate-500">点击上传图标</div>
-                      <div class="text-xs text-slate-400 dark:text-slate-600 mt-1">支持裁剪</div>
+                      <Upload class="w-6 h-6 text-slate-300 dark:text-slate-600 mb-1" />
+                      <div class="text-xs font-medium text-slate-400 dark:text-slate-500">图标</div>
                     </template>
                   </div>
                   <button 
                     v-if="iconUrl"
                     @click.stop="removeIcon"
-                    class="absolute top-2 right-2 p-1.5 rounded-full bg-rose-500 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                    class="absolute top-1.5 right-1.5 p-1 rounded-full bg-rose-500 text-white opacity-0 group-hover:opacity-100 transition-opacity"
                   >
-                    <X class="w-3.5 h-3.5" />
+                    <X class="w-3 h-3" />
                   </button>
                 </div>
                 <input ref="iconInputRef" type="file" accept="image/png,image/jpeg,image/webp" class="hidden" @change="handleFileSelected($event, 'icon')" />
               </div>
 
-              <!-- Banner Upload -->
-              <div class="space-y-2">
-                <div class="text-xs font-medium text-slate-500 dark:text-slate-400">Banner 图（横幅）</div>
+              <div class="flex-1 space-y-1.5">
+                <div class="text-xs font-medium text-slate-500 dark:text-slate-400">Banner 横幅图</div>
                 <div class="relative group">
                   <div 
                     class="w-full aspect-video rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 flex flex-col items-center justify-center cursor-pointer hover:border-emerald-400 dark:hover:border-emerald-500 transition-colors overflow-hidden"
@@ -289,17 +293,17 @@ const handleSubmit = async () => {
                   >
                     <img v-if="bannerUrl" :src="bannerUrl" class="w-full h-full object-cover" />
                     <template v-else>
-                      <Upload class="w-8 h-8 text-slate-300 dark:text-slate-600 mb-2" />
-                      <div class="text-sm font-medium text-slate-400 dark:text-slate-500">点击上传 Banner</div>
-                      <div class="text-xs text-slate-400 dark:text-slate-600 mt-1">16:9 横幅图</div>
+                      <Upload class="w-6 h-6 text-slate-300 dark:text-slate-600 mb-1" />
+                      <div class="text-xs font-medium text-slate-400 dark:text-slate-500">点击上传 Banner</div>
+                      <div class="text-[10px] text-slate-400 dark:text-slate-600 mt-0.5">16:9 横幅图</div>
                     </template>
                   </div>
                   <button 
                     v-if="bannerUrl"
                     @click.stop="removeBanner"
-                    class="absolute top-2 right-2 p-1.5 rounded-full bg-rose-500 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                    class="absolute top-1.5 right-1.5 p-1 rounded-full bg-rose-500 text-white opacity-0 group-hover:opacity-100 transition-opacity"
                   >
-                    <X class="w-3.5 h-3.5" />
+                    <X class="w-3 h-3" />
                   </button>
                 </div>
                 <input ref="bannerInputRef" type="file" accept="image/png,image/jpeg,image/webp" class="hidden" @change="handleFileSelected($event, 'banner')" />

@@ -11,17 +11,14 @@
       </select>
     </div>
 
-    <div v-if="loading" class="flex items-center justify-center py-20">
-      <div class="w-8 h-8 border-3 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-    </div>
+    <ui-LoadingSpinner v-if="loading" brand="dev" />
 
-    <div v-else-if="comments.length === 0" class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-10 text-center">
-      <MessageSquare class="w-12 h-12 mx-auto mb-3 text-slate-300 dark:text-slate-600" />
-      <p class="text-slate-500 dark:text-slate-400 text-sm">暂无评论</p>
+    <div v-else-if="comments.length === 0" class="bg-white/72 dark:bg-slate-900/62 backdrop-blur-lg rounded-3xl border border-white/70 dark:border-slate-700/70 shadow-xl shadow-slate-900/8 dark:shadow-black/30">
+      <ui-EmptyState :icon="MessageSquare" title="暂无评论" containerClass="p-10" />
     </div>
 
     <div v-else class="space-y-3">
-      <div v-for="comment in comments" :key="comment.id" class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+      <div v-for="comment in comments" :key="comment.id" class="bg-white/72 dark:bg-slate-900/62 backdrop-blur-lg rounded-3xl border border-white/70 dark:border-slate-700/70 shadow-xl shadow-slate-900/8 dark:shadow-black/30 overflow-hidden">
         <div class="p-4 lg:p-5">
           <div class="flex items-start justify-between gap-3">
             <div class="flex-1 min-w-0">
@@ -45,11 +42,7 @@
       </div>
     </div>
 
-    <div v-if="totalPages > 1" class="flex items-center justify-between text-sm pt-2">
-      <button @click="prevPage" :disabled="page <= 1" class="px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed">上一页</button>
-      <div class="text-slate-500 dark:text-slate-300">{{ page }} / {{ totalPages }}</div>
-      <button @click="nextPage" :disabled="page >= totalPages" class="px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed">下一页</button>
-    </div>
+    <ui-Pagination v-model:page="page" :total="total" :page-size="20" />
 
     <div v-if="showReplyModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
       <div class="w-full max-w-lg bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-2xl overflow-hidden">
@@ -74,10 +67,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, watch } from 'vue';
 import { adminFetch, formatAdminError } from '../../composables/useAdminFetch';
 import { API } from '../../api/endpoints';
 import { MessageSquare } from 'lucide-vue-next';
+import { Pagination as uiPagination, LoadingSpinner as uiLoadingSpinner, EmptyState as uiEmptyState } from '../../components/ui';
 
 const comments = ref<any[]>([]);
 const page = ref(1);
@@ -91,8 +85,6 @@ const showReplyModal = ref(false);
 const replyCommentId = ref('');
 const replyBody = ref('');
 const isReplying = ref(false);
-
-const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize.value)));
 
 const formatTime = (v: string) => {
   try {
@@ -166,8 +158,7 @@ const submitReply = async () => {
   }
 };
 
-const prevPage = () => { if (page.value > 1) { page.value--; fetchComments(); } };
-const nextPage = () => { if (page.value < totalPages.value) { page.value++; fetchComments(); } };
+watch(page, fetchComments);
 
 onMounted(fetchComments);
 </script>

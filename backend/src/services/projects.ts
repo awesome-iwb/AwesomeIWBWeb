@@ -1,6 +1,7 @@
 import { sql } from "../db/client";
 import { newSlug } from "../utils/slug";
 import { normalizeProjectTags } from "../domain/projectTags";
+import { normalizeProjectInput } from "../domain/normalizeProjectInput";
 
 export type CategoryRow = {
   id: string;
@@ -39,6 +40,10 @@ export type ProjectRow = {
   github_parent_url: string;
   github_source_url: string;
   extra: any;
+  organization_id: string | null;
+  developer_user_id: string | null;
+  organization_name?: string | null;
+  developer_user_name?: string | null;
 };
 
 /**
@@ -61,9 +66,11 @@ export async function listCategories() {
 export async function getCatalog() {
   const categories = await listCategories();
   const projects = await sql()<ProjectRow[]>`
-    select id, slug, name, category_id, developer, status, version, ai_usage_state, description, keywords, recommendation, github_url, avatar, icon, banner, stars, language, last_update, github_is_fork, github_parent_url, github_source_url, extra
-    from projects
-    order by name asc
+    select p.*, o.name as organization_name, u.name as developer_user_name
+    from projects p
+    left join organizations o on o.id = p.organization_id
+    left join users u on u.id = p.developer_user_id
+    order by p.name asc
   `;
   const normalizedProjects = projects.map(normalizeProjectTags);
   return {
@@ -156,26 +163,28 @@ export async function listProjects(params: {
 
   const orderBy =
     sort === "stars"
-      ? db`stars desc nulls last, name asc`
+      ? db`p.stars desc nulls last, p.name asc`
       : sort === "updated"
-        ? db`last_update desc nulls last, name asc`
-        : db`name asc`;
+        ? db`p.last_update desc nulls last, p.name asc`
+        : db`p.name asc`;
 
   const whereParts = [];
-  if (q) whereParts.push(sql()`(name ilike ${"%" + q + "%"} or developer ilike ${"%" + q + "%"} or ${q} = any(keywords))`);
-  if (category) whereParts.push(sql()`category_id = ${category}`);
+  if (q) whereParts.push(sql()`(p.name ilike ${"%" + q + "%"} or p.developer ilike ${"%" + q + "%"} or ${q} = any(p.keywords))`);
+  if (category) whereParts.push(sql()`p.category_id = ${category}`);
   const where = whereParts.length ? sql().join(whereParts, sql()` and `) : sql()`true`;
 
   const items = await sql()<ProjectRow[]>`
-    select id, slug, name, category_id, developer, status, version, ai_usage_state, description, keywords, recommendation, github_url, avatar, icon, banner, stars, language, last_update, github_is_fork, github_parent_url, github_source_url, extra
-    from projects
+    select p.*, o.name as organization_name, u.name as developer_user_name
+    from projects p
+    left join organizations o on o.id = p.organization_id
+    left join users u on u.id = p.developer_user_id
     where ${where}
     order by ${orderBy}
     limit ${pageSize} offset ${offset}
   `;
 
   const [{ count }] = await sql()<Array<{ count: string }>>`
-    select count(*)::text as count from projects where ${where}
+    select count(*)::text as count from projects p where ${where}
   `;
 
   return { items: items.map(normalizeProjectTags), page, pageSize, total: Number(count) };
@@ -186,9 +195,11 @@ export async function listProjects(params: {
  */
 export async function getProjectById(id: string) {
   const rows = await sql()<ProjectRow[]>`
-    select id, slug, name, category_id, developer, status, version, ai_usage_state, description, keywords, recommendation, github_url, avatar, icon, banner, stars, language, last_update, github_is_fork, github_parent_url, github_source_url, extra
-    from projects
-    where id = ${id}
+    select p.*, o.name as organization_name, u.name as developer_user_name
+    from projects p
+    left join organizations o on o.id = p.organization_id
+    left join users u on u.id = p.developer_user_id
+    where p.id = ${id}
     limit 1
   `;
   return rows[0] ? normalizeProjectTags(rows[0]) : null;
@@ -202,17 +213,21 @@ export async function getProjectById(id: string) {
 export async function getProjectByKey(key: string) {
   const keyTrim = key.trim();
   const bySlug = await sql()<ProjectRow[]>`
-    select id, slug, name, category_id, developer, status, version, ai_usage_state, description, keywords, recommendation, github_url, avatar, icon, banner, stars, language, last_update, github_is_fork, github_parent_url, github_source_url, extra
-    from projects
-    where slug = ${keyTrim}
+    select p.*, o.name as organization_name, u.name as developer_user_name
+    from projects p
+    left join organizations o on o.id = p.organization_id
+    left join users u on u.id = p.developer_user_id
+    where p.slug = ${keyTrim}
     limit 1
   `;
   if (bySlug[0]) return normalizeProjectTags(bySlug[0]);
 
   const byName = await sql()<ProjectRow[]>`
-    select id, slug, name, category_id, developer, status, version, ai_usage_state, description, keywords, recommendation, github_url, avatar, icon, banner, stars, language, last_update, github_is_fork, github_parent_url, github_source_url, extra
-    from projects
-    where lower(name) = lower(${keyTrim})
+    select p.*, o.name as organization_name, u.name as developer_user_name
+    from projects p
+    left join organizations o on o.id = p.organization_id
+    left join users u on u.id = p.developer_user_id
+    where lower(p.name) = lower(${keyTrim})
     limit 2
   `;
   return byName.length === 1 ? normalizeProjectTags(byName[0]) : null;
@@ -227,7 +242,7 @@ export async function getProjectByKey(key: string) {
 export async function createProject(input: Partial<ProjectRow> & { name: string }) {
   const slug = input.slug?.trim() || newSlug();
   const [row] = await sql()<ProjectRow[]>`
-    insert into projects (slug, name, category_id, developer, status, version, ai_usage_state, description, keywords, recommendation, github_url, avatar, icon, banner, stars, language, last_update, github_is_fork, github_parent_url, github_source_url, extra)
+    insert into projects (slug, name, category_id, developer, status, version, ai_usage_state, description, keywords, recommendation, github_url, avatar, icon, banner, stars, language, last_update, github_is_fork, github_parent_url, github_source_url, extra, organization_id, developer_user_id)
     values (
       ${slug},
       ${input.name},
@@ -250,18 +265,78 @@ export async function createProject(input: Partial<ProjectRow> & { name: string 
       ,${input.github_parent_url ?? ""}
       ,${input.github_source_url ?? ""}
       ,${input.extra ?? {}}
+      ,${input.organization_id ?? null}
+      ,${input.developer_user_id ?? null}
     )
-    returning id, slug, name, category_id, developer, status, version, ai_usage_state, description, keywords, recommendation, github_url, avatar, icon, banner, stars, language, last_update, github_is_fork, github_parent_url, github_source_url, extra
+    returning id, slug, name, category_id, developer, status, version, ai_usage_state, description, keywords, recommendation, github_url, avatar, icon, banner, stars, language, last_update, github_is_fork, github_parent_url, github_source_url, extra, organization_id, developer_user_id
   `;
   return row;
 }
 
 /**
+ * Fields any project member with `dev:project_edit` may change via `PATCH /api/dev/projects/:id`.
+ * (Curatorial / catalog fields such as category and editors-choice stay admin-only.)
+ */
+export function extractDevProjectBaselinePatch(payload: unknown): Partial<ProjectRow> {
+  if (!payload || typeof payload !== "object") return {};
+  const p = payload as Record<string, unknown>;
+  const n = normalizeProjectInput(p);
+  const out: Partial<ProjectRow> = {};
+  if (Object.prototype.hasOwnProperty.call(p, "name") && typeof n.name === "string") out.name = n.name;
+  if (Object.prototype.hasOwnProperty.call(p, "description") && typeof n.description === "string") out.description = n.description;
+  if (Object.prototype.hasOwnProperty.call(p, "github_url") && typeof n.github_url === "string") out.github_url = n.github_url;
+  if (Object.prototype.hasOwnProperty.call(p, "language") && typeof n.language === "string") out.language = n.language;
+  if (Object.prototype.hasOwnProperty.call(p, "status") && typeof n.status === "string") out.status = n.status;
+  if (Object.prototype.hasOwnProperty.call(p, "version") && typeof n.version === "string") out.version = n.version;
+  if (Object.prototype.hasOwnProperty.call(p, "keywords") && n.keywords !== undefined) out.keywords = n.keywords;
+  return out;
+}
+
+function recommendationToArray(v: unknown): string[] {
+  if (Array.isArray(v)) return v.map((x) => String(x).trim()).filter(Boolean);
+  if (typeof v === "string" && v.trim()) return [v.trim()];
+  return [];
+}
+
+/**
+ * Media + metadata fields only allowed for project owner with `dev:project_admin`
+ * (see `PATCH /api/dev/projects/:id` handler).
+ */
+export function extractDevProjectOwnerAdminPatch(payload: unknown): Partial<ProjectRow> {
+  if (!payload || typeof payload !== "object") return {};
+  const p = payload as Record<string, unknown>;
+  const n = normalizeProjectInput(p);
+  const out: Partial<ProjectRow> = {};
+  if (Object.prototype.hasOwnProperty.call(p, "icon") && typeof n.icon === "string") out.icon = n.icon;
+  if (Object.prototype.hasOwnProperty.call(p, "banner") && typeof n.banner === "string") out.banner = n.banner;
+  if (Object.prototype.hasOwnProperty.call(p, "avatar") && typeof n.avatar === "string") out.avatar = n.avatar;
+  if (Object.prototype.hasOwnProperty.call(p, "extra")) {
+    out.extra = typeof p.extra === "object" && p.extra ? (p.extra as object) : (n.extra ?? {});
+  }
+  if (Object.prototype.hasOwnProperty.call(p, "stars") && n.stars !== undefined) out.stars = n.stars;
+  if (Object.prototype.hasOwnProperty.call(p, "ai_usage_state") && typeof n.ai_usage_state === "string") out.ai_usage_state = n.ai_usage_state;
+  if (Object.prototype.hasOwnProperty.call(p, "recommendation")) {
+    const r = n.recommendation;
+    out.recommendation = recommendationToArray(r !== undefined ? r : p.recommendation);
+  }
+  if (Object.prototype.hasOwnProperty.call(p, "last_update") && (n.last_update === null || typeof n.last_update === "string")) {
+    out.last_update = n.last_update ?? null;
+  }
+  if (Object.prototype.hasOwnProperty.call(p, "github_is_fork") && typeof n.github_is_fork === "boolean") out.github_is_fork = n.github_is_fork;
+  if (Object.prototype.hasOwnProperty.call(p, "github_parent_url") && typeof n.github_parent_url === "string") out.github_parent_url = n.github_parent_url;
+  if (Object.prototype.hasOwnProperty.call(p, "github_source_url") && typeof n.github_source_url === "string") out.github_source_url = n.github_source_url;
+  return out;
+}
+
+/**
  * Update a project row by id.
  *
- * The update uses `coalesce` so callers may send partial payloads.
+ * Uses `coalesce` for most fields so callers may send partial payloads.
+ * `organization_id` and `developer_user_id` honor explicit `null` to clear when the key is present.
  */
 export async function updateProject(id: string, input: Partial<ProjectRow>) {
+  const hasOrg = Object.prototype.hasOwnProperty.call(input, "organization_id");
+  const hasDev = Object.prototype.hasOwnProperty.call(input, "developer_user_id");
   const [row] = await sql()<ProjectRow[]>`
     update projects
     set
@@ -285,9 +360,11 @@ export async function updateProject(id: string, input: Partial<ProjectRow>) {
       github_parent_url = coalesce(${input.github_parent_url ?? null}, github_parent_url),
       github_source_url = coalesce(${input.github_source_url ?? null}, github_source_url),
       extra = coalesce(${input.extra ?? null}, extra),
+      organization_id = case when ${hasOrg} then ${input.organization_id ?? null} else projects.organization_id end,
+      developer_user_id = case when ${hasDev} then ${input.developer_user_id ?? null} else projects.developer_user_id end,
       updated_at = now()
     where id = ${id}
-    returning id, slug, name, category_id, developer, status, version, ai_usage_state, description, keywords, recommendation, github_url, avatar, icon, banner, stars, language, last_update, github_is_fork, github_parent_url, github_source_url, extra
+    returning id, slug, name, category_id, developer, status, version, ai_usage_state, description, keywords, recommendation, github_url, avatar, icon, banner, stars, language, last_update, github_is_fork, github_parent_url, github_source_url, extra, organization_id, developer_user_id
   `;
   return row ?? null;
 }

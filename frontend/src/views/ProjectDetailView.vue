@@ -8,6 +8,7 @@ import ProjectLineageGraph from '../components/ProjectLineageGraph.vue';
 import CommentPanel from '../components/CommentPanel.vue';
 import { computeCursorFrames } from '../utils/captchaCursor';
 import { useProjects } from '../composables/useProjects';
+import { useAnalytics } from '../composables/useAnalytics';
 import type { Project } from '../composables/useProjects';
 import type { ProjectDeveloper } from '../composables/useProjects';
 import { 
@@ -28,6 +29,7 @@ import {
 const route = useRoute();
 const router = useRouter();
 const { fetchProjectByName, allProjects, fetchProjects } = useProjects();
+const { trackClick } = useAnalytics();
 const loading = ref(true);
 
 const project = ref<Project | null>(null);
@@ -508,6 +510,7 @@ if (allProjects.value.length === 0) {
               :href="project?.github_url" 
               target="_blank" 
               class="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-3.5 rounded-2xl font-bold shadow-lg shadow-emerald-600/20 hover:shadow-emerald-600/40 transition-all hover:-translate-y-0.5 active:translate-y-0"
+              @click="trackClick(project?.slug || '', 'download')"
             >
               <Download class="w-5 h-5" />
               Get App
@@ -517,6 +520,7 @@ if (allProjects.value.length === 0) {
               target="_blank" 
               class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors"
               title="View Source Code"
+              @click="trackClick(project?.slug || '', 'github')"
             >
               <Github class="w-6 h-6" />
             </a>

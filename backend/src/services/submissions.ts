@@ -1,10 +1,14 @@
 import { sql } from "../db/client";
 
-export async function createSubmission(payload: any) {
+export async function createSubmission(
+  payload: any,
+  meta?: { submitter_user_id?: string | null }
+) {
+  const submitterMeta = { submitter_user_id: meta?.submitter_user_id ?? null };
   const [row] = await sql()<Array<any>>`
     insert into project_submissions (status, payload, submitter_meta)
-    values ('pending', ${payload}, ${{} as any})
-    returning id, status, payload, review_note, created_at, updated_at
+    values ('pending', ${payload}, ${sql().json(submitterMeta as any)})
+    returning id, status, payload, submitter_meta, review_note, created_at, updated_at
   `;
   return row;
 }
@@ -26,7 +30,7 @@ export async function listSubmissions(params: { status?: string; q?: string; pag
   }
 
   const items = await sql()<Array<any>>`
-    select id, status, payload, review_note, created_at, updated_at
+    select id, status, payload, submitter_meta, review_note, created_at, updated_at
     from project_submissions
     where ${where}
     order by created_at desc
@@ -44,7 +48,7 @@ export async function listSubmissions(params: { status?: string; q?: string; pag
 
 export async function getSubmission(id: string) {
   const rows = await sql()<Array<any>>`
-    select id, status, payload, review_note, created_at, updated_at
+    select id, status, payload, submitter_meta, review_note, created_at, updated_at
     from project_submissions
     where id = ${id}
     limit 1
@@ -57,7 +61,7 @@ export async function updateSubmissionStatus(id: string, status: string, reviewN
     update project_submissions
     set status = ${status}, review_note = ${reviewNote ?? ""}, updated_at = now()
     where id = ${id}
-    returning id, status, payload, review_note, created_at, updated_at
+    returning id, status, payload, submitter_meta, review_note, created_at, updated_at
   `;
   return row ?? null;
 }

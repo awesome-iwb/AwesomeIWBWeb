@@ -1,66 +1,87 @@
 <template>
-  <FloatingPanel
-    ref="panelRef"
-    :selected-label="selectedProjectId ? projectDraft?.name : ''"
-    placeholder="选择一个项目"
-    list-label="项目列表"
-    :count="projectsPage.total"
-    :prev-enabled="projectsPage.page > 1"
-    :next-enabled="projectsPage.page < Math.ceil(projectsPage.total / projectsPage.pageSize)"
-    @prev="prevProjectPage"
-    @next="nextProjectPage"
+  <div class="h-full min-h-0">
+  <ui-ListDetailLayout
+    :selected-id="selectedProjectId"
+    :selected-item-label="projectDraft?.name"
+    :selected-item-icon="Package"
+    :searchable="false"
+    :infinite="true"
+    :has-more="projectsHasMore"
+    :loading-more="projectsLoadingMore"
+    list-title="项目列表"
+    detail-title="项目详情"
+    @load-more="loadMoreProjects"
+    @back="selectedProjectId = null, projectDraft = null"
   >
-    <template #content>
-      <div v-if="projectDraft" class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col">
-        <div class="p-4 lg:p-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50 flex items-start justify-between gap-4">
-          <div>
-            <h2 class="text-lg lg:text-xl font-bold text-slate-800 dark:text-white flex items-center gap-3">
-              正在编辑: <span class="text-blue-500">{{ projectDraft.name }}</span>
+    <template #detail>
+      <div v-if="projectDraft" class="bg-white/72 dark:bg-slate-900/62 backdrop-blur-lg rounded-3xl border border-white/70 dark:border-slate-700/70 shadow-xl shadow-slate-900/8 dark:shadow-black/30 overflow-hidden flex flex-col h-full min-h-0">
+        <div class="p-4 lg:p-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-4">
+          <div class="min-w-0 w-full lg:w-auto lg:flex-1">
+            <h2 class="text-lg lg:text-xl font-bold text-slate-800 dark:text-white flex flex-wrap items-center gap-x-3 gap-y-1 text-left">
+              正在编辑: <span class="text-emerald-500 break-words">{{ projectDraft.name }}</span>
             </h2>
-            <div v-if="projectDraft.slug" class="text-xs text-slate-500 dark:text-slate-400 mt-1">slug: {{ projectDraft.slug }}</div>
+            <div v-if="projectDraft.slug" class="text-xs text-slate-500 dark:text-slate-400 mt-1 break-all text-left">slug: {{ projectDraft.slug }}</div>
           </div>
-          <div class="flex items-center gap-2">
-            <button v-if="projectDraft.id" @click="openRevisions" class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-sm font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">
+          <div class="flex flex-wrap items-center gap-2 w-full lg:w-auto lg:flex-nowrap lg:justify-end lg:shrink-0">
+            <button v-if="projectDraft.id" @click="openRevisions" type="button" class="shrink-0 px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-sm font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors whitespace-normal text-center">
               历史版本
             </button>
-            <button @click="saveProjects" class="px-4 py-2 rounded-xl bg-blue-500 hover:bg-blue-600 text-white text-sm font-bold shadow-lg shadow-blue-500/20 transition-all flex items-center gap-2">
-              <Save class="w-4 h-4" />
-              {{ isSaving ? '保存中...' : '保存项目' }}
+            <button @click="saveProjects" type="button" class="shrink-0 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold shadow-lg shadow-emerald-500/20 transition-all inline-flex flex-row flex-nowrap items-center justify-center gap-2 whitespace-normal text-left">
+              <Save class="w-4 h-4 shrink-0" />
+              <span>{{ isSaving ? '保存中...' : '保存项目' }}</span>
             </button>
-            <button v-if="projectDraft.id" @click="deleteCurrentProject" class="px-4 py-2 rounded-xl bg-rose-500 hover:bg-rose-600 text-white text-sm font-bold shadow-lg shadow-rose-500/20 transition-all flex items-center gap-2">
+            <button v-if="projectDraft.id" @click="deleteCurrentProject" type="button" class="shrink-0 px-4 py-2 rounded-xl bg-rose-500 hover:bg-rose-600 text-white text-sm font-bold shadow-lg shadow-rose-500/20 transition-all inline-flex flex-row flex-nowrap items-center justify-center gap-2 whitespace-normal text-left">
               删除项目
             </button>
           </div>
         </div>
 
-        <div class="p-4 lg:p-8 space-y-4 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-8 overflow-y-auto" style="max-height: 600px;">
+        <div class="flex-1 min-h-0 p-4 lg:p-8 space-y-4 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-8 overflow-y-auto">
           <div class="lg:col-span-1 space-y-4">
             <div class="lg:col-span-1">
               <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">软件名称</label>
-              <input type="text" v-model="projectDraft.name" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-blue-500 text-base" />
+              <input type="text" v-model="projectDraft.name" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-emerald-500 text-base" />
             </div>
             <div class="lg:col-span-1">
               <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">作者 / 开发者</label>
-              <input type="text" v-model="projectDraft.developer" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-blue-500 text-base" />
+              <SearchSelect
+                :key="`dev-user-${selectedProjectId || 'new'}`"
+                v-model="projectDraft.developer_user_id"
+                :search-fn="searchUsers"
+                placeholder="至少输入 1 个字符搜索用户"
+                :initial-label="projectDraft.developer_user_name || projectDraft.developer || ''"
+                @update:model-value="onDeveloperSelect"
+              />
+            </div>
+            <div class="lg:col-span-1">
+              <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">所属组织</label>
+              <SearchSelect
+                :key="`org-${selectedProjectId || 'new'}`"
+                v-model="projectDraft.organization_id"
+                :search-fn="searchOrganizations"
+                placeholder="至少输入 1 个字符搜索组织"
+                :initial-label="projectDraft.organization_name || ''"
+                @update:model-value="(val) => onOrgSelect(val)"
+              />
             </div>
             <div class="lg:col-span-1">
               <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">一句话简介</label>
-              <textarea v-model="projectDraft.description" rows="2" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-blue-500 resize-none text-base"></textarea>
+              <textarea v-model="projectDraft.description" rows="2" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-emerald-500 resize-none text-base"></textarea>
             </div>
             <div class="lg:col-span-1">
               <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">状态</label>
-              <input type="text" v-model="projectDraft.status" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-blue-500 text-base" placeholder="例如：活跃 / 停更 / 维护中" />
+              <input type="text" v-model="projectDraft.status" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-emerald-500 text-base" placeholder="例如：活跃 / 停更 / 维护中" />
             </div>
             <div class="lg:col-span-1">
               <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">开源仓库 (Repository)</label>
-              <input type="text" v-model="projectDraft.github_url" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-blue-500 text-base" />
+              <input type="text" v-model="projectDraft.github_url" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-emerald-500 text-base" />
             </div>
           </div>
 
           <div class="lg:col-span-1 space-y-4">
             <div class="lg:col-span-1">
               <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">AI 使用率标签</label>
-              <select v-model="projectDraft.ai_usage_state" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-blue-500 text-base">
+              <select v-model="projectDraft.ai_usage_state" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-emerald-500 text-base">
                 <option value="unknown">未知（用户点击后转圈）</option>
                 <option value="under50">未超过 50%</option>
                 <option value="over50">超过 50%</option>
@@ -68,7 +89,7 @@
             </div>
             <div class="lg:col-span-1">
               <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">稳定性标签</label>
-              <select v-model="projectDraft.recommendation" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-blue-500 text-base">
+              <select v-model="projectDraft.recommendation" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-emerald-500 text-base">
                 <option value="">无</option>
                 <option value="稳定">稳定</option>
                 <option value="不稳定">不稳定</option>
@@ -77,18 +98,18 @@
             </div>
             <div class="lg:col-span-1">
               <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">编辑推荐</label>
-              <select v-model="projectDraft.is_editors_choice" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-blue-500 text-base">
+              <select v-model="projectDraft.is_editors_choice" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-emerald-500 text-base">
                 <option :value="false">否</option>
                 <option :value="true">是</option>
               </select>
             </div>
             <div class="lg:col-span-1">
               <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">功能特性 (逗号分隔)</label>
-              <input type="text" v-model="projectDraft.keywords" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-blue-500 text-base" placeholder="例如：白板, 批注, C#" />
+              <input type="text" v-model="projectDraft.keywords" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-emerald-500 text-base" placeholder="例如：白板, 批注, C#" />
             </div>
             <div class="lg:col-span-1">
               <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">所属分类</label>
-              <select v-model="projectDraft.category_id" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-blue-500 text-base">
+              <select v-model="projectDraft.category_id" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-emerald-500 text-base">
                 <option :value="null">未分类</option>
                 <option v-for="c in adminCategories" :key="c.id" :value="c.id">{{ c.name }}</option>
               </select>
@@ -96,63 +117,18 @@
           </div>
 
           <div class="lg:col-span-2 space-y-4">
-            <div class="p-4 lg:p-6 rounded-2xl bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-700">
-              <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
-                <div>
-                  <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-4 flex justify-between items-center">
-                    <span>应用图标 (Icon)</span>
-                    <span class="text-blue-500 text-xs cursor-pointer hover:underline" @click="triggerProjectIconUpload">上传新图标...</span>
-                    <input type="file" ref="projectIconInput" @change="uploadProjectIcon" class="hidden" accept="image/*" />
-                  </label>
-                  <div class="flex gap-4 items-center">
-                    <div class="w-16 h-16 shrink-0 bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-center p-2">
-                      <img v-if="projectDraft.icon || projectDraft.avatar" :src="projectDraft.icon || projectDraft.avatar" class="w-full h-full object-contain" />
-                      <span v-else class="text-slate-400 text-xs">无图</span>
-                    </div>
-                    <input
-                      type="text"
-                      :value="projectDraft.icon"
-                      @input="projectDraft.icon = normalizeMediaUrl(($event.target as HTMLInputElement).value)"
-                      class="flex-1 px-4 py-3 lg:py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-blue-500 text-base"
-                      placeholder="请上传并使用站内地址（/api/uploads/...）"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-4 flex justify-between items-center">
-                    <span>应用横幅 (Banner)</span>
-                    <span class="text-blue-500 text-xs cursor-pointer hover:underline" @click="triggerProjectBannerUpload">上传新横幅...</span>
-                    <input type="file" ref="projectBannerInput" @change="uploadProjectBanner" class="hidden" accept="image/*" />
-                  </label>
-                  <div class="flex flex-col gap-3">
-                    <div class="w-full h-24 bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-center p-1 overflow-hidden">
-                      <img v-if="projectDraft.banner" :src="projectDraft.banner" class="w-full h-full object-cover rounded-lg" />
-                      <span v-else class="text-slate-400 text-xs">无横幅</span>
-                    </div>
-                    <input
-                      type="text"
-                      :value="projectDraft.banner"
-                      @input="projectDraft.banner = normalizeMediaUrl(($event.target as HTMLInputElement).value)"
-                      class="w-full px-4 py-3 lg:py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-blue-500 text-base"
-                      placeholder="请上传并使用站内地址（/api/uploads/...）"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div v-if="uploadErrorMessage" class="text-xs text-rose-500">{{ uploadErrorMessage }}</div>
+            <ProjectMediaFields v-model:icon="projectDraft.icon" v-model:banner="projectDraft.banner" />
           </div>
 
           <div class="lg:col-span-2 space-y-4">
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <div>
                 <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">编程语言 (Language)</label>
-                <input type="text" v-model="projectDraft.language" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-blue-500 text-base" />
+                <input type="text" v-model="projectDraft.language" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-emerald-500 text-base" />
               </div>
               <div>
                 <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Star 数量 (Stars)</label>
-                <input type="number" v-model.number="projectDraft.stars" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-blue-500 text-base" />
+                <input type="number" v-model.number="projectDraft.stars" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-emerald-500 text-base" />
               </div>
             </div>
 
@@ -165,7 +141,7 @@
               </label>
               <div class="space-y-2">
                 <div v-for="(d, idx) in (projectDraft.platform_developers || [])" :key="idx" class="grid grid-cols-1 lg:grid-cols-5 gap-2 p-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white/70 dark:bg-slate-900/30">
-                  <input v-model="d.username" type="text" placeholder="username（如 cjk_mkp）" class="lg:col-span-4 px-3 py-3 lg:py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 outline-none focus:border-blue-500 text-base" />
+                  <input v-model="d.username" type="text" placeholder="username（如 cjk_mkp）" class="lg:col-span-4 px-3 py-3 lg:py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 outline-none focus:border-emerald-500 text-base" />
                   <button @click="removePlatformDeveloper(Number(idx))" type="button" class="lg:col-span-1 px-3 py-3 lg:py-2 rounded-xl bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 font-extrabold hover:bg-rose-100 dark:hover:bg-rose-500/20 transition-colors">
                     删除
                   </button>
@@ -175,18 +151,40 @@
                 </div>
               </div>
             </div>
+
+            <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+              <div class="p-4 lg:p-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50 flex items-center justify-between">
+                <h3 class="font-bold text-sm text-slate-700 dark:text-slate-300">项目成员</h3>
+                <button @click="showAddMember = true" class="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold transition-colors">添加成员</button>
+              </div>
+              <div class="p-4 lg:p-6 space-y-2">
+                <div v-if="projectMembers.length === 0" class="text-sm text-slate-400 text-center py-4">暂无成员</div>
+                <div v-for="m in projectMembers" :key="memberRowKey(m)" class="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-900/50">
+                  <img v-if="memberAvatarUrl(m)" :src="memberAvatarUrl(m)" class="w-8 h-8 rounded-full object-cover" />
+                  <div v-else class="w-8 h-8 rounded-full bg-emerald-500 text-white flex items-center justify-center text-xs font-bold">{{ (m.user_name || m.user_id || '?')[0].toUpperCase() }}</div>
+                  <div class="flex-1 min-w-0">
+                    <div class="text-sm font-bold text-slate-800 dark:text-white truncate">{{ m.user_name || m.user_id }}</div>
+                    <div class="text-xs text-slate-500">{{ m.org_name || '' }}</div>
+                  </div>
+                  <span class="px-2 py-0.5 rounded text-xs font-bold" :class="m.role === 'owner' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'">{{ m.role === 'owner' ? '负责人' : '协作者' }}</span>
+                  <button v-if="m.role !== 'owner'" @click="removeMember(m)" class="text-xs text-rose-500 hover:underline">移除</button>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
-      <div v-else class="flex items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl min-h-[400px]">
-        <div class="text-center">
-          <p class="text-slate-400 mb-2">点击下方悬浮栏选择项目</p>
-          <button @click="openPanel" class="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold transition-colors">打开列表</button>
         </div>
       </div>
     </template>
 
-    <template #list>
+    <template #empty-detail>
+      <div class="h-full min-h-0 flex items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-3xl bg-white/50 dark:bg-slate-900/35 backdrop-blur-sm">
+        <div class="text-center">
+          <p class="text-slate-400 mb-2">从列表选择项目</p>
+        </div>
+      </div>
+    </template>
+
+    <template #list-toolbar>
       <div class="space-y-3">
         <div class="flex items-center gap-2">
           <button @click="showCategoryManager = true; openCategoryManager()" class="px-3 py-1.5 rounded-lg bg-slate-200/70 dark:bg-slate-700/60 text-slate-700 dark:text-slate-200 text-sm font-bold hover:bg-slate-300 dark:hover:bg-slate-700 transition-colors">
@@ -196,45 +194,21 @@
             日志
           </button>
           <div class="flex-1"></div>
-          <button @click="createNewProject" class="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center hover:bg-blue-200 transition-colors" title="添加新软件">
+          <button @click="createNewProject" class="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 flex items-center justify-center hover:bg-blue-200 transition-colors" title="添加新软件">
             <Plus class="w-4 h-4" />
           </button>
         </div>
 
         <div class="space-y-2">
-          <input v-model="projectQuery.q" @keyup.enter="fetchAdminProjects" type="text" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-blue-500 text-sm" placeholder="搜索项目（名称/开发者/关键词）" />
-          <select v-model="projectQuery.category" @change="projectQuery.page = 1; fetchAdminProjects()" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-blue-500 text-sm">
+          <input v-model="projectQuery.q" @keyup.enter="resetAndFetchProjects" type="text" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-emerald-500 text-sm" placeholder="搜索项目（名称/开发者/关键词）" />
+          <select v-model="projectQuery.category" @change="resetAndFetchProjects" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-emerald-500 text-sm">
             <option value="">全部分类</option>
             <option v-for="c in adminCategories" :key="c.id" :value="c.id">{{ c.name }}</option>
           </select>
           <div class="flex gap-2">
-            <button @click="projectQuery.page = 1; fetchAdminProjects()" class="flex-1 px-3 py-2.5 rounded-xl bg-blue-500 hover:bg-blue-600 text-white text-sm font-bold transition-colors">搜索</button>
+            <button @click="resetAndFetchProjects" class="flex-1 px-3 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold transition-colors">搜索</button>
             <button @click="resetProjectQuery" class="px-3 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-sm font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">重置</button>
           </div>
-        </div>
-
-        <div class="space-y-2">
-          <div
-            v-for="p in projectsPage.items"
-            :key="p.id || p.slug || p.name"
-            @click="selectProject(p); closePanel()"
-            class="p-3 rounded-xl border cursor-pointer transition-all duration-200 flex items-center gap-3"
-            :class="selectedProjectId === p.id ? 'bg-blue-500 text-white border-blue-500 shadow-md shadow-blue-500/20' : 'bg-slate-50 dark:bg-slate-900/50 border-transparent hover:border-blue-300'"
-          >
-            <img v-if="p.icon || p.avatar" :src="p.icon || p.avatar" class="w-8 h-8 rounded bg-white object-contain p-0.5" />
-            <div v-else class="w-8 h-8 rounded bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-xs font-bold text-slate-500">{{ (p.name || '?').charAt(0) }}</div>
-            <div class="flex-1 min-w-0">
-              <div class="font-medium truncate text-sm">{{ p.name }}</div>
-              <div class="text-xs opacity-80 truncate">{{ p.developer }}</div>
-            </div>
-          </div>
-          <div v-if="projectsPage.items.length === 0" class="text-sm text-slate-400 text-center py-10">暂无数据</div>
-        </div>
-
-        <div class="flex items-center justify-between text-sm pt-2 border-t border-slate-100 dark:border-slate-700">
-          <button @click="prevProjectPage" :disabled="projectsPage.page <= 1" class="px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed">上一页</button>
-          <div class="text-slate-500 dark:text-slate-300">{{ projectsPage.page }} / {{ Math.max(1, Math.ceil(projectsPage.total / projectsPage.pageSize)) }}</div>
-          <button @click="nextProjectPage" :disabled="projectsPage.page >= Math.ceil(projectsPage.total / projectsPage.pageSize)" class="px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed">下一页</button>
         </div>
 
         <div class="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 dark:border-slate-700">
@@ -247,7 +221,28 @@
         </div>
       </div>
     </template>
-  </FloatingPanel>
+
+    <template #list>
+      <div class="space-y-2">
+          <div
+            v-for="p in projectsPage.items"
+            :key="p.id || p.slug || p.name"
+            @click="selectProject(p)"
+            class="p-3 rounded-xl border cursor-pointer transition-all duration-200 flex items-center gap-3"
+            :class="selectedProjectId === p.id ? 'bg-emerald-500 text-white border-emerald-500 shadow-md shadow-emerald-500/20' : 'bg-slate-50 dark:bg-slate-900/50 border-transparent hover:border-blue-300'"
+          >
+            <img v-if="p.icon" :src="p.icon" class="w-8 h-8 rounded bg-white object-contain p-0.5" />
+            <div v-else class="w-8 h-8 rounded bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-xs font-bold text-slate-500">{{ (p.name || '?').charAt(0) }}</div>
+            <div class="flex-1 min-w-0">
+              <div class="font-medium truncate text-sm">{{ p.name }}</div>
+              <div class="text-xs opacity-80 truncate">{{ p.developer }}</div>
+            </div>
+          </div>
+          <ui-EmptyState v-if="projectsPage.items.length === 0" :icon="Inbox" title="暂无数据" />
+      </div>
+    </template>
+  </ui-ListDetailLayout>
+  </div>
 
   <div v-if="showCategoryManager" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
     <div class="w-full max-w-3xl bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-2xl overflow-hidden">
@@ -269,11 +264,11 @@
               <input v-model="c.description" type="text" class="sm:col-span-2 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-emerald-500" />
             </div>
             <div class="mt-3 flex gap-2">
-              <button @click="saveCategory(c)" class="flex-1 px-3 py-2 rounded-xl bg-blue-500 hover:bg-blue-600 text-white font-bold transition-colors">保存</button>
+              <button @click="saveCategory(c)" class="flex-1 px-3 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold transition-colors">保存</button>
               <button @click="deleteCategory(c)" class="px-3 py-2 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-bold transition-colors">删除</button>
             </div>
           </div>
-          <div v-if="categoryDrafts.length === 0" class="text-center text-slate-400 py-10">暂无分类</div>
+          <ui-EmptyState v-if="categoryDrafts.length === 0" :icon="FolderOpen" title="暂无分类" />
         </div>
       </div>
     </div>
@@ -293,7 +288,7 @@
           </div>
           <button @click="rollbackToRevision(r.id)" class="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold transition-colors">回滚</button>
         </div>
-        <div v-if="revisions.length === 0" class="text-center text-slate-400 py-10">暂无历史版本</div>
+        <ui-EmptyState v-if="revisions.length === 0" :icon="History" title="暂无历史版本" />
       </div>
     </div>
   </div>
@@ -313,22 +308,99 @@
             </div>
             <div class="text-sm text-slate-700 dark:text-slate-200 mt-1">{{ l.entity_type }} {{ l.entity_id }}</div>
           </div>
-          <div v-if="auditPage.items.length === 0" class="text-center text-slate-400 py-10">暂无日志</div>
+          <ui-EmptyState v-if="auditPage.items.length === 0" :icon="ScrollText" title="暂无日志" />
         </div>
+      </div>
+    </div>
+  </div>
+
+  <div v-if="showAddMember" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="showAddMember = false">
+    <div class="bg-white dark:bg-slate-800 rounded-2xl p-6 w-full max-w-md mx-4 shadow-xl">
+      <h3 class="font-bold text-lg text-slate-800 dark:text-white mb-4">添加项目成员</h3>
+      <SearchSelect
+        v-model="newMemberId"
+        :search-fn="searchUsers"
+        placeholder="至少输入 1 个字符搜索用户"
+      />
+      <div class="flex gap-3 mt-4">
+        <button @click="addMember" :disabled="!newMemberId" class="flex-1 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-sm disabled:opacity-50 transition-colors">确认添加</button>
+        <button @click="showAddMember = false; newMemberId = null" class="flex-1 px-4 py-2 rounded-xl bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-sm transition-colors">取消</button>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
-import { Save, Plus } from 'lucide-vue-next';
-import { adminFetch, formatAdminError, uploadFile, normalizeMediaUrl } from '../../composables/useAdminFetch';
-import FloatingPanel from '../../components/admin/FloatingPanel.vue';
+import { ref, onMounted, computed } from 'vue';
+import { Save, Plus, Inbox, FolderOpen, History, ScrollText } from 'lucide-vue-next';
+import { adminFetch, formatAdminError, normalizeMediaUrl } from '../../composables/useAdminFetch';
+import SearchSelect from '../../components/admin/SearchSelect.vue';
+import ProjectMediaFields from '../../components/shared/ProjectMediaFields.vue';
+import { ListDetailLayout as uiListDetailLayout, EmptyState as uiEmptyState } from '../../components/ui';
 
-const panelRef = ref<InstanceType<typeof FloatingPanel> | null>(null);
-const openPanel = () => { if (panelRef.value) panelRef.value.expanded = true; };
-const closePanel = () => { panelRef.value?.close(); };
+const memberRowKey = (m: any) => (m.user_id ? `u:${m.user_id}` : m.org_id ? `o:${m.org_id}` : `j:${m.joined_at ?? ''}`);
+const memberAvatarUrl = (m: any) => m.avatar_url || m.user_avatar_url || m.org_avatar_url || '';
+
+const searchUsers = async (query: string) => {
+  const qt = query.trim();
+  if (qt.length < 1) return [];
+  const qs = new URLSearchParams({ q: qt, pageSize: '10' });
+  const res = await adminFetch(`/api/admin/users?${qs.toString()}`);
+  if (!res.ok) return [];
+  const json = await res.json();
+  const items = Array.isArray(json.items) ? json.items : Array.isArray(json) ? json : [];
+  const mapped = items.map((u: any) => {
+    const label = u.name || u.email || u.id || '';
+    const subtitle = [u.email, u.stcn_username].filter(Boolean).join(' · ') || '';
+    const row = { id: String(u.id), label, subtitle: subtitle || undefined, avatar: u.avatar_url || '' };
+    userLabelCache.set(row.id, label);
+    return row;
+  });
+  return mapped;
+};
+
+const searchOrganizations = async (query: string) => {
+  const qt = query.trim();
+  if (qt.length < 1) return [];
+  const qs = new URLSearchParams({ q: qt, status: 'approved', pageSize: '10' });
+  const res = await adminFetch(`/api/admin/organizations?${qs.toString()}`);
+  if (!res.ok) return [];
+  const json = await res.json();
+  const items = Array.isArray(json.items) ? json.items : Array.isArray(json) ? json : [];
+  return items.map((o: any) => {
+    orgLabelCache.set(String(o.id), o.name || '');
+    const statusLabel = o.status === 'approved' ? '已通过' : o.status === 'pending' ? '审核中' : (o.status || '');
+    return {
+      id: String(o.id),
+      label: o.name || '',
+      subtitle: [o.slug ? `@${o.slug}` : '', statusLabel].filter(Boolean).join(' · '),
+      avatar: o.avatar_url || '',
+    };
+  });
+};
+
+const userLabelCache = new Map<string, string>();
+const orgLabelCache = new Map<string, string>();
+
+const onOrgSelect = (val: string | null) => {
+  if (val) {
+    projectDraft.value.organization_name = orgLabelCache.get(val) || '';
+  } else {
+    projectDraft.value.organization_name = '';
+  }
+};
+
+const onDeveloperSelect = (val: string | null) => {
+  if (val) {
+    const label = userLabelCache.get(val) || '';
+    projectDraft.value.developer = label;
+    projectDraft.value.developer_user_name = label;
+  } else {
+    projectDraft.value.developer = '';
+    projectDraft.value.developer_user_id = null;
+    projectDraft.value.developer_user_name = '';
+  }
+};
 
 const adminCategories = ref<any[]>([]);
 
@@ -349,19 +421,22 @@ const fetchAdminCategories = async () => {
 const projectsPage = ref<{ items: any[]; page: number; pageSize: number; total: number }>({
   items: [],
   page: 1,
-  pageSize: 20,
+  pageSize: 30,
   total: 0
 });
 const projectQuery = ref<{ q: string; category: string; page: number; pageSize: number }>({
   q: '',
   category: '',
   page: 1,
-  pageSize: 20
+  pageSize: 30
 });
+const projectsLoading = ref(true);
+const projectsLoadingMore = ref(false);
+const projectsHasMore = computed(() => projectsPage.value.items.length < projectsPage.value.total);
+
 const selectedProjectId = ref<string | null>(null);
 const projectDraft = ref<any | null>(null);
 const isSaving = ref(false);
-const uploadErrorMessage = ref('');
 
 const normalizeProjectDraft = (p: any) => {
   const clone = { ...p };
@@ -383,7 +458,9 @@ const normalizeProjectDraft = (p: any) => {
   return clone;
 };
 
-const fetchAdminProjects = async () => {
+const fetchAdminProjects = async (append = false) => {
+  if (append) projectsLoadingMore.value = true;
+  else projectsLoading.value = true;
   try {
     const qs = new URLSearchParams();
     if (projectQuery.value.q) qs.set('q', projectQuery.value.q);
@@ -393,10 +470,16 @@ const fetchAdminProjects = async () => {
     const res = await adminFetch(`/api/admin/projects?${qs.toString()}`);
     if (res.ok) {
       const json = await res.json();
-      projectsPage.value = { ...json, items: (json.items ?? []).map(normalizeProjectDraft) };
+      projectsPage.value = {
+        ...json,
+        items: append ? [...projectsPage.value.items, ...(json.items ?? []).map(normalizeProjectDraft)] : (json.items ?? []).map(normalizeProjectDraft),
+      };
       return;
     }
-  } catch {}
+  } catch {} finally {
+    projectsLoading.value = false;
+    projectsLoadingMore.value = false;
+  }
   try {
     const res = await adminFetch('/api/projects');
     if (!res.ok) return;
@@ -414,39 +497,60 @@ const fetchAdminProjects = async () => {
     const total = filtered.length;
     const start = (projectQuery.value.page - 1) * projectQuery.value.pageSize;
     const items = filtered.slice(start, start + projectQuery.value.pageSize);
-    projectsPage.value = { items: items.map(normalizeProjectDraft), page: projectQuery.value.page, pageSize: projectQuery.value.pageSize, total };
+    projectsPage.value = {
+      items: append ? [...projectsPage.value.items, ...items.map(normalizeProjectDraft)] : items.map(normalizeProjectDraft),
+      page: projectQuery.value.page,
+      pageSize: projectQuery.value.pageSize,
+      total,
+    };
   } catch {}
+};
+
+const resetAndFetchProjects = async () => {
+  projectQuery.value.page = 1;
+  projectsPage.value = { items: [], page: 1, pageSize: projectQuery.value.pageSize, total: 0 };
+  selectedProjectId.value = null;
+  projectDraft.value = null;
+  await fetchAdminProjects(false);
+};
+
+const loadMoreProjects = async () => {
+  if (projectsLoadingMore.value || projectsLoading.value || !projectsHasMore.value) return;
+  projectQuery.value.page += 1;
+  await fetchAdminProjects(true);
 };
 
 const selectProject = (p: any) => {
   selectedProjectId.value = p.id ?? null;
   projectDraft.value = normalizeProjectDraft(p);
+  fetchProjectMembers();
 };
 
 const createNewProject = () => {
-  selectedProjectId.value = null;
+  selectedProjectId.value = 'new';
   projectDraft.value = normalizeProjectDraft({
     name: '新建软件项目',
     developer: '',
+    developer_user_id: null,
+    developer_user_name: '',
+    organization_id: null,
+    organization_name: '',
     status: '活跃',
     ai_usage_state: 'unknown',
     description: '',
     github_url: '',
     stars: 0,
     language: '',
-    avatar: '',
     icon: '',
     banner: '',
     recommendation: '',
     keywords: '',
     category_id: projectQuery.value.category || null
   });
-  panelRef.value?.close();
 };
 
 const saveProjects = async () => {
   isSaving.value = true;
-  uploadErrorMessage.value = '';
   try {
     if (!projectDraft.value) {
       alert('请先选择一个项目');
@@ -455,6 +559,7 @@ const saveProjects = async () => {
     const p: any = { ...projectDraft.value };
     p.icon = normalizeMediaUrl(p.icon);
     p.banner = normalizeMediaUrl(p.banner);
+    delete p.avatar;
     const toList = (v: any) => {
       if (Array.isArray(v)) return v;
       if (typeof v !== 'string') return [];
@@ -480,6 +585,7 @@ const saveProjects = async () => {
       const json = await res.json();
       if (!res.ok) throw new Error(formatAdminError(json, '创建失败', res.status));
       projectDraft.value = normalizeProjectDraft(json);
+      selectedProjectId.value = json.id || 'new';
     }
     await fetchAdminProjects();
     alert('项目保存成功！');
@@ -512,22 +618,9 @@ const deleteCurrentProject = async () => {
   }
 };
 
-const prevProjectPage = async () => {
-  if (projectsPage.value.page <= 1) return;
-  projectQuery.value.page -= 1;
-  await fetchAdminProjects();
-};
-
-const nextProjectPage = async () => {
-  const maxPage = Math.max(1, Math.ceil(projectsPage.value.total / projectsPage.value.pageSize));
-  if (projectsPage.value.page >= maxPage) return;
-  projectQuery.value.page += 1;
-  await fetchAdminProjects();
-};
-
 const resetProjectQuery = async () => {
-  projectQuery.value = { q: '', category: '', page: 1, pageSize: 20 };
-  await fetchAdminProjects();
+  projectQuery.value = { q: '', category: '', page: 1, pageSize: 30 };
+  await resetAndFetchProjects();
 };
 
 const importJsonInput = ref<HTMLInputElement | null>(null);
@@ -579,36 +672,6 @@ const importProjectsCsv = async (e: Event) => {
   }
 };
 
-const projectIconInput = ref<HTMLInputElement | null>(null);
-const projectBannerInput = ref<HTMLInputElement | null>(null);
-
-const triggerProjectIconUpload = () => projectIconInput.value?.click();
-const triggerProjectBannerUpload = () => projectBannerInput.value?.click();
-
-const uploadProjectIcon = async (e: Event) => {
-  const file = (e.target as HTMLInputElement).files?.[0];
-  if (!file || !projectDraft.value) return;
-  uploadErrorMessage.value = '';
-  try {
-    const url = await uploadFile(file);
-    projectDraft.value.icon = url;
-  } catch (err: unknown) {
-    uploadErrorMessage.value = err instanceof Error ? err.message : '上传失败';
-  }
-};
-
-const uploadProjectBanner = async (e: Event) => {
-  const file = (e.target as HTMLInputElement).files?.[0];
-  if (!file || !projectDraft.value) return;
-  uploadErrorMessage.value = '';
-  try {
-    const url = await uploadFile(file);
-    projectDraft.value.banner = url;
-  } catch (err: unknown) {
-    uploadErrorMessage.value = err instanceof Error ? err.message : '上传失败';
-  }
-};
-
 const addPlatformDeveloper = () => {
   if (!projectDraft.value) return;
   if (!Array.isArray(projectDraft.value.platform_developers)) projectDraft.value.platform_developers = [];
@@ -619,6 +682,78 @@ const removePlatformDeveloper = (idx: number) => {
   if (!projectDraft.value) return;
   if (!Array.isArray(projectDraft.value.platform_developers)) return;
   projectDraft.value.platform_developers.splice(idx, 1);
+};
+
+const projectMembers = ref<any[]>([]);
+const showAddMember = ref(false);
+const newMemberId = ref<string | null>(null);
+
+const fetchProjectMembers = async () => {
+  if (!projectDraft.value?.id) {
+    projectMembers.value = [];
+    return;
+  }
+  try {
+    const res = await adminFetch(`/api/admin/projects/${encodeURIComponent(projectDraft.value.id)}`);
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      projectMembers.value = [];
+      alert(formatAdminError(json, '加载项目成员失败', res.status));
+      return;
+    }
+    projectMembers.value = Array.isArray(json.members) ? json.members : [];
+  } catch (e: unknown) {
+    projectMembers.value = [];
+    alert(formatAdminError({ message: e instanceof Error ? e.message : '' }, '加载项目成员失败'));
+  }
+};
+
+const addMember = async () => {
+  if (!newMemberId.value || !projectDraft.value?.id) return;
+  try {
+    const res = await adminFetch(`/api/admin/projects/${encodeURIComponent(projectDraft.value.id)}/members`, {
+      method: 'POST',
+      body: JSON.stringify({ user_id: newMemberId.value, role: 'collaborator' }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      alert(formatAdminError(json, '添加成员失败', res.status));
+      return;
+    }
+    showAddMember.value = false;
+    newMemberId.value = null;
+    await fetchProjectMembers();
+  } catch (e: unknown) {
+    alert(formatAdminError({ message: e instanceof Error ? e.message : '' }, '添加成员失败'));
+  }
+};
+
+const removeMember = async (m: any) => {
+  if (!projectDraft.value?.id || !confirm('确定移除此成员？')) return;
+  const pid = projectDraft.value.id;
+  let url: string;
+  const opts: RequestInit = { method: 'DELETE' };
+  if (m.org_id && !m.user_id) {
+    url = `/api/admin/projects/${encodeURIComponent(pid)}/members/${encodeURIComponent(m.org_id)}`;
+    opts.headers = { 'Content-Type': 'application/json' };
+    opts.body = JSON.stringify({ org_id: m.org_id });
+  } else if (m.user_id) {
+    url = `/api/admin/projects/${encodeURIComponent(pid)}/members/${encodeURIComponent(m.user_id)}`;
+  } else {
+    alert('无法移除：成员缺少 user_id / org_id');
+    return;
+  }
+  try {
+    const res = await adminFetch(url, opts);
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      alert(formatAdminError(json, '移除成员失败', res.status));
+      return;
+    }
+    await fetchProjectMembers();
+  } catch (e: unknown) {
+    alert(formatAdminError({ message: e instanceof Error ? e.message : '' }, '移除成员失败'));
+  }
 };
 
 const showCategoryManager = ref(false);

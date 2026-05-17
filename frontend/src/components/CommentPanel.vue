@@ -580,10 +580,12 @@ const handleIssueClick = (id: string) => {
         <div v-for="e in comments" :key="e.id" class="p-5 rounded-2xl border" :class="e.moderation_status === 'pending' ? 'border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800/50 opacity-70' : 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/30'">
           <div class="flex items-center justify-between gap-3">
             <div class="flex items-center gap-3 min-w-0">
-              <img v-if="e.author_avatar_url" :src="e.author_avatar_url" :alt="e.author" class="w-8 h-8 rounded-full object-cover shrink-0" />
-              <div v-else class="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center shrink-0 text-emerald-700 dark:text-emerald-300 text-sm font-extrabold">{{ e.author.charAt(0).toUpperCase() }}</div>
+              <router-link :to="'/u/' + encodeURIComponent(e.author)" class="shrink-0">
+                <img v-if="e.author_avatar_url" :src="e.author_avatar_url" :alt="e.author" class="w-8 h-8 rounded-full object-cover" />
+                <div v-else class="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-700 dark:text-emerald-300 text-sm font-extrabold">{{ e.author.charAt(0).toUpperCase() }}</div>
+              </router-link>
               <div class="min-w-0">
-                <div class="font-extrabold text-slate-900 dark:text-white truncate">{{ e.author }}</div>
+                <router-link :to="'/u/' + encodeURIComponent(e.author)" class="font-extrabold text-slate-900 dark:text-white truncate hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">{{ e.author }}</router-link>
                 <div class="text-xs text-slate-500 dark:text-slate-400">{{ formatTime(e.created_at) }}</div>
               </div>
             </div>
@@ -724,7 +726,7 @@ const handleIssueClick = (id: string) => {
             <div class="min-w-0 flex-1">
               <div class="font-extrabold text-slate-900 dark:text-white truncate">{{ i.title }}</div>
               <div class="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                {{ i.author }} · {{ formatTime(i.created_at) }}
+                <router-link :to="'/u/' + encodeURIComponent(i.author)" class="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">{{ i.author }}</router-link> · {{ formatTime(i.created_at) }}
               </div>
               <div v-if="i.labels?.length" class="mt-2 flex flex-wrap gap-1.5">
                 <span v-for="lid in i.labels" :key="lid" class="px-2 py-0.5 rounded-full border text-xs font-extrabold"
@@ -906,9 +908,11 @@ const handleIssueClick = (id: string) => {
                   >
                     <div class="flex items-center justify-between gap-3">
                       <div class="flex items-center gap-2.5">
-                        <img v-if="r.actor_avatar_url" :src="r.actor_avatar_url" :alt="r.actor_username" class="w-6 h-6 rounded-full object-cover shrink-0" />
-                        <div v-else class="w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center shrink-0 text-emerald-700 dark:text-emerald-300 text-xs font-extrabold">{{ r.actor_username.charAt(0).toUpperCase() }}</div>
-                        <div class="font-extrabold text-slate-900 dark:text-white">{{ r.actor_username }}</div>
+                        <router-link :to="'/u/' + encodeURIComponent(r.actor_username)" class="shrink-0">
+                          <img v-if="r.actor_avatar_url" :src="r.actor_avatar_url" :alt="r.actor_username" class="w-6 h-6 rounded-full object-cover" />
+                          <div v-else class="w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-700 dark:text-emerald-300 text-xs font-extrabold">{{ r.actor_username.charAt(0).toUpperCase() }}</div>
+                        </router-link>
+                        <router-link :to="'/u/' + encodeURIComponent(r.actor_username)" class="font-extrabold text-slate-900 dark:text-white hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">{{ r.actor_username }}</router-link>
                       </div>
                       <div class="text-xs text-slate-500 dark:text-slate-400">{{ formatTime(r.created_at) }}</div>
                     </div>

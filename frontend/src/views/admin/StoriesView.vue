@@ -1,36 +1,40 @@
 <template>
-  <FloatingPanel
-    ref="panelRef"
-    :selectedLabel="currentStory?.title || ''"
-    placeholder="选择一篇文章"
-    listLabel="文章列表"
-    :count="stories.length"
-    :prevEnabled="selectedIndex !== null && selectedIndex > 0"
-    :nextEnabled="selectedIndex !== null && selectedIndex < stories.length - 1"
-    @prev="selectedIndex !== null && selectedIndex > 0 ? selectedIndex-- : undefined"
-    @next="selectedIndex !== null && selectedIndex < stories.length - 1 ? selectedIndex++ : undefined"
+  <ui-ListDetailLayout
+    :selected-id="selectedStoryId"
+    :selected-item-label="currentStory?.title"
+    :selected-item-icon="FileText"
+    :searchable="false"
+    list-title="文章列表"
+    detail-title="文章编辑"
+    :page="1"
+    :total="stories.length"
+    :page-size="stories.length || 1"
+    @back="selectedIndex = null"
   >
-    <template #list>
-      <div class="flex justify-between items-center mb-4">
-        <h2 class="font-bold text-lg">文章列表</h2>
+    <template #list-toolbar>
+      <div class="flex justify-end">
         <button @click="createNewStory" class="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 flex items-center justify-center hover:bg-emerald-200 transition-colors">
           <Plus class="w-4 h-4" />
         </button>
       </div>
+    </template>
 
-      <div
-        v-for="(story, index) in stories"
-        :key="story.id"
-        @click="selectStory(index)"
-        class="p-4 rounded-2xl border cursor-pointer transition-all duration-200 group"
-        :class="selectedIndex === index ? 'bg-emerald-500 text-white border-emerald-500 shadow-lg shadow-emerald-500/20' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-emerald-400'"
-      >
-        <h3 class="font-bold truncate" :class="selectedIndex === index ? 'text-white' : 'text-slate-900 dark:text-white'">{{ story.title || '未命名文章' }}</h3>
-        <p class="text-sm truncate mt-1" :class="selectedIndex === index ? 'text-emerald-100' : 'text-slate-500'">{{ story.category }}</p>
+    <template #list>
+      <div class="space-y-2">
+        <div
+          v-for="(story, index) in stories"
+          :key="story.id"
+          @click="selectStory(index)"
+          class="p-4 rounded-2xl border cursor-pointer transition-all duration-200 group"
+          :class="selectedIndex === index ? 'bg-emerald-500 text-white border-emerald-500 shadow-lg shadow-emerald-500/20' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-emerald-400'"
+        >
+          <h3 class="font-bold truncate" :class="selectedIndex === index ? 'text-white' : 'text-slate-900 dark:text-white'">{{ story.title || '未命名文章' }}</h3>
+          <p class="text-sm truncate mt-1" :class="selectedIndex === index ? 'text-emerald-100' : 'text-slate-500'">{{ story.category }}</p>
+        </div>
       </div>
     </template>
 
-    <template #content>
+    <template #detail>
       <div v-if="currentStory" class="bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col">
 
         <div class="p-4 lg:p-6 border-b border-slate-100 dark:border-slate-700 grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6 bg-slate-50/50 dark:bg-slate-900/50">
@@ -71,31 +75,31 @@
         </div>
 
         <div class="flex items-center gap-1 lg:gap-2 p-2 lg:p-3 border-b border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 overflow-x-auto">
-          <button @click="insertText('**加粗**')" class="p-3 lg:p-2 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 flex-shrink-0" title="加粗"><Bold class="w-5 h-5 lg:w-4 lg:h-4" /></button>
-          <button @click="insertText('*斜体*')" class="p-3 lg:p-2 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 flex-shrink-0" title="斜体"><Italic class="w-5 h-5 lg:w-4 lg:h-4" /></button>
+          <button @click="insertText('**加粗**')" class="p-2.5 lg:p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 flex-shrink-0" title="加粗"><Bold class="w-5 h-5 lg:w-4 lg:h-4" /></button>
+          <button @click="insertText('*斜体*')" class="p-2.5 lg:p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 flex-shrink-0" title="斜体"><Italic class="w-5 h-5 lg:w-4 lg:h-4" /></button>
           <div class="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1 lg:mx-2 flex-shrink-0"></div>
-          <button @click="insertText('### 标题')" class="p-3 lg:p-2 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 flex-shrink-0" title="标题"><Heading class="w-5 h-5 lg:w-4 lg:h-4" /></button>
-          <button @click="insertText('> 引用段落')" class="p-3 lg:p-2 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 flex-shrink-0" title="引用"><Quote class="w-5 h-5 lg:w-4 lg:h-4" /></button>
-          <button @click="insertText('- 列表项')" class="p-3 lg:p-2 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 flex-shrink-0" title="列表"><List class="w-5 h-5 lg:w-4 lg:h-4" /></button>
+          <button @click="insertText('### 标题')" class="p-2.5 lg:p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 flex-shrink-0" title="标题"><Heading class="w-5 h-5 lg:w-4 lg:h-4" /></button>
+          <button @click="insertText('> 引用段落')" class="p-2.5 lg:p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 flex-shrink-0" title="引用"><Quote class="w-5 h-5 lg:w-4 lg:h-4" /></button>
+          <button @click="insertText('- 列表项')" class="p-2.5 lg:p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 flex-shrink-0" title="列表"><List class="w-5 h-5 lg:w-4 lg:h-4" /></button>
           <div class="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1 lg:mx-2 flex-shrink-0"></div>
-          <button @click="triggerImageUpload" class="p-3 lg:p-2 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-emerald-600 dark:text-emerald-400 flex items-center gap-2 text-sm font-bold flex-shrink-0" title="插入图片">
-            <ImageIcon class="w-5 h-5 lg:w-4 lg:h-4" /> <span class="hidden sm:inline">上传插图</span>
+          <button @click="triggerImageUpload" class="p-2.5 lg:p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-emerald-600 dark:text-emerald-400 flex-shrink-0" title="插入图片">
+            <ImageIcon class="w-5 h-5 lg:w-4 lg:h-4" />
           </button>
           <input type="file" ref="imageInput" @change="uploadImageToMarkdown" class="hidden" accept="image/*" />
 
           <div class="ml-auto flex items-center gap-2 bg-slate-100 dark:bg-slate-900 p-1 rounded-lg flex-shrink-0">
             <button @click="viewMode = 'edit'" class="px-3 py-1 text-sm rounded-md transition-colors" :class="viewMode === 'edit' ? 'bg-white dark:bg-slate-700 shadow-sm' : 'text-slate-500'">编辑</button>
-            <button @click="viewMode = 'split'" class="px-3 py-1 text-sm rounded-md transition-colors hidden sm:block" :class="viewMode === 'split' ? 'bg-white dark:bg-slate-700 shadow-sm' : 'text-slate-500'">双栏</button>
+            <button @click="viewMode = 'split'" class="px-3 py-1 text-sm rounded-md transition-colors hidden lg:block" :class="viewMode === 'split' ? 'bg-white dark:bg-slate-700 shadow-sm' : 'text-slate-500'">双栏</button>
             <button @click="viewMode = 'preview'" class="px-3 py-1 text-sm rounded-md transition-colors" :class="viewMode === 'preview' ? 'bg-white dark:bg-slate-700 shadow-sm' : 'text-slate-500'">预览</button>
           </div>
 
           <button @click="saveStories" class="h-8 px-3 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold flex items-center gap-1.5 transition-colors flex-shrink-0">
             <Save class="w-4 h-4" />
-            <span class="hidden sm:inline">{{ isSaving ? '保存中...' : '保存' }}</span>
+            <span class="lg:inline">{{ isSaving ? '保存中...' : '保存' }}</span>
           </button>
         </div>
 
-        <div class="flex-1 flex min-h-[300px] lg:min-h-[500px]">
+        <div class="flex-1 flex min-h-0">
           <div v-show="viewMode !== 'preview'" class="flex-1 border-r border-slate-100 dark:border-slate-700">
             <textarea
               ref="markdownTextarea"
@@ -105,16 +109,19 @@
             ></textarea>
           </div>
 
-          <div v-show="viewMode !== 'edit'" class="flex-1 bg-slate-50/50 dark:bg-slate-900/30 p-4 lg:p-8 overflow-y-auto max-h-[400px] lg:max-h-[600px] prose prose-slate dark:prose-invert max-w-none">
+          <div v-show="viewMode !== 'edit'" class="flex-1 bg-slate-50/50 dark:bg-slate-900/30 p-4 lg:p-8 overflow-y-auto prose prose-slate dark:prose-invert max-w-none">
             <div v-html="renderedMarkdown"></div>
           </div>
         </div>
       </div>
-      <div v-else class="flex items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-3xl min-h-[300px]">
-        <p class="text-slate-400">点击下方悬浮栏选择文章</p>
+    </template>
+
+    <template #empty-detail>
+      <div class="flex items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-3xl min-h-[300px]">
+        <p class="text-slate-400">从列表中选择文章</p>
       </div>
     </template>
-  </FloatingPanel>
+  </ui-ListDetailLayout>
 </template>
 
 <script setup lang="ts">
@@ -123,11 +130,9 @@ import { Save, Plus, Bold, Italic, Heading, Quote, List, Image as ImageIcon } fr
 import MarkdownIt from 'markdown-it';
 import DOMPurify from 'dompurify';
 import { adminFetch, formatAdminError, uploadFile, normalizeMediaUrl } from '../../composables/useAdminFetch';
-import FloatingPanel from '../../components/admin/FloatingPanel.vue';
+import { ListDetailLayout as uiListDetailLayout } from '../../components/ui';
 
 const md = new MarkdownIt({ html: true, breaks: true });
-
-const panelRef = ref<InstanceType<typeof FloatingPanel> | null>(null);
 
 interface FeaturedStory {
   id: string;
@@ -150,6 +155,11 @@ const uploadErrorMessage = ref('');
 const currentStory = computed(() => {
   if (selectedIndex.value === null) return null;
   return stories.value[selectedIndex.value];
+});
+
+const selectedStoryId = computed(() => {
+  if (selectedIndex.value === null) return null;
+  return stories.value[selectedIndex.value]?.id ?? null;
 });
 
 const renderedMarkdown = computed(() => {
@@ -190,7 +200,6 @@ const saveStories = async () => {
 
 const selectStory = (index: number) => {
   selectedIndex.value = index;
-  panelRef.value?.close();
 };
 
 const createNewStory = () => {
@@ -206,7 +215,6 @@ const createNewStory = () => {
     content: '# 在这里输入大标题\n\n写点什么...'
   });
   selectedIndex.value = stories.value.length - 1;
-  panelRef.value?.close();
 };
 
 const bannerInput = ref<HTMLInputElement | null>(null);

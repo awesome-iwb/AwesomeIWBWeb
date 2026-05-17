@@ -110,6 +110,45 @@ export async function getMediaReferences(mediaId: string): Promise<MediaReferenc
   `;
 }
 
+export async function upsertMediaReference(input: {
+  mediaId: string;
+  entityType: string;
+  entityId: string;
+  fieldPath: string;
+  refType?: string;
+}): Promise<void> {
+  if (!dbEnabled) return;
+  await sql()`
+    insert into media_references (media_id, entity_type, entity_id, field_path, ref_type)
+    values (${input.mediaId}, ${input.entityType}, ${input.entityId}, ${input.fieldPath}, ${input.refType ?? "usage"})
+    on conflict do nothing
+  `;
+}
+
+export async function upsertMediaReferencesForEntity(params: {
+  entityType: string;
+  entityId: string;
+  fields: Array<{ url: string; fieldPath: string }>;
+  refType?: string;
+}): Promise<number> {
+  if (!dbEnabled) return 0;
+  let count = 0;
+  for (const field of params.fields) {
+    if (!field.url) continue;
+    const rows = await sql()<Array<{ id: string }>>`
+      select id from media_assets where url = ${field.url} limit 1
+    `;
+    if (!rows.length) continue;
+    await sql()`
+      insert into media_references (media_id, entity_type, entity_id, field_path, ref_type)
+      values (${rows[0].id}, ${params.entityType}, ${params.entityId}, ${field.fieldPath}, ${params.refType ?? "usage"})
+      on conflict do nothing
+    `;
+    count++;
+  }
+  return count;
+}
+
 export async function softDeleteMedia(mediaId: string): Promise<MediaAsset | null> {
   if (!dbEnabled) return null;
   const [row] = await sql()<MediaAsset[]>`

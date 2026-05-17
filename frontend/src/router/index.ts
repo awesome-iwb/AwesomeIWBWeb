@@ -5,6 +5,7 @@ import ProjectDetailView from '../views/ProjectDetailView.vue'
 import SubmitProjectView from '../views/SubmitProjectView.vue'
 import CompareView from '../views/CompareView.vue'
 import FeaturedView from '../views/FeaturedView.vue'
+import CategoriesView from '../views/CategoriesView.vue'
 import AdminLayout from '../views/admin/AdminLayout.vue'
 import AboutView from '../views/AboutView.vue'
 import MeView from '../views/MeView.vue'
@@ -12,6 +13,7 @@ import AdminLoginView from '../views/AdminLoginView.vue'
 import AuthResultView from '../views/AuthResultView.vue'
 import AuthPopupCallbackView from '../views/AuthPopupCallbackView.vue'
 import NotFoundView from '../views/NotFoundView.vue'
+import { useAnalytics } from '../composables/useAnalytics'
 import { useAuth } from '../composables/useAuth'
 
 export const routes: RouteRecordRaw[] = [
@@ -30,14 +32,40 @@ export const routes: RouteRecordRaw[] = [
       { path: 'dashboard', name: 'admin-dashboard', component: () => import('../views/admin/DashboardView.vue'), meta: { title: '总览' } },
       { path: 'stories', name: 'admin-stories', component: () => import('../views/admin/StoriesView.vue'), meta: { title: '文章管理', requiresCapability: 'story:manage' } },
       { path: 'projects', name: 'admin-projects', component: () => import('../views/admin/ProjectsView.vue'), meta: { title: '项目管理', requiresCapability: 'project:read' } },
-      { path: 'submissions', name: 'admin-submissions', component: () => import('../views/admin/SubmissionsView.vue'), meta: { title: '项目审核', requiresCapability: 'submission:read' } },
-      { path: 'moderation', name: 'admin-moderation', component: () => import('../views/admin/ModerationView.vue'), meta: { title: '内容审核', requiresCapability: 'moderation:read' } },
-      { path: 'feedback', name: 'admin-feedback', component: () => import('../views/admin/FeedbackView.vue'), meta: { title: '评论反馈', requiresCapability: 'feedback:manage' } },
+      {
+        path: 'review',
+        name: 'admin-review',
+        component: () => import('../views/admin/ReviewView.vue'),
+        meta: {
+          title: '审核',
+          requiresAnyCapability: ['submission:read', 'moderation:read', 'feedback:manage'],
+        },
+      },
+      {
+        path: 'submissions',
+        name: 'admin-submissions',
+        redirect: (to) => ({ path: '/admin/review', query: { ...to.query, tab: 'projects' } }),
+        meta: { title: '项目审核', requiresCapability: 'submission:read' },
+      },
+      {
+        path: 'moderation',
+        name: 'admin-moderation',
+        redirect: (to) => ({ path: '/admin/review', query: { ...to.query, tab: 'comments' } }),
+        meta: { title: '内容审核', requiresCapability: 'moderation:read' },
+      },
+      {
+        path: 'feedback',
+        name: 'admin-feedback',
+        redirect: (to) => ({ path: '/admin/review', query: { ...to.query, tab: 'bugs' } }),
+        meta: { title: '评论反馈', requiresCapability: 'feedback:manage' },
+      },
       { path: 'users', name: 'admin-users', component: () => import('../views/admin/UsersView.vue'), meta: { title: '用户权限', requiresCapability: 'user:read' } },
+      { path: 'developers', name: 'admin-developers', component: () => import('../views/admin/DevelopersView.vue'), meta: { title: '开发者与组织', requiresAnyCapability: ['dev:developer_manage', 'org:review', 'claim:review'] } },
       { path: 'media', name: 'admin-media', component: () => import('../views/admin/MediaView.vue'), meta: { title: '图床管理', requiresCapability: 'media:read' } },
       { path: 'audit', name: 'admin-audit', component: () => import('../views/admin/AuditView.vue'), meta: { title: '审计日志', requiresCapability: 'audit:read' } },
-      { path: 'organizations', name: 'admin-organizations', component: () => import('../views/admin/AdminOrganizationsView.vue'), meta: { title: '组织审核', requiresCapability: 'org:review' } },
-      { path: 'claims', name: 'admin-claims', component: () => import('../views/admin/AdminClaimsView.vue'), meta: { title: '认领审核', requiresCapability: 'claim:review' } },
+      { path: 'analytics', name: 'admin-analytics', component: () => import('../views/admin/AnalyticsView.vue'), meta: { title: '数据分析', requiresCapability: 'analytics:read' } },
+      { path: 'organizations', redirect: () => ({ path: '/admin/developers', query: { tab: 'organizations' } }) },
+      { path: 'claims', redirect: () => ({ path: '/admin/developers', query: { tab: 'claims' } }) },
     ],
   },
   {
@@ -59,6 +87,12 @@ export const routes: RouteRecordRaw[] = [
     name: 'featured',
     component: FeaturedView,
     meta: { showNavBar: true }
+  },
+  {
+    path: '/categories',
+    name: 'categories',
+    component: CategoriesView,
+    meta: { showNavBar: true, title: '浏览分类' }
   },
   {
     path: '/about',
@@ -87,6 +121,12 @@ export const routes: RouteRecordRaw[] = [
     name: 'me',
     component: MeView,
     meta: { showNavBar: true, showBack: true, title: '个人中心' }
+  },
+  {
+    path: '/u/:name',
+    name: 'user-profile',
+    component: () => import('../views/UserProfileView.vue'),
+    meta: { showNavBar: true, showBack: true }
   },
   {
     path: '/auth/popup-callback',
@@ -157,6 +197,14 @@ export function setupRouterGuard(router: Router) {
     return auth.hasCapability(requiredCapability)
   }
 
+  const ensureAnyCapabilityLoaded = async (requiredCapabilities: string[]): Promise<boolean> => {
+    const auth = useAuth()
+    if (!auth.isAuthenticated.value) return false
+    if (requiredCapabilities.some((c) => auth.hasCapability(c))) return true
+    await auth.fetchUser()
+    return requiredCapabilities.some((c) => auth.hasCapability(c))
+  }
+
   router.beforeEach(async (to) => {
     if (typeof window === 'undefined') return true
     await ensureAuthInitialized()
@@ -169,6 +217,15 @@ export function setupRouterGuard(router: Router) {
       const allowed = await ensureCapabilityLoaded(capability);
       if (!allowed) return { path: '/me', query: { redirect: to.fullPath } };
     }
+    const anyCapsRecord = to.matched.find((r) => {
+      const m = (r.meta as any)?.requiresAnyCapability
+      return Array.isArray(m) && m.length > 0
+    })
+    const anyCaps = (anyCapsRecord?.meta as any)?.requiresAnyCapability as string[] | undefined
+    if (anyCaps?.length) {
+      const allowed = await ensureAnyCapabilityLoaded(anyCaps)
+      if (!allowed) return { path: '/me', query: { redirect: to.fullPath } };
+    }
     return true;
   });
 
@@ -178,5 +235,13 @@ export function setupRouterGuard(router: Router) {
     if ((to?.path ?? '') === '/me') return
     if ((to?.path ?? '') === '/auth/result') return
     void router.replace({ path: '/not-found', query: { reason: 'navigation-error' } })
+  })
+
+  router.afterEach((to) => {
+    if (typeof window === 'undefined') return
+    try {
+      const { trackPageView } = useAnalytics()
+      trackPageView(to.fullPath)
+    } catch {}
   })
 }

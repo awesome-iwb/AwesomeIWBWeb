@@ -1,16 +1,48 @@
 <template>
-  <FloatingPanel
-    ref="panelRef"
-    :selected-label="selectedClaimId ? `认领：${selectedClaim?.project_id?.slice(0, 8) || ''}` : ''"
-    placeholder="选择一个认领申请"
-    list-label="认领列表"
-    :count="claimsPage.total"
-    :prev-enabled="claimsPage.page > 1"
-    :next-enabled="claimsPage.page < Math.ceil(claimsPage.total / claimsPage.pageSize)"
-    @prev="prevPage"
-    @next="nextPage"
+  <ui-ListDetailLayout
+    :selected-id="selectedClaimId"
+    :selected-item-label="selectedClaim?.project_id?.slice(0, 8) ? '项目 ' + selectedClaim.project_id.slice(0, 8) + '...' : '认领详情'"
+    :selected-item-icon="ClipboardList"
+    :searchable="false"
+    list-title="认领列表"
+    detail-title="认领审核"
+    :page="claimsPage.page"
+    :total="claimsPage.total"
+    :page-size="claimsPage.pageSize"
+    @update:page="onClaimPageChange"
+    @back="selectedClaimId = null"
   >
-    <template #content>
+    <template #list-toolbar>
+      <select v-model="statusFilter" @change="fetchClaims" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-emerald-500 text-sm">
+        <option value="">全部状态</option>
+        <option value="pending">待审核</option>
+        <option value="approved">已通过</option>
+        <option value="rejected">已驳回</option>
+      </select>
+    </template>
+
+    <template #list>
+      <div class="space-y-2">
+        <div
+          v-for="claim in claimsPage.items"
+          :key="claim.id"
+          @click="selectClaim(claim)"
+          class="p-3 rounded-xl border cursor-pointer transition-all duration-200"
+          :class="selectedClaimId === claim.id ? 'bg-emerald-500 text-white border-emerald-500 shadow-md shadow-emerald-500/20' : 'bg-slate-50 dark:bg-slate-900/50 border-transparent hover:border-emerald-300'"
+        >
+          <div class="font-bold text-sm truncate">
+            项目：{{ claim.project_id?.slice(0, 8) || '-' }}
+          </div>
+          <div class="text-xs opacity-80 truncate mt-1">
+            <ui-StatusBadge :status="claim.status" />
+            <span class="ml-1">申请者：{{ claim.user_id?.slice(0, 8) || '-' }}</span>
+          </div>
+        </div>
+        <ui-EmptyState v-if="claimsPage.items.length === 0" :icon="ClipboardList" title="暂无认领申请" />
+      </div>
+    </template>
+
+    <template #detail>
       <div v-if="selectedClaim" class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col">
         <div class="p-4 lg:p-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50">
           <h2 class="text-lg lg:text-xl font-bold text-slate-800 dark:text-white">认领审核</h2>
@@ -27,7 +59,7 @@
             </div>
             <div class="space-y-2">
               <div class="text-sm font-extrabold text-slate-700 dark:text-slate-300">状态</div>
-              <span class="inline-block px-2.5 py-1 rounded-full text-xs font-bold" :class="statusClass(selectedClaim.status)">{{ statusLabel(selectedClaim.status) }}</span>
+              <ui-StatusBadge :status="selectedClaim.status" />
             </div>
             <div class="space-y-2">
               <div class="text-sm font-extrabold text-slate-700 dark:text-slate-300">申请时间</div>
@@ -52,79 +84,29 @@
           <button @click="rejectClaim" class="flex-1 px-4 py-3 rounded-2xl bg-rose-500 hover:bg-rose-600 text-white font-bold transition-colors">驳回</button>
         </div>
       </div>
-      <div v-else class="flex items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl min-h-[400px]">
-        <div class="text-center">
-          <p class="text-slate-400 mb-2">点击上方列表选择认领申请</p>
-          <button @click="openPanel" class="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold transition-colors">打开列表</button>
-        </div>
-      </div>
     </template>
 
-    <template #list>
-      <div class="space-y-3">
-        <div class="flex gap-2">
-          <select v-model="statusFilter" @change="fetchClaims" class="flex-1 px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-emerald-500 text-sm">
-            <option value="">全部状态</option>
-            <option value="pending">待审核</option>
-            <option value="approved">已通过</option>
-            <option value="rejected">已驳回</option>
-          </select>
-        </div>
-        <div class="space-y-2">
-          <div
-            v-for="claim in claimsPage.items"
-            :key="claim.id"
-            @click="selectClaim(claim)"
-            class="p-3 rounded-xl border cursor-pointer transition-all duration-200"
-            :class="selectedClaimId === claim.id ? 'bg-emerald-500 text-white border-emerald-500 shadow-md shadow-emerald-500/20' : 'bg-slate-50 dark:bg-slate-900/50 border-transparent hover:border-emerald-300'"
-          >
-            <div class="font-bold text-sm truncate">
-              项目：{{ claim.project_id?.slice(0, 8) || '-' }}
-            </div>
-            <div class="text-xs opacity-80 truncate mt-1">
-              <span class="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold" :class="statusClass(claim.status)">{{ statusLabel(claim.status) }}</span>
-              <span class="ml-1">申请者：{{ claim.user_id?.slice(0, 8) || '-' }}</span>
-            </div>
-          </div>
-          <div v-if="claimsPage.items.length === 0" class="text-sm text-slate-400 text-center py-10">暂无认领申请</div>
-        </div>
-        <div class="flex items-center justify-between text-sm pt-2 border-t border-slate-100 dark:border-slate-700">
-          <button @click="prevPage" :disabled="claimsPage.page <= 1" class="px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed">上一页</button>
-          <div class="text-slate-500 dark:text-slate-300">{{ claimsPage.page }} / {{ Math.max(1, Math.ceil(claimsPage.total / claimsPage.pageSize)) }}</div>
-          <button @click="nextPage" :disabled="claimsPage.page >= Math.ceil(claimsPage.total / claimsPage.pageSize)" class="px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed">下一页</button>
+    <template #empty-detail>
+      <div class="flex items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl min-h-[400px]">
+        <div class="text-center">
+          <p class="text-slate-400 mb-2">从列表中选择认领申请查看详情</p>
         </div>
       </div>
     </template>
-  </FloatingPanel>
+  </ui-ListDetailLayout>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { adminFetch, formatAdminError } from '../../composables/useAdminFetch';
-import FloatingPanel from '../../components/admin/FloatingPanel.vue';
-
-const panelRef = ref<InstanceType<typeof FloatingPanel> | null>(null);
-const openPanel = () => { if (panelRef.value) (panelRef.value as any).expanded = true; };
+import { ListDetailLayout as uiListDetailLayout, EmptyState as uiEmptyState, StatusBadge as uiStatusBadge } from '../../components/ui';
+import { ClipboardList } from 'lucide-vue-next';
 
 const claimsPage = ref<{ items: any[]; page: number; pageSize: number; total: number }>({ items: [], page: 1, pageSize: 20, total: 0 });
 const statusFilter = ref('pending');
 const selectedClaimId = ref<string | null>(null);
 const selectedClaim = ref<any | null>(null);
 const reviewNote = ref('');
-
-const statusLabel = (s: string) => {
-  const map: Record<string, string> = { pending: '待审核', approved: '已通过', rejected: '已驳回' };
-  return map[s] ?? s;
-};
-
-const statusClass = (s: string) => {
-  const map: Record<string, string> = {
-    pending: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
-    approved: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
-    rejected: 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400',
-  };
-  return map[s] ?? '';
-};
 
 const formatDate = (v: string) => {
   if (!v) return '-';
@@ -170,8 +152,10 @@ const rejectClaim = async () => {
   await fetchClaims();
 };
 
-const prevPage = async () => { if (claimsPage.value.page <= 1) return; claimsPage.value.page -= 1; await fetchClaims(); };
-const nextPage = async () => { const maxPage = Math.max(1, Math.ceil(claimsPage.value.total / claimsPage.value.pageSize)); if (claimsPage.value.page >= maxPage) return; claimsPage.value.page += 1; await fetchClaims(); };
+const onClaimPageChange = async (newPage: number) => {
+  claimsPage.value.page = newPage;
+  await fetchClaims();
+};
 
 onMounted(() => { fetchClaims(); });
 </script>

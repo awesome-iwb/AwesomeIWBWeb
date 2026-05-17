@@ -2,13 +2,14 @@
 -- Date: 2026-05-15
 
 CREATE TABLE IF NOT EXISTS project_members (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
   user_id UUID NULL REFERENCES users(id) ON DELETE CASCADE,
   org_id UUID NULL REFERENCES organizations(id) ON DELETE CASCADE,
   role TEXT NOT NULL DEFAULT 'collaborator'
     CHECK (role IN ('owner','collaborator')),
   joined_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  PRIMARY KEY (project_id, COALESCE(user_id, '00000000-0000-0000-0000-000000000000'), COALESCE(org_id, '00000000-0000-0000-0000-000000000000'))
+  UNIQUE (project_id, user_id, org_id)
 );
 
 ALTER TABLE project_members

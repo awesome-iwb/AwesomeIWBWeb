@@ -1,0 +1,14 @@
+- [x] 数据库迁移 0029 执行成功，projects 表包含 organization_id 和 developer_user_id 字段
+- [x] 已有项目数据回填正确（organization_id 和 developer_user_id 有值的项目比例合理）
+- [x] GET /api/admin/developers?q=xxx 返回拥有 dev_panel_access 的用户列表，支持搜索
+- [x] GET /api/admin/organizations?q=xxx 支持按名称/slug 搜索
+- [x] POST/PUT /api/admin/projects 支持 organization_id 和 developer_user_id 字段
+- [x] GET /api/admin/projects/:id 返回关联的组织名称和开发者用户名
+- [x] SearchSelect 组件可正常搜索、选择、清空，支持暗色模式
+- [x] 项目编辑页"所属开发者"SearchSelect 选中后 developer 文本字段和 developer_user_id 同步更新
+- [x] 项目编辑页"所属组织"SearchSelect 选中后 organization_id 正确设置
+- [x] 运维后台侧边栏显示"开发者管理"菜单项（需 dev:developer_manage 能力）
+- [x] 开发者管理页面显示开发者列表，支持搜索
+- [x] 开发者管理页面组织子标签显示组织列表，支持审核操作
+- [x] 前端构建无 TypeScript 错误
+- [x] 服务器部署完成，后端健康状态正常

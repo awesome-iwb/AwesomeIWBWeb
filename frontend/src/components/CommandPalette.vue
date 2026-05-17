@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, nextTick } from 'vue';
+import { ref, onMounted, computed, nextTick, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { Search, X, Folder, Hash, ArrowRight } from 'lucide-vue-next';
 
 import { useProjects } from '../composables/useProjects';
+import { useAnalytics } from '../composables/useAnalytics';
 import { includesNormalized } from '../utils/search';
 
 const props = defineProps<{
@@ -14,6 +15,7 @@ const emit = defineEmits(['close']);
 const router = useRouter();
 
 const { allProjects, fetchProjects } = useProjects();
+const { trackSearch } = useAnalytics();
 
 const query = ref('');
 const searchInput = ref<HTMLInputElement | null>(null);
@@ -27,6 +29,16 @@ const searchResults = computed(() => {
     p.keywords.some(k => includesNormalized(k, query.value)) ||
     includesNormalized(p.developer, query.value)
   ).slice(0, 8); // Max 8 results
+});
+
+let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+watch(query, (newVal) => {
+  if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+  if (newVal.trim()) {
+    searchDebounceTimer = setTimeout(() => {
+      trackSearch(newVal, searchResults.value.length);
+    }, 500);
+  }
 });
 
 const selectProject = (projectName: string) => {

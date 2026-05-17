@@ -5,6 +5,12 @@ import { VitePWA } from 'vite-plugin-pwa'
 import path from 'path'
 import fs from 'fs'
 
+const fePkg = JSON.parse(fs.readFileSync(path.resolve(__dirname, 'package.json'), 'utf-8'));
+const clientBuildId =
+  process.env.BUILD_ID?.trim() ||
+  process.env.VITE_CLIENT_BUILD_ID?.trim() ||
+  (typeof fePkg?.version === 'string' && fePkg.version.trim() ? `fe@${fePkg.version.trim()}` : 'fe@0');
+
 const data = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../backend/src/data.json'), 'utf-8'));
 const projectRoutes = data.categories.flatMap((c: any) => 
   c.projects.map((p: any) => `/project/${encodeURIComponent(p.name)}`)
@@ -121,6 +127,9 @@ function escapeHtml(str: string): string {
 }
 
 export default defineConfig({
+  define: {
+    'import.meta.env.VITE_CLIENT_BUILD_ID': JSON.stringify(clientBuildId),
+  },
   plugins: [
     vue(),
     tailwindcss(),
@@ -128,6 +137,7 @@ export default defineConfig({
       registerType: 'autoUpdate',
       injectRegister: 'auto',
       workbox: {
+        // 文档与 HTML 导航的缓存/旁路由网关层处理；此处仅声明 SW 对运行时 fetch 的策略。
         cleanupOutdatedCaches: true,
         clientsClaim: true,
         skipWaiting: true,
@@ -139,17 +149,10 @@ export default defineConfig({
             method: 'GET'
           },
           {
+            // 可变列表 API 禁止 SW 层 NetworkFirst 长缓存（曾导致编辑后最长约 120s 陈旧）。
             urlPattern: ({ url }) => url.pathname === '/api/stories' || url.pathname === '/api/projects',
-            handler: 'NetworkFirst',
-            method: 'GET',
-            options: {
-              cacheName: 'api-revalidate-cache',
-              expiration: {
-                maxEntries: 20,
-                maxAgeSeconds: 120
-              },
-              networkTimeoutSeconds: 3
-            }
+            handler: 'NetworkOnly',
+            method: 'GET'
           }
         ]
       },

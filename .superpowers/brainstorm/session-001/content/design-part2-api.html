@@ -1,0 +1,132 @@
+<h2>第二部分续：API 设计</h2>
+<p class="subtitle">新增 API 端点 + 修改现有端点</p>
+
+<div class="section">
+  <h3>🆕 新增 API：开发者后台 (/api/dev)</h3>
+  <div style="background: #1e293b; border-radius: 12px; padding: 16px; color: #e2e8f0; font-family: monospace; font-size: 11px; line-height: 1.8;">
+    <span style="color: #60a5fa;">── 我的项目 ──</span><br>
+    GET &nbsp;&nbsp;/api/dev/projects &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #94a3b8;">← 我参与的项目列表</span><br>
+    GET &nbsp;&nbsp;/api/dev/projects/:id &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #94a3b8;">← 项目详情（仅自己参与的）</span><br>
+    PATCH /api/dev/projects/:id &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #94a3b8;">← 编辑自己的项目</span><br>
+    <br>
+    <span style="color: #60a5fa;">── 项目成员管理 ──</span><br>
+    GET &nbsp;&nbsp;/api/dev/projects/:id/members &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #94a3b8;">← 查看项目成员</span><br>
+    POST &nbsp;/api/dev/projects/:id/members &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #94a3b8;">← 邀请协作者</span><br>
+    DELETE /api/dev/projects/:id/members/:userId <span style="color: #94a3b8;">← 移除协作者</span><br>
+    <br>
+    <span style="color: #60a5fa;">── Bug 反馈管理 ──</span><br>
+    GET &nbsp;&nbsp;/api/dev/feedback &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #94a3b8;">← 我项目的 Bug 列表</span><br>
+    PATCH /api/dev/feedback/:id &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #94a3b8;">← 修改 Bug 状态/标签</span><br>
+    POST &nbsp;/api/dev/feedback/:id/replies &nbsp;&nbsp;&nbsp;<span style="color: #94a3b8;">← 回复 Bug 反馈</span><br>
+    <br>
+    <span style="color: #60a5fa;">── 评论管理 ──</span><br>
+    GET &nbsp;&nbsp;/api/dev/comments &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #94a3b8;">← 我项目的评论列表</span><br>
+    DELETE /api/dev/comments/:id &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #94a3b8;">← 删除评论</span><br>
+    POST &nbsp;/api/dev/comments/:id/replies &nbsp;&nbsp;&nbsp;<span style="color: #94a3b8;">← 回复评论</span><br>
+    <br>
+    <span style="color: #60a5fa;">── 项目数据 ──</span><br>
+    GET &nbsp;&nbsp;/api/dev/stats &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #94a3b8;">← 我项目的统计数据</span><br>
+    GET &nbsp;&nbsp;/api/dev/stats/:projectId &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #94a3b8;">← 单项目详细数据</span><br>
+    <br>
+    <span style="color: #60a5fa;">── 组织管理 ──</span><br>
+    GET &nbsp;&nbsp;/api/dev/organizations &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #94a3b8;">← 我的组织列表</span><br>
+    POST &nbsp;/api/dev/organizations &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #94a3b8;">← 申请创建组织</span><br>
+    GET &nbsp;&nbsp;/api/dev/organizations/:id &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #94a3b8;">← 组织详情</span><br>
+    PATCH /api/dev/organizations/:id &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #94a3b8;">← 编辑组织信息（owner/admin）</span><br>
+    GET &nbsp;&nbsp;/api/dev/organizations/:id/members <span style="color: #94a3b8;">← 组织成员列表</span><br>
+    POST &nbsp;/api/dev/organizations/:id/members <span style="color: #94a3b8;">← 邀请成员（owner/admin）</span><br>
+    DELETE /api/dev/organizations/:id/members/:userId <span style="color: #94a3b8;">← 移除成员</span><br>
+    PATCH /api/dev/organizations/:id/members/:userId <span style="color: #94a3b8;">← 修改成员角色</span><br>
+    <br>
+    <span style="color: #60a5fa;">── 项目认领 ──</span><br>
+    POST &nbsp;/api/dev/project-claims &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #94a3b8;">← 申请认领项目</span><br>
+    GET &nbsp;&nbsp;/api/dev/project-claims &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #94a3b8;">← 我的认领申请</span><br>
+  </div>
+</div>
+
+<div class="section">
+  <h3>🆕 新增 API：运维后台扩展 (/api/admin)</h3>
+  <div style="background: #1e293b; border-radius: 12px; padding: 16px; color: #e2e8f0; font-family: monospace; font-size: 11px; line-height: 1.8;">
+    <span style="color: #f472b6;">── 组织审核 ──</span><br>
+    GET &nbsp;&nbsp;/api/admin/organizations &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #94a3b8;">← 组织列表（含 pending）</span><br>
+    GET &nbsp;&nbsp;/api/admin/organizations/:id &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #94a3b8;">← 组织详情</span><br>
+    POST &nbsp;/api/admin/organizations/:id/approve <span style="color: #94a3b8;">← 批准组织</span><br>
+    POST &nbsp;/api/admin/organizations/:id/reject &nbsp;<span style="color: #94a3b8;">← 拒绝组织</span><br>
+    PATCH /api/admin/organizations/:id &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #94a3b8;">← 编辑组织（暂停等）</span><br>
+    DELETE /api/admin/organizations/:id &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #94a3b8;">← 删除组织</span><br>
+    <br>
+    <span style="color: #f472b6;">── 项目认领审核 ──</span><br>
+    GET &nbsp;&nbsp;/api/admin/project-claims &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #94a3b8;">← 认领申请列表</span><br>
+    POST &nbsp;/api/admin/project-claims/:id/approve <span style="color: #94a3b8;">← 批准认领</span><br>
+    POST &nbsp;/api/admin/project-claims/:id/reject &nbsp;<span style="color: #94a3b8;">← 拒绝认领</span><br>
+    <br>
+    <span style="color: #f472b6;">── 项目成员管理（运维指定开发者）──</span><br>
+    POST &nbsp;/api/admin/projects/:id/members &nbsp;&nbsp;&nbsp;<span style="color: #94a3b8;">← 指定项目开发者</span><br>
+    DELETE /api/admin/projects/:id/members/:memberId <span style="color: #94a3b8;">← 移除项目开发者</span><br>
+  </div>
+</div>
+
+<div class="section">
+  <h3>🔄 修改现有 API</h3>
+  <div style="font-size: 12px; line-height: 2;">
+    <div style="background: #fef3c7; border-radius: 6px; padding: 8px 12px; margin-bottom: 6px;">
+      <strong>POST /api/submissions</strong> — 提交项目后自动创建 project_members 记录（submitter 为 owner），自动授予 dev_panel_access
+    </div>
+    <div style="background: #fef3c7; border-radius: 6px; padding: 8px 12px; margin-bottom: 6px;">
+      <strong>POST /api/dev/submissions</strong> — 开发者提交项目更新后，校验是否为项目成员
+    </div>
+    <div style="background: #fef3c7; border-radius: 6px; padding: 8px 12px; margin-bottom: 6px;">
+      <strong>POST /api/feedback</strong> — 提交反馈前校验 user:feedback 能力
+    </div>
+    <div style="background: #fef3c7; border-radius: 6px; padding: 8px 12px; margin-bottom: 6px;">
+      <strong>POST /api/upload</strong> — 上传图片前校验 user:avatar 能力（头像场景）
+    </div>
+    <div style="background: #fef3c7; border-radius: 6px; padding: 8px 12px; margin-bottom: 6px;">
+      <strong>GET /api/auth/me</strong> — 返回结果增加 organizations 字段（用户所属组织列表）
+    </div>
+    <div style="background: #fef3c7; border-radius: 6px; padding: 8px 12px; margin-bottom: 6px;">
+      <strong>GET /api/projects/:name</strong> — 返回结果增加 developers 字段（项目开发者列表，含组织）
+    </div>
+    <div style="background: #fef3c7; border-radius: 6px; padding: 8px 12px; margin-bottom: 6px;">
+      <strong>GET /api/admin/projects/:id</strong> — 返回结果增加 members 字段，支持在项目编辑页指定开发者
+    </div>
+    <div style="background: #fef3c7; border-radius: 6px; padding: 8px 12px;">
+      <strong>PATCH /api/admin/users/:id/role</strong> — 当用户获得项目成员身份时，自动将 role 从 user 提升为 dev
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>🔐 权限校验逻辑变更</h3>
+  <div style="background: #f8fafc; border-radius: 12px; padding: 16px; font-size: 12px; line-height: 2;">
+    <div style="margin-bottom: 12px;">
+      <strong>现有逻辑：</strong><br>
+      <code>requireCapability('project:update')</code> → 全局能力，有就能改所有项目
+    </div>
+    <div>
+      <strong>新逻辑：</strong><br>
+      <code>requireCapability('dev:project_edit')</code> → 全局能力 + 资源级校验<br>
+      <span style="color: #64748b;">即：先检查是否有 dev:project_edit 能力，再检查是否为该项目的成员</span><br>
+      <span style="color: #1e40af;">新增辅助函数：</span><code>requireProjectMember(projectIdParam)</code><br>
+      <span style="color: #64748b;">自动从路由参数取 projectId，查 project_members 表验证</span>
+    </div>
+  </div>
+</div>
+
+<div style="margin-top: 16px; background: #eff6ff; border-radius: 12px; padding: 16px; border: 1px solid #93c5fd;">
+  <h3 style="margin: 0 0 8px 0; color: #1e40af; font-size: 14px;">📌 自动提权逻辑</h3>
+  <div style="font-size: 12px; color: #1e40af; line-height: 2;">
+    <strong>触发条件：</strong>用户首次成为项目成员（owner 或 collaborator）<br>
+    <strong>执行操作：</strong><br>
+    1. 将 users.role 从 'user' 更新为 'dev'<br>
+    2. 授予 dev_panel_access + dev:* 系列能力<br>
+    3. 创建通知告知用户<br>
+    <br>
+    <strong>降权逻辑：</strong>当用户不再是任何项目的成员时<br>
+    1. 将 users.role 从 'dev' 更新为 'user'<br>
+    2. 撤销 dev_panel_access + dev:* 系列能力<br>
+    3. 创建通知告知用户<br>
+    <br>
+    <em style="color: #92400e;">⚠️ 注意：运维手动分配的 dev 权限不受此逻辑影响（通过 user_capabilities 表保留）</em>
+  </div>
+</div>

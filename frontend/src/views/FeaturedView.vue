@@ -5,6 +5,7 @@ import { useHead } from '@unhead/vue';
 import { Star, X, Download } from 'lucide-vue-next';
 import DOMPurify from 'dompurify';
 import { useApi } from '../composables/useApi';
+import { useAnalytics } from '../composables/useAnalytics';
 import { API } from '../api/endpoints';
 
 useHead({
@@ -45,6 +46,7 @@ const selectedStory = ref<FeaturedStory | null>(null);
 const isStoryOpen = ref(false);
 
 const { apiFetch } = useApi();
+const { trackClick } = useAnalytics();
 const stories = ref<FeaturedStory[]>([]);
 
 onMounted(async () => {
@@ -59,6 +61,7 @@ onMounted(async () => {
 });
 
 const navigateToProject = (projectName: string) => {
+  trackClick(projectName, 'click');
   if (isStoryOpen.value) {
     closeStory();
     setTimeout(() => {

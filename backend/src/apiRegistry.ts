@@ -18,6 +18,10 @@ export const API_REGISTRY: ApiRouteSpec[] = [
   { id: 'projects.detail', method: 'GET', path: '/api/projects/:name', scope: 'public' },
   { id: 'stats', method: 'GET', path: '/api/stats', scope: 'public' },
 
+  { id: 'track.pageview', method: 'POST', path: '/api/track/pageview', scope: 'public' },
+  { id: 'track.click', method: 'POST', path: '/api/track/click', scope: 'public' },
+  { id: 'track.search', method: 'POST', path: '/api/track/search', scope: 'public' },
+
   { id: 'feedback.list', method: 'GET', path: '/api/feedback', scope: 'public' },
   { id: 'feedback.create', method: 'POST', path: '/api/feedback', scope: 'auth' },
   { id: 'feedback.update', method: 'PATCH', path: '/api/feedback/:id', scope: 'auth' },
@@ -35,6 +39,7 @@ export const API_REGISTRY: ApiRouteSpec[] = [
   { id: 'uploads.get', method: 'GET', path: '/api/uploads/:filename', scope: 'public' },
   { id: 'uploads.create', method: 'POST', path: '/api/upload', scope: 'auth' },
   { id: 'avatar.upload', method: 'POST', path: '/api/user/avatar', scope: 'auth' },
+  { id: 'user.avatar.source', method: 'PATCH', path: '/api/user/avatar-source', scope: 'auth' },
 
   { id: 'moderation.my', method: 'GET', path: '/api/moderation/my', scope: 'auth' },
   { id: 'notifications.list', method: 'GET', path: '/api/notifications', scope: 'auth' },
@@ -90,6 +95,7 @@ export const API_REGISTRY: ApiRouteSpec[] = [
   { id: 'admin.media.batchTag', method: 'POST', path: '/api/admin/media/batch-tag', scope: 'admin' },
   { id: 'admin.media.batchDelete', method: 'POST', path: '/api/admin/media/batch-delete', scope: 'admin' },
   { id: 'admin.dashboard', method: 'GET', path: '/api/admin/dashboard', scope: 'admin' },
+  { id: 'admin.analytics', method: 'GET', path: '/api/admin/analytics', scope: 'admin' },
   { id: 'admin.roleTemplates', method: 'GET', path: '/api/admin/role-templates', scope: 'admin' },
 
   { id: 'auth.casdoor.login', method: 'GET', path: '/api/auth/login', scope: 'public' },

@@ -30,7 +30,7 @@ export const adminFetch = async (url: string, options: RequestInit = {}) => {
   const method = (options.method ?? 'GET').toUpperCase();
   const requestOptions: RequestInit = { ...options, headers, credentials: 'include' };
   if (method === 'GET' && requestOptions.cache === undefined) {
-    requestOptions.cache = 'no-cache';
+    requestOptions.cache = 'no-store';
   }
   return fetch(url, requestOptions);
 };
@@ -49,13 +49,27 @@ export const formatAdminError = (payload: any, fallback: string, status?: number
   return fallback;
 };
 
-export const isInternalUploadUrl = (value: string): boolean => value.startsWith('/api/uploads/');
+export type NormalizeMediaUrlOptions = {
+  publicPrefix?: string;
+  allowedExternalHosts?: string[];
+};
 
-export const normalizeMediaUrl = (value: unknown): string => {
+export const isInternalUploadUrl = (value: string, prefix = '/api/uploads/'): boolean => value.startsWith(prefix);
+
+export const normalizeMediaUrl = (value: unknown, options?: NormalizeMediaUrlOptions): string => {
+  const publicPrefix = options?.publicPrefix ?? '/api/uploads/';
+  const allowedExternalHosts = options?.allowedExternalHosts ?? [];
   const text = String(value ?? '').trim();
   if (!text) return '';
-  if (isInternalUploadUrl(text)) return text;
-  return '';
+  if (text.startsWith(publicPrefix)) return text;
+  if (text.startsWith('http')) {
+    try {
+      const host = new URL(text).hostname;
+      if (allowedExternalHosts.includes(host)) return text;
+    } catch {}
+  }
+  console.warn(`[normalizeMediaUrl] URL 不符合预期前缀 "${publicPrefix}" 且不在外部允许列表中，已保留原值: ${text}`);
+  return text;
 };
 
 export const uploadFile = async (file: File): Promise<string> => {
