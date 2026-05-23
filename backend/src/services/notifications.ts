@@ -1,6 +1,6 @@
 import { sql } from "../db/client";
 
-export type NotificationType = "moderation_approved" | "moderation_rejected";
+export type NotificationType = "moderation_approved" | "moderation_rejected" | "article_edited" | "article_comment" | "article_annotation" | "article_conflict";
 
 export type Notification = {
   id: string;

@@ -19,6 +19,11 @@ export type MediaAsset = {
   last_referenced_at: string | null;
 };
 
+export type MediaAssetListItem = MediaAsset & {
+  ref_count: number;
+  tags: string[];
+};
+
 export type MediaReference = {
   media_id: string;
   entity_type: string;
@@ -27,6 +32,43 @@ export type MediaReference = {
   ref_type: string;
   created_at: string;
 };
+
+async function touchMediaLastReferenced(mediaId: string): Promise<void> {
+  if (!dbEnabled) return;
+  await sql()`update media_assets set last_referenced_at = now() where id = ${mediaId}`;
+}
+
+export async function findActiveMediaBySha256(sha256: string): Promise<MediaAsset | null> {
+  if (!dbEnabled) return null;
+  const [row] = await sql()<MediaAsset[]>`
+    select id, sha256, storage_key, url, mime, size, width, height, source, uploader_id, status, created_at, deleted_at, last_referenced_at
+    from media_assets
+    where sha256 = ${sha256} and status = 'active'
+    order by created_at asc
+    limit 1
+  `;
+  return row ?? null;
+}
+
+export async function getMediaAssetByStorageKey(storageKey: string): Promise<MediaAsset | null> {
+  if (!dbEnabled) return null;
+  const [row] = await sql()<MediaAsset[]>`
+    select id, sha256, storage_key, url, mime, size, width, height, source, uploader_id, status, created_at, deleted_at, last_referenced_at
+    from media_assets
+    where storage_key = ${storageKey}
+    order by case when status = 'active' then 0 else 1 end, created_at desc
+    limit 1
+  `;
+  return row ?? null;
+}
+
+export async function getMediaRefCount(mediaId: string): Promise<number> {
+  if (!dbEnabled) return 0;
+  const [{ count }] = await sql()<Array<{ count: string }>>`
+    select count(*)::text as count from media_references where media_id = ${mediaId}
+  `;
+  return Number(count) || 0;
+}
 
 export async function createOrGetMediaAssetFromUpload(input: {
   sha256: string;
@@ -69,33 +111,67 @@ export async function listMediaAssets(
   },
   pagination: { page?: number; pageSize?: number },
 ) {
-  if (!dbEnabled) return { items: [], page: 1, pageSize: 50, total: 0 };
-  const db = sql();
+  if (!dbEnabled) return { items: [] as MediaAssetListItem[], page: 1, pageSize: 50, total: 0 };
   const page = Math.max(1, pagination.page ?? 1);
   const pageSize = Math.min(100, Math.max(1, pagination.pageSize ?? 50));
   const offset = (page - 1) * pageSize;
 
   const whereParts = [];
   const q = filters.q?.trim();
-  if (q) whereParts.push(sql()`(url ilike ${"%" + q + "%"} or sha256 ilike ${"%" + q + "%"} or storage_key ilike ${"%" + q + "%"})`);
-  if (filters.status) whereParts.push(sql()`status = ${filters.status}`);
-  if (filters.mime) whereParts.push(sql()`mime = ${filters.mime}`);
-  if (filters.source) whereParts.push(sql()`source = ${filters.source}`);
+  if (q) whereParts.push(sql()`(m.url ilike ${"%" + q + "%"} or m.sha256 ilike ${"%" + q + "%"} or m.storage_key ilike ${"%" + q + "%"})`);
+  if (filters.status) whereParts.push(sql()`m.status = ${filters.status}`);
+  if (filters.mime) whereParts.push(sql()`m.mime = ${filters.mime}`);
+  if (filters.source) whereParts.push(sql()`m.source = ${filters.source}`);
   if (filters.tag) {
-    whereParts.push(sql()`id in (select media_id from media_tags where tag = ${filters.tag})`);
+    whereParts.push(sql()`m.id in (select media_id from media_tags where tag = ${filters.tag})`);
   }
   const where = whereParts.length ? sql().join(whereParts, sql()` and `) : sql()`true`;
 
-  const items = await sql()<MediaAsset[]>`
-    select id, sha256, storage_key, url, mime, size, width, height, source, uploader_id, status, created_at, deleted_at, last_referenced_at
-    from media_assets
+  const rows = await sql()<
+    Array<
+      MediaAsset & {
+        ref_count: number;
+        tags: string[] | null;
+      }
+    >
+  >`
+    select
+      m.id, m.sha256, m.storage_key, m.url, m.mime, m.size, m.width, m.height, m.source, m.uploader_id, m.status, m.created_at, m.deleted_at, m.last_referenced_at,
+      coalesce(rc.ref_count, 0)::int as ref_count,
+      coalesce(tg.tags, '{}'::text[]) as tags
+    from media_assets m
+    left join lateral (
+      select count(*)::int as ref_count from media_references r where r.media_id = m.id
+    ) rc on true
+    left join lateral (
+      select array_agg(tag order by tag) as tags from media_tags mt where mt.media_id = m.id
+    ) tg on true
     where ${where}
-    order by created_at desc
+    order by m.created_at desc
     limit ${pageSize} offset ${offset}
   `;
   const [{ count }] = await sql()<Array<{ count: string }>>`
-    select count(*)::text as count from media_assets where ${where}
+    select count(*)::text as count from media_assets m where ${where}
   `;
+
+  const items: MediaAssetListItem[] = rows.map((row) => ({
+    id: row.id,
+    sha256: row.sha256,
+    storage_key: row.storage_key,
+    url: row.url,
+    mime: row.mime,
+    size: row.size,
+    width: row.width,
+    height: row.height,
+    source: row.source,
+    uploader_id: row.uploader_id,
+    status: row.status,
+    created_at: row.created_at,
+    deleted_at: row.deleted_at,
+    last_referenced_at: row.last_referenced_at,
+    ref_count: row.ref_count ?? 0,
+    tags: Array.isArray(row.tags) ? row.tags : [],
+  }));
 
   return { items, page, pageSize, total: Number(count) };
 }
@@ -123,6 +199,7 @@ export async function upsertMediaReference(input: {
     values (${input.mediaId}, ${input.entityType}, ${input.entityId}, ${input.fieldPath}, ${input.refType ?? "usage"})
     on conflict do nothing
   `;
+  await touchMediaLastReferenced(input.mediaId);
 }
 
 export async function upsertMediaReferencesForEntity(params: {
@@ -144,6 +221,7 @@ export async function upsertMediaReferencesForEntity(params: {
       values (${rows[0].id}, ${params.entityType}, ${params.entityId}, ${field.fieldPath}, ${params.refType ?? "usage"})
       on conflict do nothing
     `;
+    await touchMediaLastReferenced(rows[0].id);
     count++;
   }
   return count;
@@ -176,7 +254,7 @@ export async function getMediaTags(mediaId: string): Promise<string[]> {
   const rows = await sql()<Array<{ tag: string }>>`
     select tag from media_tags where media_id = ${mediaId} order by tag
   `;
-  return rows.map(r => r.tag);
+  return rows.map((r) => r.tag);
 }
 
 export async function setMediaTags(mediaId: string, tags: string[]): Promise<string[]> {
@@ -206,7 +284,34 @@ export async function batchSoftDeleteMedia(mediaIds: string[]): Promise<number> 
   let count = 0;
   for (const mid of mediaIds) {
     const result = await sql()`update media_assets set status = 'deleted', deleted_at = coalesce(deleted_at, now()) where id = ${mid} and status = 'active'`;
-    count += (result as any).rowCount ?? 0;
+    count += (result as any).count ?? (result as any).rowCount ?? 0;
   }
   return count;
+}
+
+export type PurgeCandidate = MediaAsset & { ref_count: number };
+
+export async function listPurgeCandidates(minDeletedDays = 7): Promise<PurgeCandidate[]> {
+  if (!dbEnabled) return [];
+  return sql()<PurgeCandidate[]>`
+    select
+      m.id, m.sha256, m.storage_key, m.url, m.mime, m.size, m.width, m.height, m.source, m.uploader_id, m.status, m.created_at, m.deleted_at, m.last_referenced_at,
+      coalesce(rc.ref_count, 0)::int as ref_count
+    from media_assets m
+    left join lateral (
+      select count(*)::int as ref_count from media_references r where r.media_id = m.id
+    ) rc on true
+    where m.status = 'deleted'
+      and m.deleted_at is not null
+      and m.deleted_at < now() - (${minDeletedDays}::text || ' days')::interval
+      and coalesce(rc.ref_count, 0) = 0
+    order by m.deleted_at asc
+  `;
+}
+
+export async function hardDeleteMediaRecord(mediaId: string): Promise<boolean> {
+  if (!dbEnabled) return false;
+  const result = await sql()`delete from media_assets where id = ${mediaId}`;
+  const count = (result as any).count ?? (result as any).rowCount ?? 0;
+  return count > 0;
 }

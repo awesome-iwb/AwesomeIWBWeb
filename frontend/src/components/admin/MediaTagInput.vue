@@ -12,7 +12,7 @@
       v-if="!disabled"
       v-model="newTag"
       @keydown.enter.prevent="addTag"
-      class="px-2 py-0.5 rounded text-xs border border-slate-200 dark:border-slate-700 bg-transparent outline-none focus:border-emerald-500 w-20"
+      class="px-2 py-0.5 rounded text-xs border border-border bg-transparent outline-none focus:border-emerald-500 w-20"
       placeholder="+ 标签"
     />
   </div>

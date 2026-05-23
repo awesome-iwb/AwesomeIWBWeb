@@ -1,104 +1,118 @@
 <template>
   <div class="grid grid-cols-1 lg:grid-cols-4 gap-4 lg:gap-8 h-full min-h-0">
-    <div class="lg:col-span-1 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col min-h-0" :class="{ 'hidden lg:flex': isMobile && mobileView === 'detail' }">
-      <div class="p-4 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
+    <div class="lg:col-span-1 bg-card rounded-3xl border border-border shadow-sm overflow-hidden flex flex-col min-h-0" :class="{ 'hidden lg:flex': isMobile && mobileView === 'detail' }">
+      <div class="p-4 sm:p-5 border-b border-border bg-card/50">
         <h2 class="font-bold text-lg">内容审核队列</h2>
       </div>
-      <div class="p-4 border-b border-slate-100 dark:border-slate-700 space-y-3">
+      <div class="p-4 sm:p-5 border-b border-border space-y-3">
         <div v-if="!lockedKind" class="flex gap-2">
           <button
             @click="moderationKind = 'comment'"
-            class="flex-1 px-3 py-3 lg:py-2 rounded-xl text-base lg:text-sm font-bold transition-colors"
-            :class="moderationKind === 'comment' ? 'bg-amber-500 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200'"
+            class="flex-1 px-3 py-3 sm:py-2 rounded-xl text-base sm:text-sm font-bold transition-colors min-h-[44px] min-w-[44px]"
+            :class="moderationKind === 'comment' ? 'bg-amber-500 text-white' : 'bg-secondary text-foreground'"
           >
             评论
           </button>
           <button
             @click="moderationKind = 'bug'"
-            class="flex-1 px-3 py-3 lg:py-2 rounded-xl text-base lg:text-sm font-bold transition-colors"
-            :class="moderationKind === 'bug' ? 'bg-amber-500 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200'"
+            class="flex-1 px-3 py-3 sm:py-2 rounded-xl text-base sm:text-sm font-bold transition-colors min-h-[44px] min-w-[44px]"
+            :class="moderationKind === 'bug' ? 'bg-amber-500 text-white' : 'bg-secondary text-foreground'"
           >
             Bug反馈
           </button>
         </div>
-        <select v-model="moderationStatus" @change="moderationQuery.page = 1; fetchModeration()" class="w-full px-3 py-3 lg:py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-amber-500 text-base lg:text-sm">
+        <select v-model="moderationStatus" @change="moderationQuery.page = 1; fetchModeration()" class="w-full px-3 py-3 sm:py-2 rounded-xl border border-border bg-card outline-none focus:border-amber-500 text-base sm:text-sm min-h-[48px] sm:min-h-[40px]">
           <option value="pending">待审核</option>
           <option value="approved">已通过</option>
           <option value="rejected">已驳回</option>
         </select>
-        <button @click="moderationQuery.page = 1; fetchModeration()" class="w-full px-3 py-3 lg:py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-base lg:text-sm font-bold transition-colors">刷新</button>
+        <button @click="moderationQuery.page = 1; fetchModeration()" class="w-full px-3 py-3 sm:py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-base sm:text-sm font-bold transition-colors min-h-[44px] min-w-[44px]">刷新</button>
       </div>
-      <div class="flex-1 overflow-y-auto p-4 space-y-2">
+      <div class="flex-1 overflow-y-auto p-4 sm:p-5 space-y-1.5">
         <div
           v-for="m in moderationPage.items"
           :key="m.id"
           @click="selectModeration(m); if (isMobile) openDetail()"
-          class="p-3 rounded-xl border cursor-pointer transition-all duration-200"
-          :class="selectedModerationId === m.id ? 'bg-amber-500 text-white border-amber-500 shadow-md shadow-amber-500/20' : 'bg-slate-50 dark:bg-slate-900/50 border-transparent hover:border-amber-300'"
+          class="p-3 rounded-xl border cursor-pointer transition-all duration-200 flex items-center gap-3 min-h-[48px]"
+          :class="selectedModerationId === m.id ? 'bg-amber-50 dark:bg-amber-500/10 border-l-[3px] border-l-amber-500 border-y border-r border-transparent' : 'bg-card/50 border-transparent hover:bg-accent/80'"
         >
-          <div class="font-bold text-sm truncate">{{ moderationKind === 'comment' ? '评论' : m.title || 'Bug反馈' }}</div>
-          <div class="text-xs opacity-80 truncate mt-1">{{ m.project_name }} · {{ m.actor_username }}</div>
-          <div class="text-xs opacity-60 mt-1">{{ new Date(m.created_at).toLocaleString() }}</div>
+          <component :is="moderationKind === 'comment' ? MessageSquare : Bug" class="w-5 h-5 text-slate-400 shrink-0" />
+          <div class="flex-1 min-w-0">
+            <div class="font-medium text-base sm:text-sm truncate text-foreground">{{ moderationKind === 'comment' ? '评论' : m.title || 'Bug反馈' }}</div>
+            <div class="text-base sm:text-xs text-muted-foreground truncate mt-0.5">{{ m.project_name }} · {{ m.actor_username }}</div>
+            <div class="text-base sm:text-xs text-slate-400 mt-0.5">{{ new Date(m.created_at).toLocaleString() }}</div>
+          </div>
         </div>
         <ui-EmptyState v-if="moderationPage.items.length === 0" :icon="Inbox" title="暂无数据" />
       </div>
-      <ui-Pagination :page="moderationQuery.page" :total="moderationPage.total" :page-size="moderationQuery.pageSize" @update:page="onModerationPageChange" />
+      <Pagination :page="moderationQuery.page" :total="Math.ceil(moderationPage.total / moderationQuery.pageSize)" :items-per-page="1" :sibling-count="1" @update:page="onModerationPageChange">
+        <PaginationList v-slot="{ items }" class="flex items-center gap-1">
+          <PaginationPrev />
+          <template v-for="(item, index) in items" :key="index">
+            <PaginationListItem v-if="item.type === 'page'" :value="item.value" as-child>
+              <Button variant="outline" class="w-9 h-9" :class="item.value === moderationQuery.page ? 'bg-[var(--color-brand-500)] text-white border-[var(--color-brand-500)]' : ''">{{ item.value }}</Button>
+            </PaginationListItem>
+            <PaginationEllipsis v-else :index="index" />
+          </template>
+          <PaginationNext />
+        </PaginationList>
+      </Pagination>
     </div>
 
     <!-- 审核详情 -->
-    <div class="lg:col-span-3 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col min-h-0" :class="{ 'hidden': isMobile && mobileView === 'list' }" v-if="moderationDraft">
-      <div class="p-4 lg:p-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50">
-        <h2 class="text-lg lg:text-xl font-bold text-slate-800 dark:text-white">审核{{ moderationKind === 'comment' ? '评论' : 'Bug反馈' }}</h2>
+    <div class="lg:col-span-3 bg-card rounded-3xl border border-border shadow-sm overflow-hidden flex flex-col min-h-0" :class="{ 'hidden': isMobile && mobileView === 'list' }" v-if="moderationDraft">
+      <div class="p-4 sm:p-5 lg:p-6 border-b border-border bg-accent/50 dark:bg-slate-900/50">
+        <h2 class="text-lg lg:text-xl font-bold text-foreground">审核{{ moderationKind === 'comment' ? '评论' : 'Bug反馈' }}</h2>
       </div>
-      <div class="flex-1 min-h-0 overflow-y-auto p-4 lg:p-8 space-y-4 lg:space-y-6">
+      <div class="flex-1 min-h-0 overflow-y-auto p-4 sm:p-5 lg:p-8 space-y-4 lg:space-y-6">
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
-          <div class="p-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
-            <div class="text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">项目</div>
-            <div class="text-sm text-slate-900 dark:text-white">{{ moderationDraft.project_name }}</div>
+          <div class="p-4 sm:p-5 rounded-2xl border border-border bg-card/50">
+            <div class="text-base sm:text-sm font-bold text-muted-foreground mb-2">项目</div>
+            <div class="text-base sm:text-sm text-foreground">{{ moderationDraft.project_name }}</div>
           </div>
-          <div class="p-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
-            <div class="text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">提交者</div>
-            <div class="text-sm text-slate-900 dark:text-white">{{ moderationDraft.actor_username }} ({{ moderationDraft.actor_role }})</div>
+          <div class="p-4 sm:p-5 rounded-2xl border border-border bg-card/50">
+            <div class="text-base sm:text-sm font-bold text-muted-foreground mb-2">提交者</div>
+            <div class="text-base sm:text-sm text-foreground">{{ moderationDraft.actor_username }} ({{ moderationDraft.actor_role }})</div>
           </div>
         </div>
 
-        <div v-if="moderationKind === 'bug' && moderationDraft.title" class="p-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
-          <div class="text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">标题</div>
-          <div class="text-sm text-slate-900 dark:text-white">{{ moderationDraft.title }}</div>
+        <div v-if="moderationKind === 'bug' && moderationDraft.title" class="p-4 sm:p-5 rounded-2xl border border-border bg-card/50">
+          <div class="text-base sm:text-sm font-bold text-muted-foreground mb-2">标题</div>
+          <div class="text-base sm:text-sm text-foreground">{{ moderationDraft.title }}</div>
         </div>
 
-        <div class="p-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
-          <div class="text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">内容</div>
-          <div class="text-sm text-slate-900 dark:text-white whitespace-pre-wrap">{{ moderationDraft.body }}</div>
+        <div class="p-4 sm:p-5 rounded-2xl border border-border bg-card/50">
+          <div class="text-base sm:text-sm font-bold text-muted-foreground mb-2">内容</div>
+          <div class="text-base sm:text-sm text-foreground whitespace-pre-wrap">{{ moderationDraft.body }}</div>
         </div>
 
-        <div v-if="moderationKind === 'bug' && moderationDraft.labels?.length" class="p-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
-          <div class="text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">标签</div>
+        <div v-if="moderationKind === 'bug' && moderationDraft.labels?.length" class="p-4 sm:p-5 rounded-2xl border border-border bg-card/50">
+          <div class="text-base sm:text-sm font-bold text-muted-foreground mb-2">标签</div>
           <div class="flex flex-wrap gap-2">
             <span v-for="label in moderationDraft.labels" :key="label" class="px-2 py-1 rounded-full bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-500/20 text-xs font-bold">{{ label }}</span>
           </div>
         </div>
 
         <div class="space-y-2">
-          <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">驳回原因（可选）</label>
-          <textarea v-model="moderationReviewNote" rows="2" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-amber-500 resize-none text-base"></textarea>
+          <label class="block text-base sm:text-sm font-bold text-muted-foreground mb-2">驳回原因（可选）</label>
+          <textarea v-model="moderationReviewNote" rows="2" class="w-full px-4 py-3 rounded-xl border border-border bg-card outline-none focus:border-amber-500 resize-none text-base sm:text-sm min-h-[48px]"></textarea>
         </div>
 
-        <div v-if="moderationDraft.status !== 'pending'" class="p-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
-          <div class="text-sm font-bold text-slate-700 dark:text-slate-300">审核状态</div>
-          <div class="text-sm mt-1" :class="moderationDraft.status === 'approved' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'">
+        <div v-if="moderationDraft.status !== 'pending'" class="p-4 sm:p-5 rounded-2xl border border-border bg-card/50">
+          <div class="text-base sm:text-sm font-bold text-muted-foreground">审核状态</div>
+          <div class="text-base sm:text-sm mt-1" :class="moderationDraft.status === 'approved' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'">
             {{ moderationDraft.status === 'approved' ? '已通过' : '已驳回' }}
             <span v-if="moderationDraft.review_note"> - {{ moderationDraft.review_note }}</span>
           </div>
         </div>
       </div>
       <!-- 操作栏 -->
-      <div class="p-4 border-t border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 flex flex-col sm:flex-row gap-3" v-if="moderationDraft.status === 'pending'">
-        <button @click="approveModeration" class="flex-1 px-4 py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold transition-colors">通过</button>
-        <button @click="rejectModeration" class="flex-1 px-4 py-3 rounded-2xl bg-rose-500 hover:bg-rose-600 text-white font-bold transition-colors">驳回</button>
+      <div class="p-4 sm:p-5 border-t border-border bg-card flex flex-col sm:flex-row gap-3" v-if="moderationDraft.status === 'pending'">
+        <button @click="approveModeration" class="flex-1 px-4 py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold transition-colors min-h-[44px] min-w-[44px]">通过</button>
+        <button @click="rejectModeration" class="flex-1 px-4 py-3 rounded-2xl bg-rose-500 hover:bg-rose-600 text-white font-bold transition-colors min-h-[44px] min-w-[44px]">驳回</button>
       </div>
     </div>
-    <div v-else class="lg:col-span-3 flex items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-3xl min-h-[300px]" :class="{ 'hidden': isMobile && mobileView === 'list' }">
+    <div v-else class="lg:col-span-3 flex items-center justify-center border-2 border-dashed border-border rounded-3xl min-h-[300px]" :class="{ 'hidden': isMobile && mobileView === 'list' }">
       <p class="text-slate-400">请在左侧选择一条待审核内容</p>
     </div>
   </div>
@@ -107,8 +121,10 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, onUnmounted } from 'vue';
 import { adminFetch, formatAdminError } from '../../composables/useAdminFetch';
-import { Pagination as uiPagination, EmptyState as uiEmptyState } from '../../components/ui';
-import { Inbox } from 'lucide-vue-next';
+import { EmptyState as uiEmptyState } from '../../components/ui';
+import { Pagination, PaginationList, PaginationListItem, PaginationPrev, PaginationNext, PaginationEllipsis } from '../../components/ui/pagination';
+import { Button } from '../../components/ui/button';
+import { Inbox, MessageSquare, Bug } from 'lucide-vue-next';
 
 const props = withDefaults(
   defineProps<{ lockedKind?: 'comment' | 'bug' | null }>(),

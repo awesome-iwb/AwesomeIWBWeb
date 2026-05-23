@@ -1,8 +1,8 @@
 <template>
   <div class="space-y-3">
     <div v-if="canManage" class="flex items-center gap-2">
-      <input type="text" v-model="inviteUserId" class="flex-1 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-blue-500 text-sm" placeholder="输入用户 ID 邀请" />
-      <select v-model="inviteRole" class="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-blue-500 text-sm">
+      <input type="text" v-model="inviteUserId" class="flex-1 px-3 py-2 rounded-xl border border-border bg-card outline-none focus:border-blue-500 text-sm" placeholder="输入用户 ID 邀请" />
+      <select v-model="inviteRole" class="px-3 py-2 rounded-xl border border-border bg-card outline-none focus:border-blue-500 text-sm">
         <option value="collaborator" v-if="targetType === 'project'">协作者</option>
         <option value="owner" v-if="targetType === 'project'">所有者</option>
         <option value="member" v-if="targetType === 'organization'">成员</option>
@@ -14,14 +14,14 @@
     </div>
 
     <div class="space-y-2">
-      <div v-for="m in members" :key="m.user_id ?? m.org_id ?? ''" class="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-900/50">
-        <div class="w-8 h-8 rounded-full overflow-hidden bg-slate-200 dark:bg-slate-700 flex-shrink-0">
+      <div v-for="m in members" :key="m.user_id ?? m.org_id ?? ''" class="flex items-center gap-3 p-3 rounded-xl bg-card">
+        <div class="w-8 h-8 rounded-full overflow-hidden bg-muted flex-shrink-0">
           <img v-if="m.user_avatar_url || m.org_avatar_url" :src="m.user_avatar_url || m.org_avatar_url" class="w-full h-full object-cover" />
-          <div v-else class="w-full h-full flex items-center justify-center text-xs font-bold text-slate-400">{{ (m.user_name || m.org_name || '?')[0] }}</div>
+          <div v-else class="w-full h-full flex items-center justify-center text-xs font-bold text-muted-foreground">{{ (m.user_name || m.org_name || '?')[0] }}</div>
         </div>
         <div class="flex-1 min-w-0">
-          <div class="text-sm font-medium truncate text-slate-900 dark:text-white">{{ m.user_name || m.org_name || '未知' }}</div>
-          <div v-if="m.org_name && m.user_name" class="text-[10px] text-slate-400">组织: {{ m.org_name }}</div>
+          <div class="text-sm font-medium truncate text-foreground">{{ m.user_name || m.org_name || '未知' }}</div>
+          <div v-if="m.org_name && m.user_name" class="text-[10px] text-muted-foreground">组织: {{ m.org_name }}</div>
         </div>
         <span class="text-[10px] px-1.5 py-0.5 rounded font-medium flex-shrink-0" :class="roleClass(m.role)">
           {{ roleLabel(m.role) }}
@@ -31,7 +31,7 @@
             v-if="targetType === 'organization' && m.role !== 'owner'"
             :value="m.role"
             @change="handleChangeRole(m.user_id, ($event.target as HTMLSelectElement).value)"
-            class="text-xs px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none"
+            class="text-xs px-2 py-1 rounded-lg border border-border bg-card outline-none"
           >
             <option value="admin">管理员</option>
             <option value="member">成员</option>
@@ -76,7 +76,7 @@ const roleLabel = (role: string) => {
 const roleClass = (role: string) => {
   if (role === 'owner') return 'bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400';
   if (role === 'admin') return 'bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400';
-  return 'bg-slate-100 dark:bg-slate-700 text-slate-500';
+  return 'bg-secondary text-muted-foreground';
 };
 
 const handleInvite = async () => {

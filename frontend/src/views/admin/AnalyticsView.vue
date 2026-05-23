@@ -1,9 +1,9 @@
 <template>
   <div class="space-y-4 lg:space-y-6 max-w-full overflow-x-hidden">
     <div class="flex items-center justify-between">
-      <h2 class="font-bold text-lg lg:text-xl text-slate-900 dark:text-white">数据分析</h2>
-      <div class="flex gap-1 bg-slate-100 dark:bg-slate-700 rounded-lg p-0.5">
-        <button v-for="d in [7, 30, 90]" :key="d" @click="days = d" class="px-3 py-1 rounded-md text-xs font-medium transition-colors" :class="days === d ? 'bg-white dark:bg-slate-600 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'">{{ d }}天</button>
+      <h2 class="font-bold text-lg lg:text-xl text-foreground">数据分析</h2>
+      <div class="flex gap-1 bg-secondary rounded-lg p-0.5">
+        <button v-for="d in [7, 30, 90]" :key="d" @click="days = d" class="px-3 py-1 rounded-md text-xs font-medium transition-colors" :class="days === d ? 'bg-white dark:bg-slate-600 text-foreground shadow-sm' : 'text-muted-foreground hover:text-slate-700 dark:hover:text-slate-300'">{{ d }}天</button>
       </div>
     </div>
 
@@ -13,37 +13,37 @@
 
     <template v-else-if="data">
       <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
-        <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4">
-          <div class="text-xs text-slate-500 dark:text-slate-400 mb-1">页面浏览</div>
-          <div class="text-2xl font-bold text-slate-900 dark:text-white">{{ formatNum(data.pv.total) }}</div>
+        <div class="bg-card rounded-2xl border border-border p-4">
+          <div class="text-xs text-muted-foreground mb-1">页面浏览</div>
+          <div class="text-2xl font-bold text-foreground">{{ formatNum(data.pv.total) }}</div>
           <div class="text-[10px] text-slate-400 mt-1">今日 {{ formatNum(data.pv.today) }} · 本周 {{ formatNum(data.pv.thisWeek) }}</div>
         </div>
-        <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4">
-          <div class="text-xs text-slate-500 dark:text-slate-400 mb-1">独立访客</div>
-          <div class="text-2xl font-bold text-slate-900 dark:text-white">{{ formatNum(data.uv.total) }}</div>
+        <div class="bg-card rounded-2xl border border-border p-4">
+          <div class="text-xs text-muted-foreground mb-1">独立访客</div>
+          <div class="text-2xl font-bold text-foreground">{{ formatNum(data.uv.total) }}</div>
           <div class="text-[10px] text-slate-400 mt-1">今日 {{ formatNum(data.uv.today) }} · 本周 {{ formatNum(data.uv.thisWeek) }}</div>
         </div>
-        <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4">
-          <div class="text-xs text-slate-500 dark:text-slate-400 mb-1">项目点击</div>
-          <div class="text-2xl font-bold text-slate-900 dark:text-white">{{ formatNum(data.clicks.total) }}</div>
+        <div class="bg-card rounded-2xl border border-border p-4">
+          <div class="text-xs text-muted-foreground mb-1">项目点击</div>
+          <div class="text-2xl font-bold text-foreground">{{ formatNum(data.clicks.total) }}</div>
           <div class="text-[10px] text-slate-400 mt-1">今日 {{ formatNum(data.clicks.today) }}</div>
         </div>
-        <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4">
-          <div class="text-xs text-slate-500 dark:text-slate-400 mb-1">搜索次数</div>
-          <div class="text-2xl font-bold text-slate-900 dark:text-white">{{ formatNum(data.searches.total) }}</div>
+        <div class="bg-card rounded-2xl border border-border p-4">
+          <div class="text-xs text-muted-foreground mb-1">搜索次数</div>
+          <div class="text-2xl font-bold text-foreground">{{ formatNum(data.searches.total) }}</div>
           <div class="text-[10px] text-slate-400 mt-1">今日 {{ formatNum(data.searches.today) }}</div>
         </div>
       </div>
 
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 lg:p-5">
-          <h3 class="font-bold text-sm lg:text-base mb-3 text-slate-900 dark:text-white">浏览趋势</h3>
+        <div class="bg-card rounded-2xl border border-border p-4 lg:p-5">
+          <h3 class="font-bold text-sm lg:text-base mb-3 text-foreground">浏览趋势</h3>
           <div class="h-64 lg:h-72">
             <VChart :option="pvTrendOption" autoresize class="w-full h-full" />
           </div>
         </div>
-        <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 lg:p-5">
-          <h3 class="font-bold text-sm lg:text-base mb-3 text-slate-900 dark:text-white">时段活跃度</h3>
+        <div class="bg-card rounded-2xl border border-border p-4 lg:p-5">
+          <h3 class="font-bold text-sm lg:text-base mb-3 text-foreground">时段活跃度</h3>
           <div class="h-64 lg:h-72">
             <VChart :option="hourlyOption" autoresize class="w-full h-full" />
           </div>
@@ -51,14 +51,14 @@
       </div>
 
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 lg:p-5">
-          <h3 class="font-bold text-sm lg:text-base mb-3 text-slate-900 dark:text-white">页面热力图</h3>
+        <div class="bg-card rounded-2xl border border-border p-4 lg:p-5">
+          <h3 class="font-bold text-sm lg:text-base mb-3 text-foreground">页面热力图</h3>
           <div class="h-64 lg:h-72">
             <VChart :option="heatmapOption" autoresize class="w-full h-full" />
           </div>
         </div>
-        <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 lg:p-5">
-          <h3 class="font-bold text-sm lg:text-base mb-3 text-slate-900 dark:text-white">搜索词云</h3>
+        <div class="bg-card rounded-2xl border border-border p-4 lg:p-5">
+          <h3 class="font-bold text-sm lg:text-base mb-3 text-foreground">搜索词云</h3>
           <div class="h-64 lg:h-72">
             <VChart v-if="data.topSearches.length" :option="wordCloudOption" autoresize class="w-full h-full" />
             <div v-else class="flex items-center justify-center h-full text-slate-400 text-sm">暂无数据</div>
@@ -67,15 +67,15 @@
       </div>
 
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 lg:p-5">
-          <h3 class="font-bold text-sm lg:text-base mb-3 text-slate-900 dark:text-white">热门项目</h3>
+        <div class="bg-card rounded-2xl border border-border p-4 lg:p-5">
+          <h3 class="font-bold text-sm lg:text-base mb-3 text-foreground">热门项目</h3>
           <div class="h-64 lg:h-72">
             <VChart v-if="data.topProjects.length" :option="topProjectsOption" autoresize class="w-full h-full" />
             <div v-else class="flex items-center justify-center h-full text-slate-400 text-sm">暂无数据</div>
           </div>
         </div>
-        <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 lg:p-5">
-          <h3 class="font-bold text-sm lg:text-base mb-3 text-slate-900 dark:text-white">周活跃度</h3>
+        <div class="bg-card rounded-2xl border border-border p-4 lg:p-5">
+          <h3 class="font-bold text-sm lg:text-base mb-3 text-foreground">周活跃度</h3>
           <div class="h-64 lg:h-72">
             <VChart :option="weeklyRadarOption" autoresize class="w-full h-full" />
           </div>
@@ -83,19 +83,19 @@
       </div>
 
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 lg:p-5">
-          <h3 class="font-bold text-sm lg:text-base mb-3 text-slate-900 dark:text-white">分类浏览占比</h3>
+        <div class="bg-card rounded-2xl border border-border p-4 lg:p-5">
+          <h3 class="font-bold text-sm lg:text-base mb-3 text-foreground">分类浏览占比</h3>
           <div class="h-64 lg:h-72">
             <VChart v-if="data.categoryDistribution.length" :option="categoryOption" autoresize class="w-full h-full" />
             <div v-else class="flex items-center justify-center h-full text-slate-400 text-sm">暂无数据</div>
           </div>
         </div>
-        <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 lg:p-5">
-          <h3 class="font-bold text-sm lg:text-base mb-3 text-slate-900 dark:text-white">热门页面</h3>
+        <div class="bg-card rounded-2xl border border-border p-4 lg:p-5">
+          <h3 class="font-bold text-sm lg:text-base mb-3 text-foreground">热门页面</h3>
           <div class="space-y-1.5 max-h-72 overflow-y-auto">
-            <div v-for="(page, i) in data.topPages.slice(0, 15)" :key="page.path" class="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700/50">
+            <div v-for="(page, i) in data.topPages.slice(0, 15)" :key="page.path" class="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-accent/50">
               <span class="text-xs font-mono w-5 text-right" :class="i < 3 ? 'text-emerald-600 dark:text-emerald-400 font-bold' : 'text-slate-400'">{{ i + 1 }}</span>
-              <span class="text-sm text-slate-700 dark:text-slate-300 truncate flex-1">{{ page.displayName }}</span>
+              <span class="text-sm text-muted-foreground truncate flex-1">{{ page.displayName }}</span>
               <span class="text-xs font-bold text-emerald-600 dark:text-emerald-400">{{ formatNum(page.count) }}</span>
             </div>
             <div v-if="!data.topPages.length" class="text-center py-8 text-slate-400 text-sm">暂无数据</div>

@@ -13,7 +13,7 @@
     @back="selectedClaimId = null"
   >
     <template #list-toolbar>
-      <select v-model="statusFilter" @change="fetchClaims" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-emerald-500 text-sm">
+      <select v-model="statusFilter" @change="fetchClaims" class="w-full px-3 py-3 sm:py-2.5 rounded-xl border border-border bg-card outline-none focus:border-emerald-500 text-base sm:text-sm min-h-[48px] sm:min-h-[40px]">
         <option value="">全部状态</option>
         <option value="pending">待审核</option>
         <option value="approved">已通过</option>
@@ -22,20 +22,25 @@
     </template>
 
     <template #list>
-      <div class="space-y-2">
+      <div class="space-y-1.5">
         <div
           v-for="claim in claimsPage.items"
           :key="claim.id"
           @click="selectClaim(claim)"
-          class="p-3 rounded-xl border cursor-pointer transition-all duration-200"
-          :class="selectedClaimId === claim.id ? 'bg-emerald-500 text-white border-emerald-500 shadow-md shadow-emerald-500/20' : 'bg-slate-50 dark:bg-slate-900/50 border-transparent hover:border-emerald-300'"
+          class="p-3 rounded-xl border cursor-pointer transition-all duration-200 flex items-center gap-3 min-h-[48px]"
+          :class="selectedClaimId === claim.id ? 'bg-[var(--color-brand-50)] dark:bg-[var(--color-brand-500)]/10 border-l-[3px] border-l-[var(--color-brand-500)] border-y border-r border-transparent' : 'bg-card/50 border-transparent hover:bg-accent/80'"
         >
-          <div class="font-bold text-sm truncate">
-            项目：{{ claim.project_id?.slice(0, 8) || '-' }}
-          </div>
-          <div class="text-xs opacity-80 truncate mt-1">
-            <ui-StatusBadge :status="claim.status" />
-            <span class="ml-1">申请者：{{ claim.user_id?.slice(0, 8) || '-' }}</span>
+          <component :is="ClipboardList" class="w-5 h-5 text-slate-400 shrink-0" />
+          <div class="flex-1 min-w-0">
+            <div class="font-medium text-base sm:text-sm truncate text-foreground">
+              项目：{{ claim.project_id?.slice(0, 8) || '-' }}
+            </div>
+            <div class="text-base sm:text-xs text-muted-foreground truncate mt-0.5">
+              <Badge :variant="getStatusConfig(claim.status).variant" :class="getStatusConfig(claim.status).class">
+                {{ getStatusConfig(claim.status).label }}
+              </Badge>
+              <span class="ml-1">申请者：{{ claim.user_id?.slice(0, 8) || '-' }}</span>
+            </div>
           </div>
         </div>
         <ui-EmptyState v-if="claimsPage.items.length === 0" :icon="ClipboardList" title="暂无认领申请" />
@@ -43,51 +48,53 @@
     </template>
 
     <template #detail>
-      <div v-if="selectedClaim" class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col">
-        <div class="p-4 lg:p-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50">
-          <h2 class="text-lg lg:text-xl font-bold text-slate-800 dark:text-white">认领审核</h2>
+      <div v-if="selectedClaim" class="bg-card rounded-2xl border border-border shadow-sm overflow-hidden flex flex-col">
+        <div class="p-4 sm:p-5 lg:p-6 border-b border-border bg-accent/50 dark:bg-slate-900/50">
+          <h2 class="text-lg lg:text-xl font-bold text-foreground">认领审核</h2>
         </div>
-        <div class="flex-1 overflow-y-auto p-4 lg:p-8 space-y-4 lg:space-y-6">
+        <div class="flex-1 overflow-y-auto p-4 sm:p-5 lg:p-8 space-y-4 lg:space-y-6">
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
             <div class="space-y-2">
-              <div class="text-sm font-extrabold text-slate-700 dark:text-slate-300">项目 ID</div>
-              <div class="text-sm text-slate-600 dark:text-slate-400 font-mono break-all">{{ selectedClaim.project_id }}</div>
+              <div class="text-base sm:text-sm font-extrabold text-muted-foreground">项目 ID</div>
+              <div class="text-base sm:text-sm text-muted-foreground font-mono break-all">{{ selectedClaim.project_id }}</div>
             </div>
             <div class="space-y-2">
-              <div class="text-sm font-extrabold text-slate-700 dark:text-slate-300">申请者 ID</div>
-              <div class="text-sm text-slate-600 dark:text-slate-400 font-mono break-all">{{ selectedClaim.user_id }}</div>
+              <div class="text-base sm:text-sm font-extrabold text-muted-foreground">申请者 ID</div>
+              <div class="text-base sm:text-sm text-muted-foreground font-mono break-all">{{ selectedClaim.user_id }}</div>
             </div>
             <div class="space-y-2">
-              <div class="text-sm font-extrabold text-slate-700 dark:text-slate-300">状态</div>
-              <ui-StatusBadge :status="selectedClaim.status" />
+              <div class="text-base sm:text-sm font-extrabold text-muted-foreground">状态</div>
+              <Badge :variant="getStatusConfig(selectedClaim.status).variant" :class="getStatusConfig(selectedClaim.status).class">
+                {{ getStatusConfig(selectedClaim.status).label }}
+              </Badge>
             </div>
             <div class="space-y-2">
-              <div class="text-sm font-extrabold text-slate-700 dark:text-slate-300">申请时间</div>
-              <div class="text-sm text-slate-600 dark:text-slate-400">{{ formatDate(selectedClaim.created_at) }}</div>
+              <div class="text-base sm:text-sm font-extrabold text-muted-foreground">申请时间</div>
+              <div class="text-base sm:text-sm text-muted-foreground">{{ formatDate(selectedClaim.created_at) }}</div>
             </div>
           </div>
           <div class="space-y-2">
-            <div class="text-sm font-extrabold text-slate-700 dark:text-slate-300">申请理由</div>
-            <div class="p-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 whitespace-pre-wrap text-sm">{{ selectedClaim.message || '无' }}</div>
+            <div class="text-base sm:text-sm font-extrabold text-muted-foreground">申请理由</div>
+            <div class="p-4 sm:p-5 rounded-2xl border border-border bg-card whitespace-pre-wrap text-base sm:text-sm">{{ selectedClaim.message || '无' }}</div>
           </div>
           <div v-if="selectedClaim.review_note" class="space-y-2">
-            <div class="text-sm font-extrabold text-slate-700 dark:text-slate-300">审核备注</div>
-            <div class="p-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 whitespace-pre-wrap text-sm">{{ selectedClaim.review_note }}</div>
+            <div class="text-base sm:text-sm font-extrabold text-muted-foreground">审核备注</div>
+            <div class="p-4 sm:p-5 rounded-2xl border border-border bg-card whitespace-pre-wrap text-base sm:text-sm">{{ selectedClaim.review_note }}</div>
           </div>
           <div class="space-y-2">
-            <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">审核备注（可选）</label>
-            <textarea v-model="reviewNote" rows="2" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-emerald-500 resize-none text-base"></textarea>
+            <label class="block text-base sm:text-sm font-bold text-muted-foreground mb-2">审核备注（可选）</label>
+            <textarea v-model="reviewNote" rows="2" class="w-full px-4 py-3 rounded-xl border border-border bg-card outline-none focus:border-emerald-500 resize-none text-base sm:text-sm min-h-[48px]"></textarea>
           </div>
         </div>
-        <div v-if="selectedClaim.status === 'pending'" class="p-4 border-t border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 flex flex-col sm:flex-row gap-3">
-          <button @click="approveClaim" class="flex-1 px-4 py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold transition-colors">通过</button>
-          <button @click="rejectClaim" class="flex-1 px-4 py-3 rounded-2xl bg-rose-500 hover:bg-rose-600 text-white font-bold transition-colors">驳回</button>
+        <div v-if="selectedClaim.status === 'pending'" class="p-4 sm:p-5 border-t border-border bg-card flex flex-col sm:flex-row gap-3">
+          <button @click="approveClaim" class="flex-1 px-4 py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold transition-colors min-h-[44px] min-w-[44px]">通过</button>
+          <button @click="rejectClaim" class="flex-1 px-4 py-3 rounded-2xl bg-rose-500 hover:bg-rose-600 text-white font-bold transition-colors min-h-[44px] min-w-[44px]">驳回</button>
         </div>
       </div>
     </template>
 
     <template #empty-detail>
-      <div class="flex items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl min-h-[400px]">
+      <div class="flex items-center justify-center border-2 border-dashed border-border rounded-2xl min-h-[400px]">
         <div class="text-center">
           <p class="text-slate-400 mb-2">从列表中选择认领申请查看详情</p>
         </div>
@@ -99,7 +106,8 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { adminFetch, formatAdminError } from '../../composables/useAdminFetch';
-import { ListDetailLayout as uiListDetailLayout, EmptyState as uiEmptyState, StatusBadge as uiStatusBadge } from '../../components/ui';
+import { ListDetailLayout as uiListDetailLayout, EmptyState as uiEmptyState } from '../../components/ui';
+import { Badge, getStatusConfig } from '../../components/ui/badge';
 import { ClipboardList } from 'lucide-vue-next';
 
 const claimsPage = ref<{ items: any[]; page: number; pageSize: number; total: number }>({ items: [], page: 1, pageSize: 20, total: 0 });

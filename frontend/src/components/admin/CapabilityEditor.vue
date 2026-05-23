@@ -1,25 +1,25 @@
 <template>
   <div class="space-y-3">
     <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-3">
-      <label class="text-sm font-bold text-slate-700 dark:text-slate-300 shrink-0">角色模板</label>
+      <label class="text-sm font-bold text-foreground shrink-0">角色模板</label>
       <select
         v-model="selectedTemplate"
         @change="applyTemplate"
-        class="w-full sm:w-auto min-w-[11rem] max-w-full px-3 py-2.5 sm:py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-base sm:text-sm touch-manipulation"
+        class="w-full sm:w-auto min-w-[11rem] max-w-full px-3 py-3 sm:py-1.5 rounded-lg border border-border bg-card text-base sm:text-sm touch-manipulation h-12 sm:h-auto"
       >
         <option value="">自定义</option>
         <option v-for="key in templateKeys" :key="key" :value="key">{{ templates[key].name }}</option>
       </select>
       <div class="flex gap-2 sm:ml-auto">
-        <button @click="selectAll" class="text-xs text-emerald-500 hover:underline">全选</button>
-        <button @click="deselectAll" class="text-xs text-slate-400 hover:underline">清空</button>
+        <button @click="selectAll" class="min-w-[44px] min-h-[44px] flex items-center justify-center text-xs text-emerald-500 hover:underline">全选</button>
+        <button @click="deselectAll" class="min-w-[44px] min-h-[44px] flex items-center justify-center text-xs text-muted-foreground hover:underline">清空</button>
       </div>
     </div>
 
-    <div v-for="tier in tiers" :key="tier.key" class="rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700">
+    <div v-for="tier in tiers" :key="tier.key" class="rounded-xl overflow-hidden border border-border">
       <button
         @click="toggleTier(tier.key)"
-        class="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold transition-colors"
+        class="w-full flex items-center gap-3 px-4 py-3 sm:py-3 text-sm font-bold transition-colors min-h-[48px]"
         :class="tierBgClass(tier.key)"
       >
         <span class="w-1 h-5 rounded-full" :class="tierDotClass(tier.key)"></span>
@@ -29,24 +29,24 @@
       </button>
 
       <div v-if="expandedTiers.has(tier.key)" class="space-y-0">
-        <div v-for="group in tierGroups(tier.key)" :key="group.category" class="border-t border-slate-100 dark:border-slate-700/50">
+        <div v-for="group in tierGroups(tier.key)" :key="group.category" class="border-t border-border">
           <button
             @click="toggleGroup(group.category)"
-            class="w-full flex items-center justify-between px-6 py-2.5 text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors"
+            class="w-full flex items-center justify-between px-4 sm:px-6 py-3 sm:py-2.5 text-sm font-medium hover:bg-accent transition-colors min-h-[48px]"
           >
             <div class="flex items-center gap-2">
               <span :class="groupHasAny(group) ? 'text-emerald-500' : 'text-slate-300'">
                 {{ groupHasAny(group) ? '✅' : '☐' }}
               </span>
-              <span class="text-slate-700 dark:text-slate-300">{{ groupLabels[group.category] || group.category }}</span>
+              <span class="text-muted-foreground">{{ groupLabels[group.category] || group.category }}</span>
               <span class="text-xs text-slate-400">({{ group.items.filter(c => modelValue.includes(c.id)).length }}/{{ group.items.length }})</span>
             </div>
             <component :is="expandedGroups.has(group.category) ? ChevronUp : ChevronDown" class="w-3.5 h-3.5 text-slate-400" />
           </button>
-          <div v-if="expandedGroups.has(group.category)" class="px-8 pb-3 space-y-1.5">
-            <label v-for="cap in group.items" :key="cap.id" class="flex items-center gap-2 text-sm cursor-pointer">
-              <input type="checkbox" :checked="modelValue.includes(cap.id)" @change="toggleCap(cap.id)" :disabled="disabled" class="rounded border-slate-300 text-emerald-500 focus:ring-emerald-500" />
-              <span class="text-slate-700 dark:text-slate-300">{{ cap.name }}</span>
+          <div v-if="expandedGroups.has(group.category)" class="px-4 sm:px-8 pb-3 space-y-0">
+            <label v-for="cap in group.items" :key="cap.id" class="flex items-center gap-2 text-sm cursor-pointer min-h-[44px] py-2 sm:py-0">
+              <input type="checkbox" :checked="modelValue.includes(cap.id)" @change="toggleCap(cap.id)" :disabled="disabled" class="rounded border-slate-300 text-emerald-500 focus:ring-emerald-500 w-5 h-5 sm:w-4 sm:h-4" />
+              <span class="text-muted-foreground">{{ cap.name }}</span>
               <span class="text-xs text-slate-400">{{ cap.description }}</span>
             </label>
           </div>
@@ -115,7 +115,7 @@ const tierBgClass = (tier: string) => {
     case 'user': return 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-800 dark:text-emerald-300';
     case 'dev': return 'bg-blue-50 dark:bg-blue-900/20 text-blue-800 dark:text-blue-300';
     case 'ops': return 'bg-purple-50 dark:bg-purple-900/20 text-purple-800 dark:text-purple-300';
-    default: return 'bg-slate-50 dark:bg-slate-700/50 text-slate-700 dark:text-slate-300';
+    default: return 'bg-card text-foreground';
   }
 };
 

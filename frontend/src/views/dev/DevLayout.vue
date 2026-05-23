@@ -2,7 +2,7 @@
   <AdminShell
     brand="dev"
     brand-name="Dev 后台"
-    :sidebar-items="devNavItems"
+    :sidebar-items="visibleNavItems"
     :user="authUser ? { name: authUser.name, avatar_url: authUser.avatar_url } : undefined"
     @logout="handleLogout"
     @go-home="router.push('/')"
@@ -10,6 +10,7 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuth } from '../../composables/useAuth';
 import { AdminShell } from '../../components/ui';
@@ -18,7 +19,7 @@ import {
 } from 'lucide-vue-next';
 
 const router = useRouter();
-const { user: authUser, logout } = useAuth();
+const { user: authUser, hasCapability, logout } = useAuth();
 
 type NavItem = {
   key: string;
@@ -37,6 +38,13 @@ const devNavItems: NavItem[] = [
   { key: 'bugs', label: 'Bug 反馈', to: '/dev/bugs', icon: Bug, group: 'primary', primary: true, cap: 'dev:bug_manage' },
   { key: 'comments', label: '评论管理', to: '/dev/comments', icon: MessageSquare, group: 'secondary', primary: false, cap: 'dev:comment_manage' },
 ];
+
+const visibleNavItems = computed(() =>
+  devNavItems.filter(item => {
+    if (item.cap) return hasCapability(item.cap);
+    return true;
+  })
+);
 
 const handleLogout = async () => {
   await logout();

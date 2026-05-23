@@ -6,6 +6,9 @@ import MarkdownIt from 'markdown-it';
 import DOMPurify from 'dompurify';
 import ProjectLineageGraph from '../components/ProjectLineageGraph.vue';
 import CommentPanel from '../components/CommentPanel.vue';
+import { resolveProjectDisplayTags } from '../lib/resolveProjectDisplayTags';
+import ProjectTagRow from '../components/projects/ProjectTagRow.vue';
+import ProjectTagGallery from '../components/projects/ProjectTagGallery.vue';
 import { computeCursorFrames } from '../utils/captchaCursor';
 import { useProjects } from '../composables/useProjects';
 import { useAnalytics } from '../composables/useAnalytics';
@@ -15,11 +18,9 @@ import {
   Github, 
   Download, 
   Star, 
-  ShieldCheck, 
   MessageCircle,
   Code2,
   Layers,
-  Sparkles,
   History,
   ArrowRight,
   X,
@@ -71,6 +72,19 @@ const techStack = computed(() => {
   const tech = (project.value as any)?.extra?.feishu?.tech_stack;
   if (Array.isArray(tech) && tech.length) return tech as string[];
   return project.value?.language ? [project.value.language] : [];
+});
+
+const displayTags = computed(() => {
+  if (!project.value) {
+    return { card: [], header: [], gallery: {} as Record<string, never[]> };
+  }
+  return resolveProjectDisplayTags({
+    status: project.value.status,
+    version: project.value.version,
+    last_update: project.value.last_update,
+    stars: project.value.stars,
+    registry_tags: project.value.registry_tags as any,
+  });
 });
 
 const developerMembers = computed(() => {
@@ -420,17 +434,17 @@ if (allProjects.value.length === 0) {
 </script>
 
 <template>
-  <div class="min-h-screen bg-[#F8FAFC] dark:bg-[#0B1120] text-slate-900 dark:text-slate-100 font-sans selection:bg-emerald-200 selection:text-emerald-900 pb-20">
+  <div class="min-h-screen bg-[#F8FAFC] dark:bg-[#0B1120] text-foreground font-sans selection:bg-emerald-200 selection:text-emerald-900 pb-20">
     
     <main class="pt-24 px-6 max-w-4xl mx-auto" v-if="loading">
       <div class="animate-pulse space-y-8">
-        <div class="h-48 bg-slate-200 dark:bg-slate-800 rounded-3xl w-full"></div>
+        <div class="h-48 bg-muted rounded-3xl w-full"></div>
         <div class="flex gap-6">
-          <div class="w-32 h-32 bg-slate-200 dark:bg-slate-800 rounded-3xl shrink-0"></div>
+          <div class="w-32 h-32 bg-muted rounded-3xl shrink-0"></div>
           <div class="space-y-4 flex-1 py-2">
-            <div class="h-8 bg-slate-200 dark:bg-slate-800 rounded-lg w-1/2"></div>
-            <div class="h-4 bg-slate-200 dark:bg-slate-800 rounded-lg w-1/3"></div>
-            <div class="h-10 bg-slate-200 dark:bg-slate-800 rounded-full w-32 mt-4"></div>
+            <div class="h-8 bg-muted rounded-lg w-1/2"></div>
+            <div class="h-4 bg-muted rounded-lg w-1/3"></div>
+            <div class="h-10 bg-muted rounded-full w-32 mt-4"></div>
           </div>
         </div>
       </div>
@@ -438,7 +452,7 @@ if (allProjects.value.length === 0) {
 
     <main class="pt-24 px-4 sm:px-6 max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out-expo" :key="route.params.name as string" v-else-if="project">
       <!-- Hero Banner -->
-      <div v-if="project.banner" class="w-full h-48 sm:h-64 md:h-80 rounded-[2rem] overflow-hidden mb-8 shadow-xl shadow-slate-200/50 dark:shadow-none border border-slate-200/50 dark:border-slate-800 relative group">
+      <div v-if="project.banner" class="w-full h-48 sm:h-64 md:h-80 rounded-[2rem] overflow-hidden mb-8 shadow-xl shadow-slate-200/50 dark:shadow-none border border-border relative group">
         <img loading="lazy" :src="project.banner" :alt="project.name" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
         <div class="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent"></div>
       </div>
@@ -462,12 +476,12 @@ if (allProjects.value.length === 0) {
 
         <!-- Title & Meta -->
         <div class="flex-1 flex flex-col pt-2 w-full">
-          <h1 class="text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white mb-2 leading-tight">
+          <h1 class="text-3xl sm:text-4xl font-extrabold tracking-tight text-foreground mb-2 leading-tight">
             {{ project.name }}
           </h1>
           
           <div class="flex items-center gap-3 mb-4">
-            <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100 dark:bg-slate-800/80 border border-slate-200/50 dark:border-slate-700 w-fit">
+            <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-secondary/80 border border-border w-fit">
               <img 
                 loading="lazy"
                 :src="project?.avatar" 
@@ -475,34 +489,17 @@ if (allProjects.value.length === 0) {
                 class="w-5 h-5 rounded-full object-cover"
                 @error="(e) => { (e.target as HTMLImageElement).src = getFallbackImage(project?.developer || '') }"
               />
-              <span class="text-sm font-semibold text-slate-700 dark:text-slate-300">{{ project?.developer }}</span>
+              <span class="text-sm font-semibold text-foreground">{{ project?.developer }}</span>
             </div>
-            <div v-if="organizationName" class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100 dark:bg-slate-800/80 border border-slate-200/50 dark:border-slate-700 w-fit">
-              <span class="text-sm font-semibold text-slate-700 dark:text-slate-300 max-w-[240px] truncate">{{ organizationName }}</span>
+            <div v-if="organizationName" class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-secondary/80 border border-border w-fit">
+              <span class="text-sm font-semibold text-muted-foreground max-w-[240px] truncate">{{ organizationName }}</span>
             </div>
             <div v-if="project?.is_editors_choice" class="flex items-center gap-1 text-xs font-bold text-amber-600 bg-amber-50 dark:bg-amber-500/10 px-2.5 py-1 rounded-md border border-amber-200/50 dark:border-amber-500/20">
               <Star class="w-3.5 h-3.5 fill-current" /> 编辑推荐
             </div>
           </div>
 
-          <div class="flex flex-wrap gap-2 mb-6">
-            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 text-sm font-medium border border-emerald-200/50 dark:border-emerald-500/20">
-              <ShieldCheck class="w-4 h-4" />
-              {{ project?.status }}
-            </span>
-            <span 
-              v-if="project?.recommendation" 
-              class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border"
-              :class="{
-                'bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-200/50 dark:border-blue-500/20': project?.recommendation === '稳定',
-                'bg-orange-50 dark:bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-200/50 dark:border-orange-500/20': project?.recommendation === '不稳定',
-                'bg-purple-50 dark:bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-200/50 dark:border-purple-500/20': project?.recommendation === '观望中'
-              }"
-            >
-              <ShieldCheck class="w-4 h-4" />
-              {{ project?.recommendation }}
-            </span>
-          </div>
+          <ProjectTagRow :tags="displayTags.header" size="md" class="mb-6" />
 
           <!-- Actions -->
           <div class="flex flex-wrap items-center gap-4 mt-auto">
@@ -518,7 +515,7 @@ if (allProjects.value.length === 0) {
             <a 
               :href="project?.github_url" 
               target="_blank" 
-              class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors"
+              class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-secondary hover:bg-accent text-muted-foreground transition-colors"
               title="View Source Code"
               @click="trackClick(project?.slug || '', 'github')"
             >
@@ -531,7 +528,7 @@ if (allProjects.value.length === 0) {
               @click="handleAiBadgeClick"
               @mouseenter="(e) => onBadgeEnter('ai', e)"
               @mouseleave="onBadgeLeave"
-              class="ml-auto flex items-center gap-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md p-2 px-3 shadow-sm select-none cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors relative group" 
+              class="ml-auto flex items-center gap-3 bg-card border border-border rounded-md p-2 px-3 shadow-sm select-none cursor-pointer hover:bg-accent transition-colors relative group"
               title="Click to verify"
               ref="aiBadgeRef"
             >
@@ -549,18 +546,18 @@ if (allProjects.value.length === 0) {
               <!-- Checkbox with checkmark -->
               <div 
                 data-captcha-checkbox
-                class="w-6 h-6 border-2 rounded flex items-center justify-center bg-white dark:bg-slate-800 transition-colors duration-300"
-                :class="showAiError ? 'border-red-500' : 'border-slate-300 dark:border-slate-600 group-hover:border-slate-400 dark:group-hover:border-slate-500'"
+                class="w-6 h-6 border-2 rounded flex items-center justify-center bg-card transition-colors duration-300"
+                :class="showAiError ? 'border-red-500' : 'border-border group-hover:border-slate-400 dark:group-hover:border-slate-500'"
               >
                 <!-- The checkmark is explicitly missing/hidden -->
               </div>
-              <span class="text-sm font-medium text-slate-700 dark:text-slate-300">I'm not a robot</span>
-              <div class="flex flex-col items-center ml-2 border-l border-slate-200 dark:border-slate-700 pl-3">
+              <span class="text-sm font-medium text-foreground">I'm not a robot</span>
+              <div class="flex flex-col items-center ml-2 border-l border-border pl-3">
                 <svg class="w-6 h-6 opacity-80 mb-0.5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                   <path d="M21 12a9 9 0 1 1-2.64-6.36" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
                   <path d="M21 5v6h-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
                 </svg>
-                <span class="text-[9px] text-slate-400 dark:text-slate-500 leading-none">reCAPTCHA</span>
+                <span class="text-[9px] text-muted-foreground leading-none">reCAPTCHA</span>
               </div>
             </div>
 
@@ -570,7 +567,7 @@ if (allProjects.value.length === 0) {
               @click="handleHumanBadgeClick"
               @mouseenter="(e) => onBadgeEnter('human', e)"
               @mouseleave="onBadgeLeave"
-              class="ml-auto flex items-center gap-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md p-2 px-3 shadow-sm select-none cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors relative group"
+              class="ml-auto flex items-center gap-3 bg-card border border-border rounded-md p-2 px-3 shadow-sm select-none cursor-pointer hover:bg-accent transition-colors relative group"
               title="Click to verify"
               ref="humanBadgeRef"
             >
@@ -578,7 +575,7 @@ if (allProjects.value.length === 0) {
               <div
                 data-captcha-checkbox
                 class="w-6 h-6 border-2 rounded flex items-center justify-center transition-colors duration-300"
-                :class="showHumanSuccess ? 'border-transparent bg-emerald-500' : 'bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 group-hover:border-slate-400 dark:group-hover:border-slate-500'"
+                :class="showHumanSuccess ? 'border-transparent bg-emerald-500' : 'bg-card border-border group-hover:border-slate-400 dark:group-hover:border-slate-500'"
               >
                 <svg
                   class="w-4 h-4 text-white transition-all duration-300"
@@ -588,13 +585,13 @@ if (allProjects.value.length === 0) {
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path>
                 </svg>
               </div>
-              <span class="text-sm font-medium text-slate-700 dark:text-slate-300">I'm not a robot</span>
-              <div class="flex flex-col items-center ml-2 border-l border-slate-200 dark:border-slate-700 pl-3">
+              <span class="text-sm font-medium text-muted-foreground">I'm not a robot</span>
+              <div class="flex flex-col items-center ml-2 border-l border-border pl-3">
                 <svg class="w-6 h-6 opacity-80 mb-0.5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                   <path d="M21 12a9 9 0 1 1-2.64-6.36" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
                   <path d="M21 5v6h-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
                 </svg>
-                <span class="text-[9px] text-slate-400 dark:text-slate-500 leading-none">reCAPTCHA</span>
+                <span class="text-[9px] text-muted-foreground leading-none">reCAPTCHA</span>
               </div>
             </div>
 
@@ -604,20 +601,20 @@ if (allProjects.value.length === 0) {
               @click="handleUnknownBadgeClick"
               @mouseenter="(e) => onBadgeEnter('unknown', e)"
               @mouseleave="onBadgeLeave"
-              class="ml-auto flex items-center gap-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md p-2 px-3 shadow-sm select-none cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors relative group"
+              class="ml-auto flex items-center gap-3 bg-card border border-border rounded-md p-2 px-3 shadow-sm select-none cursor-pointer hover:bg-accent/50 transition-colors relative group"
               title="Click to verify"
               ref="unknownBadgeRef"
             >
-              <div data-captcha-checkbox class="w-6 h-6 border-2 rounded flex items-center justify-center bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 group-hover:border-slate-400 dark:group-hover:border-slate-500">
-                <div v-if="unknownLoading" class="w-4 h-4 rounded-full border-2 border-slate-300 dark:border-slate-600 border-t-emerald-500 animate-spin"></div>
+              <div data-captcha-checkbox class="w-6 h-6 border-2 rounded flex items-center justify-center bg-card border-border group-hover:border-slate-400 dark:group-hover:border-slate-500">
+                <div v-if="unknownLoading" class="w-4 h-4 rounded-full border-2 border-border border-t-emerald-500 animate-spin"></div>
               </div>
-              <span class="text-sm font-medium text-slate-700 dark:text-slate-300">I'm not a robot</span>
-              <div class="flex flex-col items-center ml-2 border-l border-slate-200 dark:border-slate-700 pl-3">
+              <span class="text-sm font-medium text-muted-foreground">I'm not a robot</span>
+              <div class="flex flex-col items-center ml-2 border-l border-border pl-3">
                 <svg class="w-6 h-6 opacity-80 mb-0.5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                   <path d="M21 12a9 9 0 1 1-2.64-6.36" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
                   <path d="M21 5v6h-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
                 </svg>
-                <span class="text-[9px] text-slate-400 dark:text-slate-500 leading-none">reCAPTCHA</span>
+                <span class="text-[9px] text-muted-foreground leading-none">reCAPTCHA</span>
               </div>
             </div>
           </div>
@@ -642,14 +639,14 @@ if (allProjects.value.length === 0) {
             <path d="M6 4.5C5.4 4.2 4.7 4.7 4.9 5.4L9.9 23.9C10.1 24.6 11.1 24.7 11.5 24.1L14.8 18.9L20.6 16.4C21.3 16.1 21.3 15.1 20.6 14.8L6 4.5Z" stroke="white" stroke-width="1.6" stroke-linejoin="round"/>
           </svg>
         </div>
-        <div class="ml-3 -mt-1 inline-flex items-center gap-1.5 px-2 py-1 rounded-full border border-white/50 bg-white/90 dark:bg-slate-900/80 backdrop-blur text-[10px] font-extrabold text-slate-800 dark:text-slate-100 shadow-md">
+        <div class="ml-3 -mt-1 inline-flex items-center gap-1.5 px-2 py-1 rounded-full border border-white/50 bg-white/90 dark:bg-slate-900/80 backdrop-blur text-[10px] font-extrabold text-foreground shadow-md">
           <img :src="project?.avatar" class="w-4 h-4 rounded-full object-cover" @error="(e) => { (e.target as HTMLImageElement).src = getFallbackImage(project?.developer || '') }" />
           <span class="max-w-[120px] truncate">@{{ project?.developer }}</span>
         </div>
       </div>
 
       <!-- Divider -->
-      <div class="h-px w-full bg-gradient-to-r from-transparent via-slate-200 dark:via-slate-800 to-transparent my-10"></div>
+      <div class="h-px w-full bg-gradient-to-r from-transparent via-border to-transparent my-10"></div>
 
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-10">
         
@@ -658,28 +655,28 @@ if (allProjects.value.length === 0) {
           
           <!-- About -->
           <section>
-            <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+            <h2 class="text-2xl font-bold text-foreground mb-4 flex items-center gap-2">
               <Layers class="w-6 h-6 text-emerald-500" /> About
             </h2>
             <div class="prose prose-slate dark:prose-invert max-w-none">
-              <p class="text-slate-600 dark:text-slate-300 text-lg leading-relaxed whitespace-pre-wrap">{{ project.description }}</p>
+              <p class="text-muted-foreground text-lg leading-relaxed whitespace-pre-wrap">{{ project.description }}</p>
             </div>
           </section>
 
           <!-- What's New (Releases) -->
           <section v-if="project?.releases && project.releases.length > 0">
-            <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-2">
+            <h2 class="text-2xl font-bold text-foreground mb-6 flex items-center gap-2">
               <History class="w-6 h-6 text-emerald-500" /> 最近更新
             </h2>
             
             <!-- Latest Release -->
-            <div v-if="latestRelease" class="bg-white dark:bg-[#111827] rounded-3xl p-6 border border-slate-200/80 dark:border-slate-800/80 shadow-sm mb-6">
+            <div v-if="latestRelease" class="bg-white dark:bg-[#111827] rounded-3xl p-6 border border-border shadow-sm mb-6">
               <div class="flex items-center justify-between mb-4">
                 <div class="flex items-center gap-3">
                   <span class="px-3 py-1 bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400 rounded-lg font-bold text-sm">
                     {{ latestRelease.tag_name }}
                   </span>
-                  <span class="text-slate-500 text-sm" v-if="latestRelease.published_at">
+                  <span class="text-muted-foreground text-sm" v-if="latestRelease.published_at">
                     发布于 {{ formatDate(latestRelease.published_at) }}
                   </span>
                 </div>
@@ -697,14 +694,14 @@ if (allProjects.value.length === 0) {
             </div>
 
             <!-- Historical Timeline -->
-            <div v-if="historyReleases.length > 0" class="pl-4 border-l-2 border-slate-200 dark:border-slate-800 space-y-6">
+            <div v-if="historyReleases.length > 0" class="pl-4 border-l-2 border-border space-y-6">
               <div v-for="release in historyReleases" :key="release.tag_name" class="relative">
-                <div class="absolute -left-[21px] top-1.5 w-3 h-3 bg-slate-200 dark:bg-slate-700 border-2 border-white dark:border-[#0B1120] rounded-full"></div>
+                <div class="absolute -left-[21px] top-1.5 w-3 h-3 bg-muted border-2 border-white dark:border-[#0B1120] rounded-full"></div>
                 <div class="flex items-center gap-3 mb-1">
-                  <a :href="release.html_url" target="_blank" class="font-bold text-slate-700 dark:text-slate-300 hover:text-emerald-600 transition-colors">
+                  <a :href="release.html_url" target="_blank" class="font-bold text-foreground hover:text-emerald-600 transition-colors">
                     {{ release.tag_name }}
                   </a>
-                  <span class="text-slate-400 text-xs" v-if="release.published_at">{{ formatDate(release.published_at) }}</span>
+                  <span class="text-muted-foreground text-xs" v-if="release.published_at">{{ formatDate(release.published_at) }}</span>
                 </div>
               </div>
             </div>
@@ -715,7 +712,7 @@ if (allProjects.value.length === 0) {
 
           <!-- Editor's Note (Reviews) -->
           <section v-if="project.reviews && project.reviews.length > 0">
-            <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-2">
+            <h2 class="text-2xl font-bold text-foreground mb-6 flex items-center gap-2">
               <MessageCircle class="w-6 h-6 text-amber-500" /> 编辑锐评
             </h2>
             <div class="grid gap-4">
@@ -754,29 +751,29 @@ if (allProjects.value.length === 0) {
         <div class="space-y-8 lg:sticky lg:top-24 self-start">
           
           <!-- Information Card -->
-          <div class="bg-slate-50 dark:bg-[#111827] rounded-3xl p-6 border border-slate-200/50 dark:border-slate-800/80">
-            <h3 class="font-bold text-lg text-slate-900 dark:text-white mb-4">Information</h3>
+          <div class="bg-card rounded-3xl p-6 border border-border">
+            <h3 class="font-bold text-lg text-foreground mb-4">Information</h3>
             <ul class="space-y-4">
-              <li class="flex justify-between items-center py-2 border-b border-slate-200 dark:border-slate-800">
+              <li class="flex justify-between items-center py-2 border-b border-border">
                 <span class="text-slate-500">Developer</span>
-                <span class="font-medium text-slate-900 dark:text-white text-right">{{ project.developer }}</span>
+                <span class="font-medium text-foreground text-right">{{ project.developer }}</span>
               </li>
-              <li class="flex justify-between items-center py-2 border-b border-slate-200 dark:border-slate-800">
-                <span class="text-slate-500">Category</span>
+              <li class="flex justify-between items-center py-2 border-b border-border">
+                <span class="text-muted-foreground">Category</span>
                 <span class="font-medium text-emerald-600 dark:text-emerald-400 text-right flex items-center gap-1">
                   App
                 </span>
               </li>
-              <li class="flex justify-between items-center py-2 border-b border-slate-200 dark:border-slate-800">
-                <span class="text-slate-500">Status</span>
-                <span class="font-medium text-slate-900 dark:text-white text-right">{{ project.status }}</span>
+              <li class="flex justify-between items-center py-2 border-b border-border">
+                <span class="text-muted-foreground">Status</span>
+                <span class="font-medium text-foreground text-right">{{ project.status }}</span>
               </li>
             </ul>
           </div>
 
           <!-- Developers Card -->
-          <div v-if="hasDevelopersData" class="bg-slate-50 dark:bg-[#111827] rounded-3xl p-6 border border-slate-200/50 dark:border-slate-800/80">
-            <h3 class="font-bold text-lg text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+          <div v-if="hasDevelopersData" class="bg-card rounded-3xl p-6 border border-border/80">
+            <h3 class="font-bold text-lg text-foreground mb-4 flex items-center gap-2">
               <Users class="w-5 h-5 text-emerald-500" /> 开发者
             </h3>
             <div class="space-y-3">
@@ -788,12 +785,12 @@ if (allProjects.value.length === 0) {
                 <img
                   :src="member.user_avatar_url || getFallbackImage(member.user_name || '')"
                   :alt="member.user_name"
-                  class="w-8 h-8 rounded-full object-cover border border-slate-200 dark:border-slate-700"
+                  class="w-8 h-8 rounded-full object-cover border border-border"
                   @error="(e) => { (e.target as HTMLImageElement).src = getFallbackImage(member.user_name || '') }"
                 />
                 <div class="min-w-0 flex-1">
-                  <div class="text-sm font-medium text-slate-900 dark:text-white truncate">{{ member.user_name }}</div>
-                  <div class="text-xs text-slate-500 dark:text-slate-400">{{ member.role === 'owner' ? '负责人' : '协作者' }}</div>
+                  <div class="text-sm font-medium text-foreground truncate">{{ member.user_name }}</div>
+                  <div class="text-xs text-muted-foreground">{{ member.role === 'owner' ? '负责人' : '协作者' }}</div>
                 </div>
               </div>
               <div
@@ -804,36 +801,20 @@ if (allProjects.value.length === 0) {
                 <img
                   :src="org.org_avatar_url || getFallbackImage(org.org_name || '')"
                   :alt="org.org_name"
-                  class="w-8 h-8 rounded-lg object-cover border border-slate-200 dark:border-slate-700"
+                  class="w-8 h-8 rounded-lg object-cover border border-border"
                   @error="(e) => { (e.target as HTMLImageElement).src = getFallbackImage(org.org_name || '') }"
                 />
                 <div class="min-w-0 flex-1">
-                  <div class="text-sm font-medium text-slate-900 dark:text-white truncate">{{ org.org_name }}</div>
-                  <div class="text-xs text-slate-500 dark:text-slate-400">组织</div>
+                  <div class="text-sm font-medium text-foreground truncate">{{ org.org_name }}</div>
+                  <div class="text-xs text-muted-foreground">组织</div>
                 </div>
               </div>
             </div>
           </div>
 
-          <!-- Features -->
-          <div v-if="project.keywords && project.keywords.length > 0" class="bg-slate-50 dark:bg-[#111827] rounded-3xl p-6 border border-slate-200/50 dark:border-slate-800/80">
-            <h3 class="font-bold text-lg text-slate-900 dark:text-white mb-4 flex items-center gap-2">
-              <Sparkles class="w-5 h-5 text-emerald-500" /> 功能特性
-            </h3>
-            <div class="flex flex-wrap gap-2">
-              <span 
-                v-for="kw in project.keywords" 
-                :key="kw" 
-                class="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-sm font-medium hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-500/10 dark:hover:text-emerald-400 transition-colors cursor-default"
-              >
-                {{ kw }}
-              </span>
-            </div>
-          </div>
-
           <!-- Tech Stack -->
-          <div v-if="techStack.length" class="bg-slate-50 dark:bg-[#111827] rounded-3xl p-6 border border-slate-200/50 dark:border-slate-800/80">
-            <h3 class="font-bold text-lg text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+          <div v-if="techStack.length" class="bg-card rounded-3xl p-6 border border-border/80">
+            <h3 class="font-bold text-lg text-foreground mb-4 flex items-center gap-2">
               <Code2 class="w-5 h-5 text-indigo-500" /> 技术栈
             </h3>
             <div class="flex flex-wrap gap-2">
@@ -847,16 +828,18 @@ if (allProjects.value.length === 0) {
             </div>
           </div>
 
+          <ProjectTagGallery :gallery="displayTags.gallery" />
+
         </div>
       </div>
     </main>
 
     <main class="pt-32 px-6 text-center" v-else>
-      <div class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-slate-100 dark:bg-slate-800 mb-6 text-slate-400">
+      <div class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-secondary mb-6 text-muted-foreground">
         <Code2 class="w-10 h-10" />
       </div>
-      <h1 class="text-2xl font-bold text-slate-900 dark:text-white mb-2">Project not found</h1>
-      <p class="text-slate-500 mb-8">The app you're looking for doesn't exist or has been removed.</p>
+      <h1 class="text-2xl font-bold text-foreground mb-2">Project not found</h1>
+      <p class="text-muted-foreground mb-8">The app you're looking for doesn't exist or has been removed.</p>
       <button 
         @click="router.push('/')" 
         class="inline-flex items-center justify-center bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-xl font-bold transition-colors"

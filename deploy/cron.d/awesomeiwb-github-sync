@@ -1,0 +1,3 @@
+# Fallback cron — primary scheduling runs in-process (githubSyncJob scheduler).
+# Interval is controlled via admin UI; this daily run covers restarts / missed ticks.
+0 4 * * * root docker exec awesomeiwb-backend bun run src/scripts/sync-github-stats.ts >> /var/log/awesomeiwb/github-sync.log 2>&1

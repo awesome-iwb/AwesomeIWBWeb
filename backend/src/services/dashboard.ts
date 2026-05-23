@@ -93,24 +93,21 @@ export async function getDashboardData(userId: string, username: string): Promis
 
   if (await hasCap("story:manage")) {
     try {
-      const dirs = await fs.promises.readdir(STORIES_DIR);
-      const storyList: Array<{ id: string; title: string; cover: string; author: string; created_at: string }> = [];
-      for (const dir of dirs) {
-        try {
-          const metaPath = path.join(STORIES_DIR, dir, "meta.json");
-          const metaContent = await fs.promises.readFile(metaPath, "utf-8");
-          const meta = JSON.parse(metaContent);
-          storyList.push({
-            id: dir,
-            title: meta.title || dir,
-            cover: meta.cover || meta.image || "",
-            author: meta.author || "",
-            created_at: meta.date || meta.created_at || "",
-          });
-        } catch {}
-      }
-      storyList.sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
-      data.stories = { total: storyList.length, recent: storyList.slice(0, 5) };
+      const rows = await sql()<Array<{ id: string; slug: string; title: string; cover_image: string; updated_at: string }>>`
+        select id, slug, title, cover_image, updated_at::text as updated_at
+        from articles
+        order by updated_at desc
+        limit 20
+      `;
+      const storyList = rows.map((r) => ({
+        id: r.slug || r.id,
+        title: r.title,
+        cover: r.cover_image,
+        author: "",
+        created_at: r.updated_at,
+      }));
+      const [{ total }] = await sql()<Array<{ total: string }>>`select count(*)::text as total from articles`;
+      data.stories = { total: Number(total), recent: storyList.slice(0, 5) };
     } catch {
       data.stories = { total: 0, recent: [] };
     }

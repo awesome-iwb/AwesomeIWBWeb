@@ -1,6 +1,7 @@
 import { sql } from "../db/client";
 import { newSlug } from "../utils/slug";
 import { normalizeProjectTags } from "../domain/projectTags";
+import { attachRegistryTagsToCatalog } from "./tags";
 import { normalizeProjectInput } from "../domain/normalizeProjectInput";
 
 export type CategoryRow = {
@@ -73,14 +74,14 @@ export async function getCatalog() {
     order by p.name asc
   `;
   const normalizedProjects = projects.map(normalizeProjectTags);
-  return {
-    categories: categories.map((c) => ({
-      id: c.id,
-      name: c.name,
-      description: c.description,
-      projects: normalizedProjects.filter((p) => p.category_id === c.id)
-    }))
-  };
+  const grouped = categories.map((c) => ({
+    id: c.id,
+    name: c.name,
+    description: c.description,
+    projects: normalizedProjects.filter((p) => p.category_id === c.id),
+  }));
+  const enriched = await attachRegistryTagsToCatalog(grouped);
+  return { categories: enriched };
 }
 
 /**
@@ -148,6 +149,7 @@ export async function deleteCategory(id: string) {
 export async function listProjects(params: {
   q?: string;
   category?: string;
+  tag_id?: string;
   sort?: "stars" | "updated" | "name";
   page?: number;
   pageSize?: number;
@@ -171,6 +173,9 @@ export async function listProjects(params: {
   const whereParts = [];
   if (q) whereParts.push(sql()`(p.name ilike ${"%" + q + "%"} or p.developer ilike ${"%" + q + "%"} or ${q} = any(p.keywords))`);
   if (category) whereParts.push(sql()`p.category_id = ${category}`);
+  if (tagId) {
+    whereParts.push(sql()`p.id in (select project_id from project_tag_links where tag_id = ${tagId})`);
+  }
   const where = whereParts.length ? sql().join(whereParts, sql()` and `) : sql()`true`;
 
   const items = await sql()<ProjectRow[]>`
@@ -187,7 +192,24 @@ export async function listProjects(params: {
     select count(*)::text as count from projects p where ${where}
   `;
 
-  return { items: items.map(normalizeProjectTags), page, pageSize, total: Number(count) };
+  const normalized = items.map(normalizeProjectTags);
+  const { getTagsForProjects } = await import("./tags");
+  const tagMap = await getTagsForProjects(normalized.map((p) => p.id).filter(Boolean));
+  const enriched = normalized.map((p) => {
+    const tags = tagMap.get(p.id) ?? [];
+    return {
+      ...p,
+      tag_ids: tags.map((t) => t.id),
+      registry_tags: tags.slice(0, 5).map((t) => ({
+        id: t.id,
+        label: t.label,
+        group: t.group,
+        color_variant: t.color_variant,
+      })),
+    };
+  });
+
+  return { items: enriched, page, pageSize, total: Number(count) };
 }
 
 /**

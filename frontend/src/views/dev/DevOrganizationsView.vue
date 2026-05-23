@@ -1,15 +1,15 @@
 <template>
   <div class="space-y-4">
     <div class="flex items-center justify-between">
-      <h2 class="text-lg font-bold text-slate-900 dark:text-white">我的组织</h2>
-      <router-link to="/dev/organizations/create" class="px-4 py-2 rounded-xl bg-blue-500 hover:bg-blue-600 text-white text-sm font-bold shadow-lg shadow-blue-500/20 transition-all">
+      <h2 class="text-lg font-bold text-foreground">我的组织</h2>
+      <router-link to="/dev/organizations/create" class="px-4 py-3 sm:py-2 min-h-[48px] sm:min-h-[44px] rounded-xl bg-blue-500 hover:bg-blue-600 text-white text-sm font-bold shadow-lg shadow-blue-500/20 transition-all inline-flex items-center justify-center">
         创建组织
       </router-link>
     </div>
 
     <ui-LoadingSpinner v-if="loading" brand="dev" />
 
-    <div v-else-if="organizations.length === 0" class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
+    <div v-else-if="organizations.length === 0" class="bg-card rounded-2xl border border-border shadow-sm">
       <ui-EmptyState :icon="Building2" title="暂无组织" description="创建或加入组织后即可在此管理" containerClass="p-10" />
     </div>
 
@@ -18,21 +18,26 @@
         v-for="org in organizations"
         :key="org.id"
         :to="`/dev/organizations/${org.id}`"
-        class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-5 hover:shadow-md transition-shadow flex flex-col gap-3"
+        class="bg-card rounded-2xl border border-border shadow-sm p-4 sm:p-5 hover:shadow-md transition-shadow flex flex-col gap-3"
       >
         <div class="flex items-center gap-3">
-          <ui-Avatar :src="org.avatar_url" :name="org.name" size="md" rounded="default" />
+          <Avatar class="w-10 h-10 rounded-xl">
+            <AvatarImage :src="org.avatar_url" :alt="org.name" />
+            <AvatarFallback>{{ org.name?.charAt(0)?.toUpperCase() || '?' }}</AvatarFallback>
+          </Avatar>
           <div class="flex-1 min-w-0">
-            <div class="font-bold text-sm truncate text-slate-900 dark:text-white">{{ org.name }}</div>
+            <div class="font-bold text-sm truncate text-foreground">{{ org.name }}</div>
             <div class="text-xs text-slate-400 truncate">{{ org.slug }}</div>
           </div>
         </div>
-        <p class="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">{{ org.description || '暂无描述' }}</p>
+        <p class="text-xs text-muted-foreground line-clamp-2">{{ org.description || '暂无描述' }}</p>
         <div class="flex items-center gap-2 mt-auto">
-          <span class="text-[10px] px-1.5 py-0.5 rounded font-medium" :class="org.member_role === 'owner' ? 'bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400' : org.member_role === 'admin' ? 'bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400' : 'bg-slate-100 dark:bg-slate-700 text-slate-500'">
+          <span class="text-[10px] px-1.5 py-0.5 rounded font-medium" :class="org.member_role === 'owner' ? 'bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400' : org.member_role === 'admin' ? 'bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400' : 'bg-secondary text-slate-500'">
             {{ org.member_role === 'owner' ? '所有者' : org.member_role === 'admin' ? '管理员' : '成员' }}
           </span>
-          <ui-StatusBadge :status="org.status" :label="orgStatusLabel(org.status)" />
+          <Badge :variant="getStatusConfig(org.status).variant" :class="getStatusConfig(org.status).class">
+            {{ orgStatusLabel(org.status) || getStatusConfig(org.status).label }}
+          </Badge>
         </div>
       </router-link>
     </div>
@@ -44,7 +49,9 @@ import { ref, onMounted } from 'vue';
 import { adminFetch } from '../../composables/useAdminFetch';
 import { API } from '../../api/endpoints';
 import { Building2 } from 'lucide-vue-next';
-import { LoadingSpinner as uiLoadingSpinner, EmptyState as uiEmptyState, StatusBadge as uiStatusBadge, Avatar as uiAvatar } from '../../components/ui';
+import { LoadingSpinner as uiLoadingSpinner, EmptyState as uiEmptyState } from '../../components/ui';
+import { Badge, getStatusConfig } from '../../components/ui/badge';
+import { Avatar, AvatarImage, AvatarFallback } from '../../components/ui/avatar';
 
 const organizations = ref<any[]>([]);
 const loading = ref(true);

@@ -15,82 +15,87 @@
   >
     <template #detail>
       <div v-if="submissionDraft" class="bg-white/72 dark:bg-slate-900/62 backdrop-blur-lg rounded-3xl border border-white/70 dark:border-slate-700/70 shadow-xl shadow-slate-900/8 dark:shadow-black/30 overflow-hidden flex flex-col h-full min-h-0">
-        <div class="p-4 lg:p-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50">
-          <h2 class="text-lg lg:text-xl font-bold text-slate-800 dark:text-white">审核项目提交</h2>
+        <div class="p-4 lg:p-6 border-b border-border bg-accent/50 dark:bg-slate-900/50">
+          <h2 class="text-lg lg:text-xl font-bold text-foreground">审核项目提交</h2>
         </div>
-        <div class="flex-1 overflow-y-auto p-4 lg:p-8 space-y-4 lg:space-y-6">
-          <div v-if="submissionKind === 'project_update'" class="space-y-4 lg:space-y-6">
-            <div class="p-4 lg:p-5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
-              <div class="text-sm font-extrabold text-slate-800 dark:text-slate-200 mb-2">目标项目</div>
-              <div class="text-lg font-extrabold text-slate-900 dark:text-white">{{ submissionDraft.project_name }}</div>
-              <div class="text-sm text-slate-500 dark:text-slate-400 mt-1">开发者：{{ submissionDraft.actor?.username || '-' }}</div>
+        <div class="flex-1 overflow-y-auto p-4 lg:p-8 space-y-5 lg:space-y-6">
+          <div v-if="submissionKind === 'project_update'" class="space-y-5 lg:space-y-6">
+            <div class="p-4 lg:p-5 rounded-2xl border border-border bg-card/50">
+              <div class="text-sm font-extrabold text-foreground mb-2">目标项目</div>
+              <div class="text-lg font-extrabold text-foreground">{{ submissionDraft.project_name }}</div>
+              <div class="text-sm text-muted-foreground mt-1">开发者：{{ submissionDraft.actor?.username || '-' }}</div>
             </div>
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-5 lg:gap-6">
               <div class="space-y-2">
-                <div class="text-sm font-extrabold text-slate-700 dark:text-slate-300">新简介</div>
-                <div class="p-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 whitespace-pre-wrap text-sm">{{ submissionDraft.patch?.description || '' }}</div>
+                <div class="text-sm font-extrabold text-muted-foreground">新简介</div>
+                <div class="p-4 rounded-2xl border border-border bg-card whitespace-pre-wrap text-sm">{{ submissionDraft.patch?.description || '' }}</div>
               </div>
               <div class="space-y-2">
-                <div class="text-sm font-extrabold text-slate-700 dark:text-slate-300">新关键词</div>
-                <div class="p-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 whitespace-pre-wrap text-sm">{{ submissionDraft.patch?.keywords || '' }}</div>
+                <div class="text-sm font-extrabold text-muted-foreground">新关键词</div>
+                <div class="p-4 rounded-2xl border border-border bg-card whitespace-pre-wrap text-sm">{{ submissionDraft.patch?.keywords || '' }}</div>
               </div>
             </div>
             <div class="space-y-2">
-              <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">驳回原因（可选）</label>
-              <textarea v-model="submissionReviewNote" rows="2" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-emerald-500 resize-none text-base"></textarea>
+              <label class="block text-sm font-bold text-muted-foreground mb-2">驳回原因（可选）</label>
+              <textarea v-model="submissionReviewNote" rows="2" class="w-full px-4 py-3.5 lg:py-3 rounded-xl border border-border bg-card outline-none focus:border-emerald-500 resize-none text-base"></textarea>
             </div>
           </div>
-          <div v-else class="space-y-4 lg:grid lg:grid-cols-2 lg:gap-8">
+          <div v-else class="space-y-5 lg:grid lg:grid-cols-2 lg:gap-8">
             <div class="lg:col-span-1">
-              <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">项目名称</label>
-              <input type="text" v-model="submissionDraft.name" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-emerald-500 text-base" />
+              <label class="block text-sm font-bold text-muted-foreground mb-2">项目名称</label>
+              <input type="text" v-model="submissionDraft.name" class="w-full px-4 py-3.5 lg:py-3 rounded-xl border border-border bg-card outline-none focus:border-emerald-500 text-base" />
             </div>
             <div class="lg:col-span-1">
-              <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">开发者</label>
-              <input type="text" v-model="submissionDraft.developer" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-emerald-500 text-base" />
+              <label class="block text-sm font-bold text-muted-foreground mb-2">开发者</label>
+              <input type="text" v-model="submissionDraft.developer" class="w-full px-4 py-3.5 lg:py-3 rounded-xl border border-border bg-card outline-none focus:border-emerald-500 text-base" />
             </div>
             <div class="lg:col-span-2">
-              <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">GitHub 仓库</label>
-              <input type="text" v-model="submissionDraft.github_url" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-emerald-500 text-base" />
+              <label class="block text-sm font-bold text-muted-foreground mb-2">GitHub 仓库</label>
+              <input type="text" v-model="submissionDraft.github_url" class="w-full px-4 py-3.5 lg:py-3 rounded-xl border border-border bg-card outline-none focus:border-emerald-500 text-base" />
             </div>
             <div class="lg:col-span-2">
-              <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">简介</label>
-              <textarea v-model="submissionDraft.description" rows="3" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-emerald-500 resize-none text-base"></textarea>
+              <label class="block text-sm font-bold text-muted-foreground mb-2">简介</label>
+              <textarea v-model="submissionDraft.description" rows="3" class="w-full px-4 py-3.5 lg:py-3 rounded-xl border border-border bg-card outline-none focus:border-emerald-500 resize-none text-base"></textarea>
             </div>
             <div class="lg:col-span-1">
-              <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">标签（逗号分隔）</label>
-              <input type="text" v-model="submissionDraft.keywords" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-emerald-500 text-base" />
+              <label class="block text-sm font-bold text-muted-foreground mb-2">功能特性标签（逗号分隔）</label>
+              <input type="text" v-model="submissionDraft.keywords" class="w-full px-4 py-3.5 lg:py-3 rounded-xl border border-border bg-card outline-none focus:border-emerald-500 text-base" />
+              <p class="text-xs text-muted-foreground mt-2">入库后可由管理员映射到标签注册表，显示在详情侧栏画廊。</p>
             </div>
             <div class="lg:col-span-1">
-              <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">推荐标签（逗号分隔）</label>
-              <input type="text" v-model="submissionDraft.recommendation" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-emerald-500 text-base" />
+              <label class="block text-sm font-bold text-muted-foreground mb-2">项目 AI 率是否超过 50%</label>
+              <select v-model="submissionDraft.ai_usage_state" class="w-full px-4 py-3.5 lg:py-3 rounded-xl border border-border bg-card outline-none focus:border-emerald-500 text-base">
+                <option value="unknown">未知</option>
+                <option value="under50">未超过 50%</option>
+                <option value="over50">超过 50%</option>
+              </select>
             </div>
             <div class="lg:col-span-2">
-              <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">分类</label>
+              <label class="block text-sm font-bold text-muted-foreground mb-2">分类</label>
               <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                <select v-model="submissionCategoryId" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-emerald-500 text-base">
+                <select v-model="submissionCategoryId" class="w-full px-4 py-3.5 lg:py-3 rounded-xl border border-border bg-card outline-none focus:border-emerald-500 text-base">
                   <option value="">选择现有分类</option>
                   <option v-for="c in adminCategories" :key="c.id" :value="c.id">{{ c.name }}</option>
                 </select>
-                <input v-model="submissionNewCategoryName" type="text" placeholder="或新建分类名称" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-emerald-500 text-base" />
+                <input v-model="submissionNewCategoryName" type="text" placeholder="或新建分类名称" class="w-full px-4 py-3.5 lg:py-3 rounded-xl border border-border bg-card outline-none focus:border-emerald-500 text-base" />
               </div>
-              <div class="text-xs text-slate-500 dark:text-slate-400 mt-2">优先使用"选择现有分类"，若填写新分类名称则会自动创建。</div>
+              <div class="text-xs text-muted-foreground mt-2">优先使用"选择现有分类"，若填写新分类名称则会自动创建。</div>
             </div>
             <div class="lg:col-span-2">
-              <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">驳回原因（可选）</label>
-              <textarea v-model="submissionReviewNote" rows="2" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-emerald-500 resize-none text-base"></textarea>
+              <label class="block text-sm font-bold text-muted-foreground mb-2">驳回原因（可选）</label>
+              <textarea v-model="submissionReviewNote" rows="2" class="w-full px-4 py-3.5 lg:py-3 rounded-xl border border-border bg-card outline-none focus:border-emerald-500 resize-none text-base"></textarea>
             </div>
           </div>
         </div>
-        <div class="p-4 border-t border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 flex flex-col sm:flex-row gap-3">
-          <button @click="approveSubmission" class="flex-1 px-4 py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold transition-colors">通过并入库</button>
-          <button @click="rejectSubmission" class="flex-1 px-4 py-3 rounded-2xl bg-rose-500 hover:bg-rose-600 text-white font-bold transition-colors">驳回</button>
+        <div class="p-4 border-t border-border bg-card flex flex-col sm:flex-row gap-3">
+          <button @click="approveSubmission" class="flex-1 px-4 py-3.5 lg:py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold transition-colors min-h-[48px]">通过并入库</button>
+          <button @click="rejectSubmission" class="flex-1 px-4 py-3.5 lg:py-3 rounded-2xl bg-rose-500 hover:bg-rose-600 text-white font-bold transition-colors min-h-[48px]">驳回</button>
         </div>
       </div>
     </template>
 
     <template #empty-detail>
-      <div class="h-full min-h-0 flex items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-3xl bg-white/50 dark:bg-slate-900/35 backdrop-blur-sm">
+      <div class="h-full min-h-0 flex items-center justify-center border-2 border-dashed border-border rounded-3xl bg-white/50 dark:bg-slate-900/35 backdrop-blur-sm">
         <div class="text-center">
           <p class="text-slate-400 mb-2">从列表选择待审核项目</p>
         </div>
@@ -100,8 +105,8 @@
     <template #list-toolbar>
       <div class="space-y-3">
         <div class="flex gap-2">
-          <input v-model="submissionQuery.q" @keyup.enter="resetAndFetchSubmissions" type="text" class="flex-1 px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-emerald-500 text-sm" placeholder="搜索（名称/GitHub）" />
-          <button @click="resetAndFetchSubmissions" class="px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold transition-colors">搜索</button>
+          <input v-model="submissionQuery.q" @keyup.enter="resetAndFetchSubmissions" type="text" class="flex-1 px-3 py-3 lg:py-2.5 rounded-xl border border-border bg-card outline-none focus:border-emerald-500 text-sm min-h-[48px]" placeholder="搜索（名称/GitHub）" />
+          <button @click="resetAndFetchSubmissions" class="px-4 py-3 lg:py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold transition-colors min-h-[48px]">搜索</button>
         </div>
       </div>
     </template>
@@ -112,16 +117,19 @@
             v-for="s in submissionsPage.items"
             :key="s.id"
             @click="selectSubmission(s)"
-            class="p-3 rounded-xl border cursor-pointer transition-all duration-200"
-            :class="selectedSubmissionId === s.id ? 'bg-emerald-500 text-white border-emerald-500 shadow-md shadow-emerald-500/20' : 'bg-slate-50 dark:bg-slate-900/50 border-transparent hover:border-emerald-300'"
+            class="p-3.5 lg:p-3 rounded-xl border cursor-pointer transition-all duration-200 flex items-center gap-3 min-h-[64px]"
+            :class="selectedSubmissionId === s.id ? 'bg-[var(--color-brand-50)] dark:bg-[var(--color-brand-500)]/10 border-l-[3px] border-l-[var(--color-brand-500)] border-y border-r border-transparent' : 'bg-card/50 border-transparent hover:bg-accent/80'"
           >
-            <div class="font-bold text-sm truncate">
-              <span v-if="s.payload?.kind === 'project_update'">变更：{{ s.payload?.project_name || '未命名' }}</span>
-              <span v-else>{{ s.payload?.name || '未命名' }}</span>
-            </div>
-            <div class="text-xs opacity-80 truncate mt-1">
-              <span v-if="s.payload?.kind === 'project_update'">{{ s.payload?.actor?.username ? `开发者：${s.payload.actor.username}` : '' }}</span>
-              <span v-else>{{ s.payload?.github_url || '' }}</span>
+            <component :is="ClipboardCheck" class="w-6 h-6 lg:w-5 lg:h-5 text-slate-400 shrink-0" />
+            <div class="flex-1 min-w-0">
+              <div class="font-medium text-base lg:text-sm truncate text-foreground">
+                <span v-if="s.payload?.kind === 'project_update'">变更：{{ s.payload?.project_name || '未命名' }}</span>
+                <span v-else>{{ s.payload?.name || '未命名' }}</span>
+              </div>
+              <div class="text-sm lg:text-xs text-muted-foreground truncate mt-0.5">
+                <span v-if="s.payload?.kind === 'project_update'">{{ s.payload?.actor?.username ? `开发者：${s.payload.actor.username}` : '' }}</span>
+                <span v-else>{{ s.payload?.github_url || '' }}</span>
+              </div>
             </div>
           </div>
           <ui-EmptyState v-if="submissionsPage.items.length === 0" :icon="ClipboardCheck" title="暂无待审核" />
@@ -165,7 +173,6 @@ const submissionNewCategoryName = ref('');
 const normalizeProjectDraft = (p: any) => {
   const clone = { ...p };
   if (Array.isArray(clone.keywords)) clone.keywords = clone.keywords.join(', ');
-  if (Array.isArray(clone.recommendation)) clone.recommendation = clone.recommendation.join(', ');
   if (!Array.isArray(clone.platform_developers)) clone.platform_developers = [];
   clone.platform_developers = clone.platform_developers.map((d: any) => {
     const legacy = typeof d?.user_id === 'string' ? d.user_id : '';
@@ -227,7 +234,8 @@ const selectSubmission = (s: any) => {
   submissionKind.value = 'new_project';
   submissionDraft.value = normalizeProjectDraft({
     name: payload.name ?? '', developer: payload.developer ?? '', github_url: payload.github_url ?? payload.githubUrl ?? '',
-    description: payload.description ?? '', keywords: payload.keywords ?? payload.tags ?? '', recommendation: payload.recommendation ?? '',
+    description: payload.description ?? '', keywords: payload.keywords ?? payload.tags ?? '',
+    ai_usage_state: payload.ai_usage_state ?? 'unknown',
     status: payload.status ?? '', language: payload.language ?? '', stars: payload.stars ?? 0, icon: payload.icon ?? '', banner: payload.banner ?? ''
   });
   submissionReviewNote.value = '';
@@ -248,7 +256,8 @@ const approveSubmission = async () => {
   }
   const toList = (v: any) => { if (Array.isArray(v)) return v; if (typeof v !== 'string') return []; return v.split(/[,，;]/).map((x) => x.trim()).filter(Boolean); };
   const p: any = { ...submissionDraft.value };
-  p.keywords = toList(p.keywords); p.recommendation = toList(p.recommendation);
+  p.keywords = toList(p.keywords);
+  delete p.recommendation;
   const body: any = { project: p };
   if (submissionNewCategoryName.value.trim()) body.category_name = submissionNewCategoryName.value.trim();
   else if (submissionCategoryId.value) body.category_id = submissionCategoryId.value;

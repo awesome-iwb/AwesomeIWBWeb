@@ -57,17 +57,21 @@ import {
 import { authPlugin, requireAuth, requireCapability } from "./plugins/auth";
 import { casdoorAuthPlugin } from "./plugins/casdoorAuth";
 import { localAuthPlugin } from "./plugins/localAuth";
-import { listUsers, setUserRole, setUserActive, updateUserLogin, updateUserAvatarPreference, findUserByName, deleteUser, findUserById, bumpUserTokenVersion, createUser, getUserPublicProfile, getUserPublicComments, getUserPublicProjects, getUserPublicOrganizations, renameUser } from "./services/users";
+import { listUsers, setUserRole, setUserActive, updateUserLogin, updateUserAvatarPreference, findUserByName, deleteUser, findUserById, bumpUserTokenVersion, createUser, getUserPublicProfile, getUserPublicComments, getUserPublicProjects, getUserPublicOrganizations, renameUser, issueUserAuthToken } from "./services/users";
+import { setSessionCookie } from "./utils/cookies";
 import { ensureSuperadminInitialized, SUPERADMIN_INITIAL_USERNAME, setLocalAccountPassword, validateSuperadminPassword } from "./services/localAccounts";
 import { listCapabilities, getUserCapabilitiesWithInfo, setUserCapabilities, isSuperadmin as isSuperadminUser, userHasCapability } from "./services/capabilities";
 import { getRoleTemplates } from "./services/capabilities";
 import { getDashboardData } from "./services/dashboard";
-import { createOrGetMediaAssetFromUpload, getMediaReferences, listMediaAssets, restoreMedia, softDeleteMedia, getMediaTags, setMediaTags, batchTagMedia, batchSoftDeleteMedia, upsertMediaReference, upsertMediaReferencesForEntity } from "./services/media";
-import { buildKey, writeFile as storageWriteFile, readFile as storageReadFile, publicUrl as storagePublicUrl, ensureRoot } from "./services/storage";
+import { getMediaAssetByStorageKey, getMediaReferences, listMediaAssets, restoreMedia, softDeleteMedia, getMediaTags, setMediaTags, batchTagMedia, batchSoftDeleteMedia, upsertMediaReference, upsertMediaReferencesForEntity } from "./services/media";
+import { readFile as storageReadFile, ensureRoot } from "./services/storage";
+import { bufferFromUploadFile, processImageUpload, validateImageMime } from "./services/imageUpload";
+import { getOrCreateThumbnail, parseThumbWidth } from "./services/thumbnails";
 import { appConfig } from "./config";
 import { checkRateLimit } from "./plugins/rateLimit";
 import {
   addProjectMember,
+  assignProjectUserOwner,
   removeProjectMember,
   removeProjectOrgMember,
   getProjectMembers,
@@ -82,6 +86,66 @@ import { createProjectClaim, listProjectClaims, approveProjectClaim, rejectProje
 import { promoteToDev, demoteFromDev } from "./services/rolePromotion";
 import { listDevelopers, getDeveloperDetail } from "./services/developers";
 import { recordPageView, recordClickEvent, recordSearchQuery, getAnalyticsOverview, clampAnalyticsDays } from "./services/analytics";
+import { listPages, createPage, updatePage, deletePage, syncPages } from "./services/pages";
+import {
+  listPublishedArticles,
+  getPublishedArticleBySlug,
+  listAdminArticles,
+  getArticleById,
+  createArticle,
+  updateArticle,
+  deleteArticle,
+  publishArticle,
+  toLegacyStoryPayload,
+  buildArticleMediaFields,
+  normalizeArticleSlug,
+} from "./services/articles";
+import { listArticleBacklinks } from "./services/articleLinks";
+import {
+  listArticleRevisions,
+  getArticleRevision,
+  rollbackArticle,
+} from "./services/articleRevisions";
+import {
+  heartbeat as articleHeartbeat,
+  getActiveEditors,
+  removePresence as articleRemovePresence,
+} from "./services/articlePresence";
+import {
+  listArticleComments,
+  listArticleCommentReplies,
+  createArticleComment,
+  updateArticleComment,
+  deleteArticleComment,
+  getArticleComment,
+  getArticleIdBySlug,
+} from "./services/articleComments";
+import {
+  listArticleAnnotations,
+  createArticleAnnotation,
+  updateArticleAnnotation,
+  deleteArticleAnnotation,
+  getArticleAnnotation,
+} from "./services/articleAnnotations";
+import { importStoriesFromFilesIfEmpty } from "./services/importStoriesFromFiles";
+import {
+  listActiveTags,
+  listAdminTags,
+  createTag,
+  updateTag,
+  deleteTag,
+  getTagsForProject,
+  setProjectTags,
+  getProjectTagIds,
+  seedTagsFromProjectsIfEmpty,
+} from "./services/tags";
+import { syncAllProjectsFromGithub, syncProjectFromGithub } from "./services/githubProjectSync";
+import {
+  getGithubSyncStatus,
+  runGithubProjectSync,
+  startGithubSyncScheduler,
+  updateGithubSyncSettings,
+} from "./services/githubSyncJob";
 import { sql } from "./db/client";
 
 /**
@@ -118,7 +182,12 @@ const dbEnabled = Boolean(process.env.DATABASE_URL);
 if (appConfig.isProduction && !dbEnabled) {
   throw new Error("DATABASE_URL is required in production");
 }
-if (dbEnabled) await migrate();
+if (dbEnabled) {
+  await migrate();
+  await importStoriesFromFilesIfEmpty();
+  await seedTagsFromProjectsIfEmpty();
+  startGithubSyncScheduler();
+}
 // Seed bootstrap superadmin (default username from SUPERADMIN_INITIAL_USERNAME env, "lincube").
 // Other ops users are created via the admin UI or scripts/set-user-role.ts.
 if (dbEnabled) await ensureSuperadminInitialized();
@@ -266,13 +335,6 @@ function resolveStoryFile(id: string, filename: string) {
   return { safeId, safeFilename, resolved };
 }
 
-function extFromMime(mime: string) {
-  if (mime === "image/png") return "png";
-  if (mime === "image/jpeg") return "jpg";
-  if (mime === "image/webp") return "webp";
-  return null;
-}
-
 function uploadError(set: any, status: number, code: string, message: string) {
   set.status = status;
   return { error: message, code, message };
@@ -304,25 +366,15 @@ function trySendNotModified(headers: Record<string, string | undefined>, set: an
   return false;
 }
 
-async function registerUploadedMedia(input: {
-  sha256: string;
-  filename: string;
-  storageKey: string;
-  url: string;
-  mime: string;
-  size: number;
-  source?: string;
-  uploaderId?: string | null;
-}) {
-  return await createOrGetMediaAssetFromUpload({
-    sha256: input.sha256,
-    storageKey: input.storageKey,
-    url: input.url,
-    mime: input.mime,
-    size: input.size,
-    source: input.source,
-    uploaderId: input.uploaderId,
-  });
+function mapImageUploadError(set: any, err: unknown) {
+  const code = err instanceof Error ? err.message : "UPLOAD_FAILED";
+  if (code === "UPLOAD_UNSUPPORTED_TYPE") {
+    return uploadError(set, 400, code, "仅支持 PNG、JPG、WEBP 格式");
+  }
+  if (code === "UPLOAD_INVALID_SIGNATURE") {
+    return uploadError(set, 400, code, "文件内容与图片格式不匹配");
+  }
+  return uploadError(set, 500, "UPLOAD_FAILED", "上传失败，请稍后重试");
 }
 
 const allowedOrigins = appConfig.allowedOrigins;
@@ -441,7 +493,13 @@ const app = new Elysia()
       const orgs = await sql()`SELECT name FROM organizations WHERE id = ${project.organization_id}`;
       organizationName = orgs[0]?.name ?? null;
     }
-    return { ...project, developers: members, organization_name: organizationName };
+    const registry_tags = await getTagsForProject(project.id);
+    return { ...project, developers: members, organization_name: organizationName, registry_tags };
+  })
+  .get("/api/tags", async ({ set }) => {
+    applyPublicShortCache(set, 300);
+    const items = await listActiveTags();
+    return { items };
   })
   .get("/api/stats", async () => {
     if (!dbEnabled) {
@@ -910,6 +968,7 @@ const app = new Elysia()
     if (capErr) return capErr;
     const q = typeof query.q === "string" ? query.q : undefined;
     const category = typeof query.category === "string" ? query.category : undefined;
+    const tag_id = typeof query.tag_id === "string" ? query.tag_id : undefined;
     const sort =
       query.sort === "stars" || query.sort === "updated" || query.sort === "name"
         ? (query.sort as any)
@@ -933,7 +992,7 @@ const app = new Elysia()
       const items = filtered.slice(offset, offset + pSize);
       return { items, page: pPage, pageSize: pSize, total: filtered.length };
     }
-    return await listProjects({ q, category, sort, page, pageSize });
+    return await listProjects({ q, category, tag_id, sort, page, pageSize });
   })
   .get("/api/admin/projects/:id", async ({ params: { id }, set, user }) => {
     const capErr = await checkCap(user, set, "project:read");
@@ -952,7 +1011,114 @@ const app = new Elysia()
       const devUser = await findUserById(project.developer_user_id);
       devUserName = devUser?.name ?? null;
     }
-    return { ...project, members, organization_name: orgName, developer_user_name: devUserName };
+    const registry_tags = await getTagsForProject(id);
+    const tag_ids = await getProjectTagIds(id);
+    return { ...project, members, organization_name: orgName, developer_user_name: devUserName, registry_tags, tag_ids };
+  })
+  .get("/api/admin/projects/:id/tags", async ({ params: { id }, set, user }) => {
+    const capErr = await checkCap(user, set, "project:read");
+    if (capErr) return capErr;
+    if (!dbEnabled) return apiNotFound(set);
+    const tags = await getTagsForProject(String(id));
+    return { items: tags, tag_ids: tags.map((t) => t.id) };
+  })
+  .put("/api/admin/projects/:id/tags", async ({ params: { id }, body, set, user }) => {
+    const capErr = await checkCap(user, set, "project:update");
+    if (capErr) return capErr;
+    if (!dbEnabled) return apiNotFound(set);
+    const tagIds = Array.isArray((body as any)?.tag_ids) ? (body as any).tag_ids.map(String) : [];
+    const items = await setProjectTags(String(id), tagIds);
+    await logAuditCompat({ actor: user?.name, action: "set_project_tags", entity_type: "project", entity_id: id, diff: { tag_ids: tagIds } });
+    return { items, tag_ids: items.map((t) => t.id) };
+  })
+  .post("/api/admin/projects/sync-github", async ({ body, set, user }) => {
+    const capErr = await checkCap(user, set, "project:update");
+    if (capErr) return capErr;
+    if (!dbEnabled) return apiNotFound(set);
+    const projectId = (body as any)?.project_id ? String((body as any).project_id) : "";
+    const dryRun = Boolean((body as any)?.dry_run);
+    if (projectId) {
+      const project = await getProjectById(projectId);
+      if (!project) return apiNotFound(set, "Project not found");
+      const result = await syncProjectFromGithub(project, { dryRun });
+      return result;
+    }
+    const limit = (body as any)?.limit ? Number((body as any).limit) : undefined;
+    return await syncAllProjectsFromGithub({ limit, dryRun });
+  })
+  .get("/api/admin/sync/github", async ({ set, user }) => {
+    const capErr = await checkCap(user, set, "project:update");
+    if (capErr) return capErr;
+    if (!dbEnabled) return apiNotFound(set);
+    return await getGithubSyncStatus();
+  })
+  .post("/api/admin/sync/github", async ({ set, user }) => {
+    const capErr = await checkCap(user, set, "project:update");
+    if (capErr) return capErr;
+    if (!dbEnabled) return apiNotFound(set);
+    const result = await runGithubProjectSync({ trigger: "manual" });
+    await logAuditCompat({
+      actor: user?.name,
+      action: "github_sync_manual",
+      entity_type: "sync_job",
+      entity_id: "github_project_stats",
+      diff: { status: result.status, updated: result.updated, failed: result.failed },
+    });
+    return result;
+  })
+  .patch("/api/admin/sync/github", async ({ body, set, user }) => {
+    const capErr = await checkCap(user, set, "project:update");
+    if (capErr) return capErr;
+    if (!dbEnabled) return apiNotFound(set);
+    const payload = body as any;
+    try {
+      const status = await updateGithubSyncSettings({
+        interval_hours: payload?.interval_hours !== undefined ? Number(payload.interval_hours) : undefined,
+        enabled: payload?.enabled !== undefined ? Boolean(payload.enabled) : undefined,
+      });
+      await logAuditCompat({
+        actor: user?.name,
+        action: "github_sync_settings",
+        entity_type: "sync_job",
+        entity_id: "github_project_stats",
+        diff: { interval_hours: status.interval_hours, enabled: status.enabled },
+      });
+      return status;
+    } catch (e: any) {
+      if (String(e?.message) === "INVALID_INTERVAL_HOURS") {
+        return apiBadRequest(set, "无效的同步频率");
+      }
+      throw e;
+    }
+  })
+  .get("/api/admin/tags", async ({ set, user, query }) => {
+    const capErr = await checkCap(user, set, "project:read");
+    if (capErr) return capErr;
+    return await listAdminTags({ q: query?.q as string, group: query?.group as string });
+  })
+  .post("/api/admin/tags", async ({ body, set, user }) => {
+    const capErr = await checkCap(user, set, "project:update");
+    if (capErr) return capErr;
+    try {
+      return await createTag(body as any);
+    } catch (e: any) {
+      if (String(e?.message).includes("duplicate")) return apiBadRequest(set, "slug 已存在");
+      throw e;
+    }
+  })
+  .patch("/api/admin/tags/:id", async ({ params, body, set, user }) => {
+    const capErr = await checkCap(user, set, "project:update");
+    if (capErr) return capErr;
+    const tag = await updateTag(String(params.id), body as any);
+    if (!tag) return apiNotFound(set);
+    return tag;
+  })
+  .delete("/api/admin/tags/:id", async ({ params, set, user }) => {
+    const capErr = await checkCap(user, set, "project:update");
+    if (capErr) return capErr;
+    const ok = await deleteTag(String(params.id));
+    if (!ok) return apiNotFound(set);
+    return { ok: true };
   })
   .get("/api/admin/projects/:id/members", async ({ params: { id }, set, user }) => {
     const capErr = await checkCap(user, set, "project:read");
@@ -1248,6 +1414,65 @@ const app = new Elysia()
     const capErr = await checkCap(user, set, "user:manage");
     if (capErr) return capErr;
     return { templates: getRoleTemplates() };
+  })
+  .get("/api/admin/pages", async ({ set, user, query }) => {
+    const capErr = await checkCap(user, set, "route:manage");
+    if (capErr) return capErr;
+    return await listPages({ group: query?.group as string });
+  })
+  .post("/api/admin/pages", async ({ body, set, user }) => {
+    const capErr = await checkCap(user, set, "route:manage");
+    if (capErr) return capErr;
+    try {
+      const page = await createPage(body as any);
+      return page;
+    } catch (e: any) {
+      if (e.message?.includes("unique") || e.message?.includes("duplicate")) {
+        return apiBadRequest(set, "路径已存在");
+      }
+      throw e;
+    }
+  }, {
+    body: t.Object({
+      path: t.String(),
+      title: t.String(),
+      description: t.Optional(t.String()),
+      group: t.Optional(t.String()),
+      icon: t.Optional(t.String()),
+      required_capability: t.Optional(t.String()),
+      is_visible: t.Optional(t.Boolean()),
+      sort_index: t.Optional(t.Number()),
+    })
+  })
+  .put("/api/admin/pages/:id", async ({ params, body, set, user }) => {
+    const capErr = await checkCap(user, set, "route:manage");
+    if (capErr) return capErr;
+    const page = await updatePage(String(params.id), body as any);
+    if (!page) return apiNotFound(set, "页面不存在");
+    return page;
+  }, {
+    body: t.Object({
+      path: t.Optional(t.String()),
+      title: t.Optional(t.String()),
+      description: t.Optional(t.String()),
+      group: t.Optional(t.String()),
+      icon: t.Optional(t.String()),
+      required_capability: t.Optional(t.String()),
+      is_visible: t.Optional(t.Boolean()),
+      sort_index: t.Optional(t.Number()),
+    })
+  })
+  .delete("/api/admin/pages/:id", async ({ params, set, user }) => {
+    const capErr = await checkCap(user, set, "route:manage");
+    if (capErr) return capErr;
+    const ok = await deletePage(String(params.id));
+    if (!ok) return apiNotFound(set, "页面不存在");
+    return { ok: true };
+  })
+  .post("/api/admin/pages/sync", async ({ set, user }) => {
+    const capErr = await checkCap(user, set, "route:manage");
+    if (capErr) return capErr;
+    return await syncPages();
   })
   .get("/api/admin/audit-logs", async ({ query, set, user }) => {
     const capErr = await checkCap(user, set, "audit:read");
@@ -1647,6 +1872,13 @@ const app = new Elysia()
     const payload = body as any;
     const updated = await updateOrganization(id, { name: payload?.name, description: payload?.description, website_url: payload?.website_url, avatar_url: payload?.avatar_url });
     if (!updated) return apiNotFound(set, "Organization not found");
+    if (dbEnabled && updated.avatar_url) {
+      await upsertMediaReferencesForEntity({
+        entityType: "organization",
+        entityId: id,
+        fields: [{ url: updated.avatar_url, fieldPath: "avatar_url" }],
+      });
+    }
     return updated;
   })
   .get("/api/dev/organizations/:id/members", async ({ params: { id }, user, set }) => {
@@ -2018,8 +2250,350 @@ const app = new Elysia()
       return apiError(set, 500, "INTERNAL", e?.message ?? String(e));
     }
   })
+  .get("/api/articles", async ({ set, headers, query }) => {
+    applyPublicShortCache(set, 30);
+    if (!dbEnabled) {
+      set.status = 503;
+      return apiError(set, 503, "UNAVAILABLE", "articles require database");
+    }
+    const layout = query?.layout as "hero" | "interview" | "app_spotlight" | undefined;
+    const limit = query?.limit ? Number(query.limit) : undefined;
+    const items = await listPublishedArticles({ layout, limit });
+    const payload = items.map(toLegacyStoryPayload);
+    const etag = weakEtagFromJson(payload);
+    if (trySendNotModified(headers, set, etag)) return;
+    return { items: payload };
+  })
+  .get("/api/articles/:slug", async ({ params, set, headers }) => {
+    applyPublicShortCache(set, 60);
+    if (!dbEnabled) {
+      set.status = 503;
+      return apiError(set, 503, "UNAVAILABLE", "articles require database");
+    }
+    const article = await getPublishedArticleBySlug(String(params.slug));
+    if (!article) return apiNotFound(set);
+    const payload = toLegacyStoryPayload(article);
+    const etag = weakEtagFromJson(payload);
+    if (trySendNotModified(headers, set, etag)) return;
+    return payload;
+  })
+  .get("/api/admin/articles", async ({ set, user, query }) => {
+    const capErr = await checkCap(user, set, "story:manage");
+    if (capErr) return capErr;
+    if (!dbEnabled) return apiError(set, 503, "UNAVAILABLE", "articles require database");
+    const page = query?.page ? Number(query.page) : undefined;
+    const pageSize = query?.pageSize ? Number(query.pageSize) : undefined;
+    return await listAdminArticles({
+      q: typeof query?.q === "string" ? query.q : undefined,
+      status: typeof query?.status === "string" ? query.status : undefined,
+      page,
+      pageSize,
+    });
+  })
+  .get("/api/admin/articles/:id", async ({ params, set, user }) => {
+    const capErr = await checkCap(user, set, "story:manage");
+    if (capErr) return capErr;
+    if (!dbEnabled) return apiError(set, 503, "UNAVAILABLE", "articles require database");
+    const article = await getArticleById(String(params.id));
+    if (!article) return apiNotFound(set);
+    return article;
+  })
+  .post("/api/admin/articles", async ({ body, set, user }) => {
+    const capErr = await checkCap(user, set, "story:manage");
+    if (capErr) return capErr;
+    if (!dbEnabled) return apiError(set, 503, "UNAVAILABLE", "articles require database");
+    try {
+      const input = body as any;
+      const article = await createArticle({
+        ...input,
+        slug: input.slug ?? normalizeArticleSlug(input.title ?? "article"),
+        author_user_id: user?.id ?? null,
+      });
+      if (dbEnabled) {
+        await upsertMediaReferencesForEntity({
+          entityType: "article",
+          entityId: article.id,
+          fields: buildArticleMediaFields(article),
+        });
+      }
+      await logAuditCompat({ action: "create", entity_type: "article", entity_id: article.id }, user?.name);
+      return article;
+    } catch (e: any) {
+      if (String(e?.message ?? "").includes("duplicate") || String(e?.message ?? "").includes("unique")) {
+        return apiBadRequest(set, "slug 已存在");
+      }
+      if (e?.message === "invalid slug") return apiBadRequest(set, "slug 格式无效");
+      throw e;
+    }
+  })
+  .patch("/api/admin/articles/:id", async ({ params, body, set, user }) => {
+    const capErr = await checkCap(user, set, "story:manage");
+    if (capErr) return capErr;
+    if (!dbEnabled) return apiError(set, 503, "UNAVAILABLE", "articles require database");
+    const before = await getArticleById(String(params.id));
+    if (!before) return apiNotFound(set);
+    try {
+      const article = await updateArticle(String(params.id), body as any);
+      if (!article) return apiNotFound(set);
+      await upsertMediaReferencesForEntity({
+        entityType: "article",
+        entityId: article.id,
+        fields: buildArticleMediaFields(article),
+      });
+      await logAuditCompat(
+        { action: "update", entity_type: "article", entity_id: article.id, diff: { before, after: article } },
+        user?.name
+      );
+      return article;
+    } catch (e: any) {
+      if (e?.name === "ArticleConflictError") {
+        return apiError(set, 409, "CONFLICT", "文章已被他人修改，请刷新后重试", { serverArticle: e.serverArticle });
+      }
+      if (String(e?.message ?? "").includes("duplicate") || String(e?.message ?? "").includes("unique")) {
+        return apiBadRequest(set, "slug 已存在");
+      }
+      if (e?.message === "invalid slug") return apiBadRequest(set, "slug 格式无效");
+      throw e;
+    }
+  })
+  .delete("/api/admin/articles/:id", async ({ params, set, user }) => {
+    const capErr = await checkCap(user, set, "story:manage");
+    if (capErr) return capErr;
+    if (!dbEnabled) return apiError(set, 503, "UNAVAILABLE", "articles require database");
+    const before = await getArticleById(String(params.id));
+    if (!before) return apiNotFound(set);
+    await deleteArticle(String(params.id));
+    await logAuditCompat({ action: "delete", entity_type: "article", entity_id: before.id, diff: { before } }, user?.name);
+    return { ok: true };
+  })
+  .post("/api/admin/articles/:id/publish", async ({ params, body, set, user }) => {
+    const capErr = await checkCap(user, set, "story:manage");
+    if (capErr) return capErr;
+    if (!dbEnabled) return apiError(set, 503, "UNAVAILABLE", "articles require database");
+    const publish = (body as any)?.publish !== false;
+    const article = await publishArticle(String(params.id), publish);
+    if (!article) return apiNotFound(set);
+    await logAuditCompat(
+      { action: publish ? "publish" : "unpublish", entity_type: "article", entity_id: article.id },
+      user?.name
+    );
+    return article;
+  })
+  .get("/api/admin/articles/:id/backlinks", async ({ params, set, user }) => {
+    const capErr = await checkCap(user, set, "story:manage");
+    if (capErr) return capErr;
+    if (!dbEnabled) return apiError(set, 503, "UNAVAILABLE", "articles require database");
+    const article = await getArticleById(String(params.id));
+    if (!article) return apiNotFound(set);
+    const items = await listArticleBacklinks(article.slug);
+    return { items };
+  })
+  .get("/api/admin/articles/:id/revisions", async ({ params, query, set, user }) => {
+    const capErr = await checkCap(user, set, "story:manage");
+    if (capErr) return capErr;
+    if (!dbEnabled) return apiError(set, 503, "UNAVAILABLE", "articles require database");
+    const article = await getArticleById(String(params.id));
+    if (!article) return apiNotFound(set);
+    const page = Number(query.page) || 1;
+    const pageSize = Number(query.pageSize) || 20;
+    return await listArticleRevisions(String(params.id), { page, pageSize });
+  })
+  .get("/api/admin/articles/:id/revisions/:revId", async ({ params, set, user }) => {
+    const capErr = await checkCap(user, set, "story:manage");
+    if (capErr) return capErr;
+    if (!dbEnabled) return apiError(set, 503, "UNAVAILABLE", "articles require database");
+    const revision = await getArticleRevision(String(params.revId));
+    if (!revision || revision.article_id !== String(params.id)) return apiNotFound(set);
+    return revision;
+  })
+  .post("/api/admin/articles/:id/revisions/:revId/rollback", async ({ params, set, user }) => {
+    const capErr = await checkCap(user, set, "story:manage");
+    if (capErr) return capErr;
+    if (!dbEnabled) return apiError(set, 503, "UNAVAILABLE", "articles require database");
+    const result = await rollbackArticle(String(params.id), String(params.revId));
+    if (!result) return apiNotFound(set);
+    await logAuditCompat(
+      { action: "rollback", entity_type: "article", entity_id: String(params.id), diff: { revisionId: String(params.revId) } },
+      user?.name,
+    );
+    return result;
+  })
+  .post("/api/admin/articles/:id/presence/heartbeat", async ({ params, body, set, user }) => {
+    const capErr = await checkCap(user, set, "story:manage");
+    if (capErr) return capErr;
+    if (!dbEnabled) return apiError(set, 503, "UNAVAILABLE", "articles require database");
+    if (!user?.id) return apiError(set, 401, "UNAUTHORIZED", "login required");
+    await articleHeartbeat(String(params.id), user.id, user.name ?? "", user.avatar_url ?? "");
+    return { ok: true };
+  })
+  .delete("/api/admin/articles/:id/presence", async ({ params, set, user }) => {
+    const capErr = await checkCap(user, set, "story:manage");
+    if (capErr) return capErr;
+    if (!dbEnabled) return apiError(set, 503, "UNAVAILABLE", "articles require database");
+    if (!user?.id) return apiError(set, 401, "UNAUTHORIZED", "login required");
+    await articleRemovePresence(String(params.id), user.id);
+    return { ok: true };
+  })
+  .get("/api/admin/articles/:id/presence", async ({ params, set, user }) => {
+    const capErr = await checkCap(user, set, "story:manage");
+    if (capErr) return capErr;
+    if (!dbEnabled) return apiError(set, 503, "UNAVAILABLE", "articles require database");
+    const editors = await getActiveEditors(String(params.id));
+    return { editors };
+  })
+  .get("/api/articles/:slug/comments", async ({ params, query, set }) => {
+    if (!dbEnabled) return apiError(set, 503, "UNAVAILABLE", "articles require database");
+    const articleId = await getArticleIdBySlug(String(params.slug));
+    if (!articleId) return apiNotFound(set);
+    const page = Number(query.page) || 1;
+    const pageSize = Number(query.pageSize) || 20;
+    return await listArticleComments(articleId, { page, pageSize });
+  })
+  .post("/api/articles/:slug/comments", async ({ params, body, set, user }) => {
+    if (!dbEnabled) return apiError(set, 503, "UNAVAILABLE", "articles require database");
+    if (!user?.id) return apiError(set, 401, "UNAUTHORIZED", "login required");
+    const articleId = await getArticleIdBySlug(String(params.slug));
+    if (!articleId) return apiNotFound(set);
+    const b = body as any;
+    const comment = await createArticleComment({
+      article_id: articleId,
+      parent_id: b.parent_id ?? null,
+      body: b.body ?? "",
+      author_user_id: user.id,
+      author_username: user.name ?? "",
+      author_role: "",
+    });
+    if (comment) {
+      const [authorRow] = await sql()<Array<{ name: string } | null>>`
+        select u.name from articles a left join users u on u.id = a.author_user_id where a.id = ${articleId}
+      `;
+      if (authorRow?.name && authorRow.name !== (user.name ?? "")) {
+        void createNotification({
+          user_name: authorRow.name,
+          type: "article_comment",
+          title: "文章收到新评论",
+          body: `${user.name ?? "用户"} 评论了你的文章`,
+          data: { articleId, commentId: comment.id },
+        });
+      }
+    }
+    return comment;
+  })
+  .get("/api/article-comments/:id/replies", async ({ params, query, set }) => {
+    if (!dbEnabled) return apiError(set, 503, "UNAVAILABLE", "articles require database");
+    const page = Number(query.page) || 1;
+    const pageSize = Number(query.pageSize) || 50;
+    return await listArticleCommentReplies(String(params.id), { page, pageSize });
+  })
+  .post("/api/article-comments/:id/replies", async ({ params, body, set, user }) => {
+    if (!dbEnabled) return apiError(set, 503, "UNAVAILABLE", "articles require database");
+    if (!user?.id) return apiError(set, 401, "UNAUTHORIZED", "login required");
+    const parent = await getArticleComment(String(params.id));
+    if (!parent) return apiNotFound(set);
+    const b = body as any;
+    const reply = await createArticleComment({
+      article_id: parent.article_id,
+      parent_id: parent.id,
+      body: b.body ?? "",
+      author_user_id: user.id,
+      author_username: user.name ?? "",
+      author_role: "",
+    });
+    return reply;
+  })
+  .patch("/api/admin/article-comments/:id", async ({ params, body, set, user }) => {
+    const capErr = await checkCap(user, set, "story:manage");
+    if (capErr) return capErr;
+    if (!dbEnabled) return apiError(set, 503, "UNAVAILABLE", "articles require database");
+    const existing = await getArticleComment(String(params.id));
+    if (!existing) return apiNotFound(set);
+    if (existing.author_user_id !== user?.id) return apiError(set, 403, "FORBIDDEN", "not author");
+    const b = body as any;
+    return await updateArticleComment(String(params.id), { body: b.body });
+  })
+  .delete("/api/admin/article-comments/:id", async ({ params, set, user }) => {
+    const capErr = await checkCap(user, set, "story:manage");
+    if (capErr) return capErr;
+    if (!dbEnabled) return apiError(set, 503, "UNAVAILABLE", "articles require database");
+    const existing = await getArticleComment(String(params.id));
+    if (!existing) return apiNotFound(set);
+    if (existing.author_user_id !== user?.id) return apiError(set, 403, "FORBIDDEN", "not author");
+    await deleteArticleComment(String(params.id));
+    return { ok: true };
+  })
+  .get("/api/admin/articles/:id/annotations", async ({ params, query, set, user }) => {
+    const capErr = await checkCap(user, set, "story:manage");
+    if (capErr) return capErr;
+    if (!dbEnabled) return apiError(set, 503, "UNAVAILABLE", "articles require database");
+    const resolved = query.resolved === "true" ? true : query.resolved === "false" ? false : undefined;
+    const items = await listArticleAnnotations(String(params.id), { resolved });
+    return { items };
+  })
+  .post("/api/admin/articles/:id/annotations", async ({ params, body, set, user }) => {
+    const capErr = await checkCap(user, set, "story:manage");
+    if (capErr) return capErr;
+    if (!dbEnabled) return apiError(set, 503, "UNAVAILABLE", "articles require database");
+    if (!user?.id) return apiError(set, 401, "UNAUTHORIZED", "login required");
+    const b = body as any;
+    const annotation = await createArticleAnnotation({
+      article_id: String(params.id),
+      anchor_id: b.anchor_id ?? "",
+      selected_text: b.selected_text ?? "",
+      body: b.body ?? "",
+      author_user_id: user.id,
+      author_username: user.name ?? "",
+      author_role: "",
+    });
+    if (annotation) {
+      const [authorRow] = await sql()<Array<{ name: string } | null>>`
+        select u.name from articles a left join users u on u.id = a.author_user_id where a.id = ${String(params.id)}
+      `;
+      if (authorRow?.name && authorRow.name !== (user.name ?? "")) {
+        void createNotification({
+          user_name: authorRow.name,
+          type: "article_annotation",
+          title: "文章收到新批注",
+          body: `${user.name ?? "用户"} 对你的文章添加了批注`,
+          data: { articleId: String(params.id), annotationId: annotation.id },
+        });
+      }
+    }
+    return annotation;
+  })
+  .patch("/api/admin/article-annotations/:id", async ({ params, body, set, user }) => {
+    const capErr = await checkCap(user, set, "story:manage");
+    if (capErr) return capErr;
+    if (!dbEnabled) return apiError(set, 503, "UNAVAILABLE", "articles require database");
+    const existing = await getArticleAnnotation(String(params.id));
+    if (!existing) return apiNotFound(set);
+    const b = body as any;
+    return await updateArticleAnnotation(String(params.id), {
+      body: b.body,
+      resolved: b.resolved,
+    });
+  })
+  .delete("/api/admin/article-annotations/:id", async ({ params, set, user }) => {
+    const capErr = await checkCap(user, set, "story:manage");
+    if (capErr) return capErr;
+    if (!dbEnabled) return apiError(set, 503, "UNAVAILABLE", "articles require database");
+    const existing = await getArticleAnnotation(String(params.id));
+    if (!existing) return apiNotFound(set);
+    await deleteArticleAnnotation(String(params.id));
+    return { ok: true };
+  })
   .get("/api/stories", async ({ set, headers }) => {
     applyPublicShortCache(set, 30);
+    if (dbEnabled) {
+      try {
+        const items = await listPublishedArticles();
+        const stories = items.map(toLegacyStoryPayload);
+        const etag = weakEtagFromJson(stories);
+        if (trySendNotModified(headers, set, etag)) return;
+        return stories;
+      } catch (err) {
+        console.error("Error loading articles for /api/stories:", err);
+      }
+    }
     try {
       const dirs = await fs.readdir(STORIES_DIR);
       const stories = [];
@@ -2059,6 +2633,10 @@ const app = new Elysia()
   .post("/api/stories", async ({ body, set, user }) => {
     const capErr = await checkCap(user, set, "story:manage");
     if (capErr) return capErr;
+    if (dbEnabled) {
+      set.status = 410;
+      return apiError(set, 410, "DEPRECATED", "请使用 POST /api/admin/articles 管理文章");
+    }
     const newStories = body as any;
     
     for (const story of newStories) {
@@ -2090,8 +2668,31 @@ const app = new Elysia()
 
     return { success: true };
   })
-  .get("/api/uploads/:filename", async ({ params: { filename }, set }) => {
-    const key = path.basename(filename);
+  .get("/api/uploads/*", async ({ params, set, query }) => {
+    const key = String((params as Record<string, string>)["*"] ?? "").replace(/^\/+/, "");
+    if (!key || key.includes("..")) {
+      set.status = 404;
+      return apiNotFound(set);
+    }
+
+    if (dbEnabled) {
+      const asset = await getMediaAssetByStorageKey(key);
+      if (asset?.status === "deleted") {
+        set.status = 404;
+        return apiNotFound(set);
+      }
+    }
+
+    const thumbWidth = parseThumbWidth((query as Record<string, unknown>)?.w);
+    if (thumbWidth) {
+      const thumb = await getOrCreateThumbnail(key, thumbWidth);
+      if (thumb) {
+        set.headers["content-type"] = thumb.mime;
+        set.headers["cache-control"] = "public, max-age=31536000, immutable";
+        return thumb.buffer;
+      }
+    }
+
     const file = await storageReadFile(key);
     if (!(await file.exists())) {
       set.status = 404;
@@ -2111,36 +2712,22 @@ const app = new Elysia()
       return uploadError(set, 400, "UPLOAD_FILE_TOO_LARGE", `图片大小超过限制（最大 ${Math.round(appConfig.uploadMaxBytes / (1024 * 1024))}MB）`);
     }
     const mime = String(image.type || "");
-    if (!["image/png", "image/jpeg", "image/webp"].includes(mime)) {
+    if (!validateImageMime(mime)) {
       return uploadError(set, 400, "UPLOAD_UNSUPPORTED_TYPE", "仅支持 PNG、JPG、WEBP 格式");
     }
-    const ext = extFromMime(mime);
-    if (!ext) {
-      return uploadError(set, 400, "UPLOAD_UNSUPPORTED_TYPE", "仅支持 PNG、JPG、WEBP 格式");
+    try {
+      const buffer = await bufferFromUploadFile(image);
+      const result = await processImageUpload({
+        buffer,
+        mime,
+        namespace: "content",
+        source: "upload",
+        uploaderId: user?.id,
+      });
+      return { url: result.url, media_id: result.media?.id, storage_key: result.storage_key };
+    } catch (err) {
+      return mapImageUploadError(set, err);
     }
-    const buffer = Buffer.from(await image.arrayBuffer());
-    const isPng = buffer.length > 8 && buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47;
-    const isJpeg = buffer.length > 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
-    const isWebp = buffer.length > 12 && buffer.toString("ascii", 0, 4) === "RIFF" && buffer.toString("ascii", 8, 12) === "WEBP";
-    if (!(isPng || isJpeg || isWebp)) {
-      return uploadError(set, 400, "UPLOAD_INVALID_SIGNATURE", "文件内容与图片格式不匹配");
-    }
-    const hash = crypto.createHash("sha256").update(buffer).digest("hex");
-    const filename = `${hash}.${ext}`;
-    const key = buildKey(filename);
-    await storageWriteFile(key, buffer);
-    const url = storagePublicUrl(key);
-    const media = await registerUploadedMedia({
-      sha256: hash,
-      filename,
-      storageKey: key,
-      url,
-      mime,
-      size: buffer.length,
-      source: "upload",
-      uploaderId: user?.id,
-    });
-    return { url, media_id: media?.id, storage_key: key };
   }, {
     body: t.Object({
       image: t.File()
@@ -2157,55 +2744,41 @@ const app = new Elysia()
       return uploadError(set, 400, "UPLOAD_FILE_TOO_LARGE", `图片大小超过限制（最大 ${Math.round(appConfig.uploadMaxBytes / (1024 * 1024))}MB）`);
     }
     const mime = String(image.type || "");
-    if (!["image/png", "image/jpeg", "image/webp"].includes(mime)) {
+    if (!validateImageMime(mime)) {
       return uploadError(set, 400, "UPLOAD_UNSUPPORTED_TYPE", "仅支持 PNG、JPG、WEBP 格式");
     }
-    const ext = extFromMime(mime);
-    if (!ext) {
-      return uploadError(set, 400, "UPLOAD_UNSUPPORTED_TYPE", "仅支持 PNG、JPG、WEBP 格式");
-    }
-    const buffer = Buffer.from(await image.arrayBuffer());
-    const isPng = buffer.length > 8 && buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47;
-    const isJpeg = buffer.length > 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
-    const isWebp = buffer.length > 12 && buffer.toString("ascii", 0, 4) === "RIFF" && buffer.toString("ascii", 8, 12) === "WEBP";
-    if (!(isPng || isJpeg || isWebp)) {
-      return uploadError(set, 400, "UPLOAD_INVALID_SIGNATURE", "文件内容与图片格式不匹配");
-    }
-    const hash = crypto.createHash("sha256").update(buffer).digest("hex");
-    const filename = `${hash}.${ext}`;
-    const key = buildKey(filename);
-    await storageWriteFile(key, buffer);
-    const avatarUrl = storagePublicUrl(key);
-    const media = await registerUploadedMedia({
-      sha256: hash,
-      filename,
-      storageKey: key,
-      url: avatarUrl,
-      mime,
-      size: buffer.length,
-      source: "avatar",
-      uploaderId: user?.id,
-    });
-
-    // Update user's avatar in database
-    if (user?.id && !String(user.id).startsWith("local:")) {
-      await updateUserLogin(user.id, {
-        avatar_url: avatarUrl,
-        avatar_source: "upload",
-        upload_avatar_url: avatarUrl,
+    try {
+      const buffer = await bufferFromUploadFile(image);
+      const result = await processImageUpload({
+        buffer,
+        mime,
+        namespace: "avatars",
+        source: "avatar",
+        uploaderId: user?.id,
       });
-    }
+      const avatarUrl = result.url;
 
-    if (media?.id && user?.id) {
-      await upsertMediaReference({
-        mediaId: media.id,
-        entityType: "user",
-        entityId: String(user.id),
-        fieldPath: "avatar",
-      });
-    }
+      if (user?.id && !String(user.id).startsWith("local:")) {
+        await updateUserLogin(user.id, {
+          avatar_url: avatarUrl,
+          avatar_source: "upload",
+          upload_avatar_url: avatarUrl,
+        });
+      }
 
-    return { url: avatarUrl, media_id: media?.id, storage_key: key };
+      if (result.media?.id && user?.id) {
+        await upsertMediaReference({
+          mediaId: result.media.id,
+          entityType: "user",
+          entityId: String(user.id),
+          fieldPath: "avatar",
+        });
+      }
+
+      return { url: avatarUrl, media_id: result.media?.id, storage_key: result.storage_key };
+    } catch (err) {
+      return mapImageUploadError(set, err);
+    }
   }, {
     body: t.Object({
       image: t.File()
@@ -2247,9 +2820,10 @@ const app = new Elysia()
     const status = typeof query.status === "string" ? query.status : undefined;
     const mime = typeof query.mime === "string" ? query.mime : undefined;
     const source = typeof query.source === "string" ? query.source : undefined;
+    const tag = typeof query.tag === "string" ? query.tag : undefined;
     const page = typeof query.page === "string" ? Number(query.page) : undefined;
     const pageSize = typeof query.pageSize === "string" ? Number(query.pageSize) : undefined;
-    return await listMediaAssets({ q, status, mime, source }, { page, pageSize });
+    return await listMediaAssets({ q, status, mime, source, tag }, { page, pageSize });
   })
   .get("/api/admin/media/:id/references", async ({ params: { id }, set, user }) => {
     const capErr = await checkCap(user, set, "media:read");
@@ -2746,10 +3320,52 @@ const app = new Elysia()
     if (capErr) return capErr;
     const payload = body as any;
     if (!payload?.user_id && !payload?.org_id) return apiBadRequest(set, "user_id or org_id is required");
-    const result = await addProjectMember({ project_id: id, user_id: payload.user_id, org_id: payload.org_id, role: payload.role ?? "owner" });
+    const role = payload.role === "owner" ? "owner" : "collaborator";
+    if (payload.user_id && role === "owner") {
+      await assignProjectUserOwner(id, payload.user_id);
+      await promoteToDev(payload.user_id);
+      await logAuditCompat({
+        actor: user?.name,
+        action: "assign_project_owner",
+        entity_type: "project",
+        entity_id: id,
+        diff: { user_id: payload.user_id },
+      });
+      const members = await getProjectMembers(id);
+      return { ok: true, members };
+    }
+    const result = await addProjectMember({
+      project_id: id,
+      user_id: payload.user_id,
+      org_id: payload.org_id,
+      role: payload.org_id ? (role as "owner" | "collaborator") : "collaborator",
+    });
     if (payload.user_id) await promoteToDev(payload.user_id);
-    await logAuditCompat({ actor: user?.name, action: "add_project_member", entity_type: "project", entity_id: id, diff: { user_id: payload.user_id, org_id: payload.org_id, role: payload.role } });
+    await logAuditCompat({
+      actor: user?.name,
+      action: "add_project_member",
+      entity_type: "project",
+      entity_id: id,
+      diff: { user_id: payload.user_id, org_id: payload.org_id, role },
+    });
     return result;
+  })
+  .patch("/api/admin/projects/:id/members/:memberId", async ({ params: { id, memberId }, body, user, set }) => {
+    const capErr = await checkCap(user, set, "project:update");
+    if (capErr) return capErr;
+    const payload = body as { role?: string };
+    if (payload?.role !== "owner") return apiBadRequest(set, "仅支持设为负责人");
+    await assignProjectUserOwner(id, String(memberId));
+    await promoteToDev(String(memberId));
+    await logAuditCompat({
+      actor: user?.name,
+      action: "assign_project_owner",
+      entity_type: "project",
+      entity_id: id,
+      diff: { user_id: memberId },
+    });
+    const members = await getProjectMembers(id);
+    return { ok: true, members };
   })
   .delete("/api/admin/projects/:id/members/:memberId", async ({ params: { id, memberId }, body, user, set }) => {
     const capErr = await checkCap(user, set, "project:update");
@@ -2796,7 +3412,9 @@ const app = new Elysia()
     if (!newName) return apiBadRequest(set, "用户名不能为空");
     try {
       const updated = await renameUser({ userId: user.id, newName, source: "self" });
-      return { name: updated.name, avatar_url: updated.avatar_url };
+      const session = await issueUserAuthToken(user.id);
+      if (session) setSessionCookie(set, session.token);
+      return { name: updated.name, avatar_url: updated.avatar_url, token: session?.token };
     } catch (e: any) {
       if (e?.message === "INVALID_NAME_FORMAT") return apiBadRequest(set, "用户名格式不正确，仅支持2-30位中文、英文、数字、下划线、连字符");
       if (e?.message === "NAME_ALREADY_TAKEN") return apiBadRequest(set, "该用户名已被占用");
@@ -2813,6 +3431,10 @@ const app = new Elysia()
     try {
       const updated = await renameUser({ userId: id, newName, changedBy: user?.id, source: "admin" });
       await logAuditCompat({ actor: user?.name, action: "rename_user", entity_type: "user", entity_id: id, diff: { new_name: newName } });
+      if (user?.id === id) {
+        const session = await issueUserAuthToken(id);
+        if (session) setSessionCookie(set, session.token);
+      }
       return { id: updated.id, name: updated.name, avatar_url: updated.avatar_url };
     } catch (e: any) {
       if (e?.message === "INVALID_NAME_FORMAT") return apiBadRequest(set, "用户名格式不正确，仅支持2-30位中文、英文、数字、下划线、连字符");

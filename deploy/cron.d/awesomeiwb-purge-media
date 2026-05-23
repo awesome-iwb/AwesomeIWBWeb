@@ -1,0 +1,1 @@
+0 4 * * 0 root POSTGRES_USER=awesome_iwb POSTGRES_DB=awesome_iwb PURGE_MIN_DAYS=7 cd /opt/awesomeiwb/backend && bun run src/scripts/purge-orphan-media.ts >> /var/log/awesomeiwb/purge-media.log 2>&1

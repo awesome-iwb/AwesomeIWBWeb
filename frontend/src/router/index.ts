@@ -31,7 +31,9 @@ export const routes: RouteRecordRaw[] = [
       { path: '', redirect: '/admin/dashboard' },
       { path: 'dashboard', name: 'admin-dashboard', component: () => import('../views/admin/DashboardView.vue'), meta: { title: '总览' } },
       { path: 'stories', name: 'admin-stories', component: () => import('../views/admin/StoriesView.vue'), meta: { title: '文章管理', requiresCapability: 'story:manage' } },
+      { path: 'stories/:id/edit', name: 'admin-article-edit', component: () => import('../views/admin/ArticleEditView.vue'), meta: { title: '编辑文章', requiresCapability: 'story:manage' } },
       { path: 'projects', name: 'admin-projects', component: () => import('../views/admin/ProjectsView.vue'), meta: { title: '项目管理', requiresCapability: 'project:read' } },
+      { path: 'tags', redirect: '/admin/projects' },
       {
         path: 'review',
         name: 'admin-review',
@@ -64,6 +66,8 @@ export const routes: RouteRecordRaw[] = [
       { path: 'media', name: 'admin-media', component: () => import('../views/admin/MediaView.vue'), meta: { title: '图床管理', requiresCapability: 'media:read' } },
       { path: 'audit', name: 'admin-audit', component: () => import('../views/admin/AuditView.vue'), meta: { title: '审计日志', requiresCapability: 'audit:read' } },
       { path: 'analytics', name: 'admin-analytics', component: () => import('../views/admin/AnalyticsView.vue'), meta: { title: '数据分析', requiresCapability: 'analytics:read' } },
+      { path: 'routes', name: 'admin-routes', component: () => import('../views/admin/RoutesView.vue'), meta: { title: '路由管理', requiresAuth: true, requiresCapability: 'route:manage' } },
+      { path: 'sync', name: 'admin-sync', component: () => import('../views/admin/SyncSettingsView.vue'), meta: { title: '数据同步', requiresCapability: 'project:update' } },
       { path: 'organizations', redirect: () => ({ path: '/admin/developers', query: { tab: 'organizations' } }) },
       { path: 'claims', redirect: () => ({ path: '/admin/developers', query: { tab: 'claims' } }) },
     ],
@@ -84,9 +88,16 @@ export const routes: RouteRecordRaw[] = [
   },
   {
     path: '/today',
-    name: 'featured',
+    name: 'today',
+    alias: '/featured',
     component: FeaturedView,
     meta: { showNavBar: true }
+  },
+  {
+    path: '/articles/:slug',
+    name: 'article-detail',
+    component: () => import('../views/ArticleDetailView.vue'),
+    meta: { showNavBar: true, showBack: true, title: '文章' }
   },
   {
     path: '/categories',

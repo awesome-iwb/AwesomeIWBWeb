@@ -52,31 +52,31 @@ const handleLogin = async () => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-[#F8FAFC] dark:bg-[#0B1120] text-slate-900 dark:text-slate-100 font-sans flex items-center justify-center px-4">
+  <div class="min-h-screen bg-[#F8FAFC] dark:bg-[#0B1120] text-foreground font-sans flex items-center justify-center px-4">
     <div class="w-full max-w-md">
       <!-- Back button -->
       <button
         @click="goBack"
-        class="mb-6 inline-flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+        class="mb-6 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
       >
         <ArrowLeft class="w-4 h-4" />
         返回登录页
       </button>
 
       <!-- Card -->
-      <div class="bg-white dark:bg-[#111827] rounded-3xl p-8 border border-slate-200/80 dark:border-slate-800/80 shadow-xl shadow-slate-200/50 dark:shadow-none">
+      <div class="bg-white dark:bg-[#111827] rounded-3xl p-8 border border-border shadow-xl shadow-slate-200/50 dark:shadow-none">
         <!-- Header -->
         <div class="flex items-center gap-3 mb-2">
           <div class="h-10 w-10 rounded-2xl bg-rose-500/10 dark:bg-rose-500/20 flex items-center justify-center">
             <Shield class="w-5 h-5 text-rose-500" />
           </div>
           <div>
-            <h1 class="text-xl font-extrabold text-slate-900 dark:text-white">超级管理员登录</h1>
-            <p class="text-xs text-slate-500 dark:text-slate-400">员工/运维入口</p>
+            <h1 class="text-xl font-extrabold text-foreground">超级管理员登录</h1>
+            <p class="text-xs text-muted-foreground">员工/运维入口</p>
           </div>
         </div>
 
-        <p class="text-sm text-slate-600 dark:text-slate-300 mt-4 mb-6">
+        <p class="text-sm text-muted-foreground mt-4 mb-6">
           当智教联盟登录系统不可用时，可使用此应急通道登录运维后台。
         </p>
 
@@ -94,25 +94,25 @@ const handleLogin = async () => {
         <!-- Form -->
         <form @submit.prevent="handleLogin" class="space-y-4">
           <div>
-            <label class="block text-sm font-extrabold text-slate-700 dark:text-slate-200 mb-1.5">用户名</label>
+            <label class="block text-sm font-extrabold text-foreground mb-1.5">用户名</label>
             <input
               v-model="username"
               type="text"
               autocomplete="username"
               placeholder="管理员账号"
-              class="w-full px-4 py-3 rounded-2xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-rose-500/50 focus:border-rose-500 transition-all"
+              class="w-full px-4 py-3 rounded-2xl bg-card/50 border border-border text-foreground placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-rose-500/50 focus:border-rose-500 transition-all"
             />
           </div>
 
           <div>
-            <label class="block text-sm font-extrabold text-slate-700 dark:text-slate-200 mb-1.5">密码</label>
+            <label class="block text-sm font-extrabold text-foreground mb-1.5">密码</label>
             <div class="relative">
               <input
                 v-model="password"
                 :type="showPassword ? 'text' : 'password'"
                 autocomplete="current-password"
                 placeholder="请输入密码"
-                class="w-full px-4 py-3 pr-12 rounded-2xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-rose-500/50 focus:border-rose-500 transition-all"
+                class="w-full px-4 py-3 pr-12 rounded-2xl bg-card/50 border border-border text-foreground placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-rose-500/50 focus:border-rose-500 transition-all"
               />
               <button
                 type="button"

@@ -115,11 +115,6 @@ function parseMarkdown(filePath: string) {
             const altText = match[1].toLowerCase();
             const badgeUrl = match[2].toLowerCase();
             
-            if (altText.includes('推荐') || badgeUrl.includes('recommend')) {
-               if (badgeUrl.includes('orange') || badgeUrl.includes('非常推荐')) currentProject.recommendation = '🥇 非常推荐';
-               else if (badgeUrl.includes('blue') || badgeUrl.includes('值得尝试')) currentProject.recommendation = '🥈 值得尝试';
-               else currentProject.recommendation = '🌟 推荐';
-            }
             if (altText.includes('停更') || badgeUrl.includes('停更')) {
                currentProject.status = '停更';
             }

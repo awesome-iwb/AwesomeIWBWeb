@@ -7,7 +7,7 @@
     <button @click="$emit('batchDelete')" class="px-3 py-1.5 rounded-lg text-sm font-medium bg-rose-500 text-white hover:bg-rose-600 transition-colors">
       批量删除
     </button>
-    <button @click="$emit('clearSelection')" class="text-sm text-slate-500 hover:text-slate-700 dark:hover:text-slate-300">
+    <button @click="$emit('clearSelection')" class="text-sm text-muted-foreground hover:text-foreground">
       取消选择
     </button>
   </div>

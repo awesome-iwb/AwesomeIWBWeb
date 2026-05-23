@@ -2,13 +2,24 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useHead } from '@unhead/vue';
-import { Search, MessageCircle, Sparkles, Zap, Plus, Star, Tag, Code2, Award, Flame, Scale, ShieldCheck, ChevronRight, Grid3X3 } from 'lucide-vue-next';
+import { Search, MessageCircle, Sparkles, Plus, Star, Award, Flame, Scale, ChevronRight, Grid3X3 } from 'lucide-vue-next';
 import HeroCarousel from '../components/HeroCarousel.vue';
 import { useProjects } from '../composables/useProjects';
 import type { Project } from '../composables/useProjects';
 import { useAnalytics } from '../composables/useAnalytics';
 import { globalState } from '../store';
 import { includesNormalized } from '../utils/search';
+import { resolveProjectDisplayTags } from '../lib/resolveProjectDisplayTags';
+import ProjectTagRow from '../components/projects/ProjectTagRow.vue';
+
+function cardTagsFor(project: Project, categoryName: string) {
+  return resolveProjectDisplayTags({
+    categoryName,
+    status: project.status,
+    version: project.version,
+    language: project.language,
+  }).card;
+}
 
 const router = useRouter();
 const { categories, loading, fetchProjects, allProjects } = useProjects();
@@ -371,7 +382,7 @@ const extractColor = (src: string, name: string) => {
 const heroCards = computed(() => {
   const seed = getDaySeed();
   
-  const candidates = allProjects.value.filter(p => p.recommendation || (p.stars && p.stars > 10));
+  const candidates = allProjects.value.filter(p => p.stars && p.stars > 10);
   if (candidates.length === 0) return allProjects.value.slice(0, 4);
 
   const withBanner = candidates.filter(p => p.banner);
@@ -413,7 +424,7 @@ watch(heroCards, (cards) => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-[#F8FAFC] dark:bg-[#0B1120] text-slate-900 dark:text-slate-50 font-sans selection:bg-emerald-200 dark:selection:bg-emerald-900">
+  <div class="min-h-screen bg-[#F8FAFC] dark:bg-[#0B1120] text-foreground font-sans selection:bg-emerald-200 dark:selection:bg-emerald-900">
     
     <!-- Hero Section -->
     <header class="relative overflow-hidden">
@@ -439,19 +450,19 @@ watch(heroCards, (cards) => {
               </span>
             </h1>
 
-            <p class="text-lg md:text-xl text-slate-600 dark:text-slate-400 max-w-xl mx-auto lg:mx-0 mb-10 leading-relaxed">
+            <p class="text-lg md:text-xl text-muted-foreground max-w-xl mx-auto lg:mx-0 mb-10 leading-relaxed">
               专为广大中小学电教打造的一站式软件推荐清单。告别臃肿难用的系统自带软件，用最现代的工具重塑课堂体验。
             </p>
 
             <div class="relative w-full max-w-xl" ref="mainSearchInput">
               <button
                 @click="globalState.isSearchOpen = true"
-                class="w-full flex items-center gap-3 pl-5 pr-6 py-4 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white/60 dark:bg-[#0B1120]/60 backdrop-blur-xl shadow-sm hover:shadow-md hover:border-emerald-300/50 dark:hover:border-emerald-700/50 transition-all duration-300 text-left group cursor-pointer"
+                class="w-full flex items-center gap-3 pl-5 pr-6 py-4 rounded-2xl border border-border bg-white/60 dark:bg-[#0B1120]/60 backdrop-blur-xl shadow-sm hover:shadow-md hover:border-emerald-300/50 dark:hover:border-emerald-700/50 transition-all duration-300 text-left group cursor-pointer"
                 :class="isScrolledPastSearch ? 'opacity-0 scale-95 pointer-events-none' : 'opacity-100 scale-100'"
               >
-                <Search class="h-5 w-5 text-slate-400 group-hover:text-emerald-500 transition-colors shrink-0" />
-                <span class="text-slate-400 dark:text-slate-500 text-base">搜索画板、课表、倒计时等工具...</span>
-                <span class="ml-auto hidden sm:flex items-center gap-1 px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 text-xs text-slate-500 font-medium shrink-0">
+                <Search class="h-5 w-5 text-muted-foreground group-hover:text-emerald-500 transition-colors shrink-0" />
+                <span class="text-muted-foreground text-base">搜索画板、课表、倒计时等工具...</span>
+                <span class="ml-auto hidden sm:flex items-center gap-1 px-2 py-1 rounded bg-secondary text-xs text-muted-foreground font-medium shrink-0">
                   <span class="text-[10px]">⌘</span> K
                 </span>
               </button>
@@ -464,7 +475,7 @@ watch(heroCards, (cards) => {
               <div 
                 v-for="(card, index) in heroCards" 
                 :key="card.name"
-                class="absolute top-0 left-0 w-full h-full bg-white dark:bg-slate-900 rounded-3xl flex flex-col cursor-pointer transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] overflow-hidden border border-slate-200/60 dark:border-slate-700/60 origin-bottom"
+                class="absolute top-0 left-0 w-full h-full bg-card rounded-3xl flex flex-col cursor-pointer transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] overflow-hidden border border-border origin-bottom"
                 :class="[
                   index === 0 ? 'z-40' : index === 1 ? 'z-30' : index === 2 ? 'z-20' : 'z-10',
                   index === 0 ? 'rotate-0' : '',
@@ -482,22 +493,22 @@ watch(heroCards, (cards) => {
                 }"
                 @click="router.push({ name: 'project-detail', params: { name: card.name } })"
               >
-                <div class="w-full h-[60%] bg-slate-100 dark:bg-slate-800 relative overflow-hidden shrink-0">
+                <div class="w-full h-[60%] bg-secondary relative overflow-hidden shrink-0">
                   <img v-if="card.banner" :src="card.banner" class="w-full h-full object-cover" alt="Banner" />
                   <div v-else class="w-full h-full flex items-center justify-center transition-colors duration-500" :style="{ backgroundColor: cardColors[card.name] ? `rgba(${cardColors[card.name]}, 0.1)` : 'rgba(16, 185, 129, 0.1)' }">
                     <Sparkles class="w-12 h-12 transition-colors duration-500" :style="{ color: cardColors[card.name] ? `rgba(${cardColors[card.name]}, 0.5)` : 'rgba(16, 185, 129, 0.5)' }" />
                   </div>
                   <div class="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent pointer-events-none"></div>
                 </div>
-                <div class="p-6 flex-1 flex flex-col justify-center bg-white dark:bg-slate-900 relative">
+                <div class="p-6 flex-1 flex flex-col justify-center bg-card relative">
                   <div class="flex items-center gap-4 mb-2">
                     <img :src="card.icon || card.avatar" class="w-14 h-14 object-contain drop-shadow-sm shrink-0" @error="(e) => { (e.target as HTMLImageElement).src = getFallbackImage(card.name) }" />
                     <div class="flex-1 min-w-0">
-                      <h2 class="text-2xl font-bold text-slate-900 dark:text-white truncate">{{ card.name }}</h2>
-                      <p class="text-sm text-slate-500 dark:text-slate-400 truncate">{{ card.developer }}</p>
+                      <h2 class="text-2xl font-bold text-foreground truncate">{{ card.name }}</h2>
+                      <p class="text-sm text-muted-foreground truncate">{{ card.developer }}</p>
                     </div>
                   </div>
-                  <p class="text-sm text-slate-600 dark:text-slate-400 line-clamp-2 leading-relaxed">{{ card.description }}</p>
+                  <p class="text-sm text-muted-foreground line-clamp-2 leading-relaxed">{{ card.description }}</p>
                 </div>
               </div>
             </div>
@@ -570,18 +581,18 @@ watch(heroCards, (cards) => {
                 <!-- Content Area -->
                 <div class="px-5 pt-4 pb-4" @click="router.push({ name: 'project-detail', params: { name: card.name } })">
                   <div class="flex items-center gap-3 mb-2">
-                    <div class="w-11 h-11 rounded-xl bg-slate-100 dark:bg-slate-800 p-1.5 flex items-center justify-center shadow-sm shrink-0">
+                    <div class="w-11 h-11 rounded-xl bg-secondary p-1.5 flex items-center justify-center shadow-sm shrink-0">
                       <img :src="card.icon || card.avatar" class="w-full h-full object-contain" @error="(e) => { (e.target as HTMLImageElement).src = getFallbackImage(card.name) }" />
                     </div>
                     <div class="flex-1 min-w-0">
-                      <h2 class="text-lg font-bold text-slate-900 dark:text-white truncate">{{ card.name }}</h2>
-                      <p class="text-xs text-slate-500 dark:text-slate-400 truncate">{{ card.developer }}</p>
+                      <h2 class="text-lg font-bold text-foreground truncate">{{ card.name }}</h2>
+                      <p class="text-xs text-muted-foreground truncate">{{ card.developer }}</p>
                     </div>
-                    <span class="shrink-0 inline-flex items-center justify-center w-8 h-8 rounded-full bg-emerald-500 text-white">
+                    <span class="btn-glass shrink-0 inline-flex items-center justify-center w-8 h-8 rounded-full bg-emerald-500 text-white">
                       <ChevronRight class="w-4 h-4" />
                     </span>
                   </div>
-                  <p class="text-sm text-slate-600 dark:text-slate-300 leading-relaxed line-clamp-2 mb-3">{{ card.description }}</p>
+                  <p class="text-sm text-muted-foreground leading-relaxed line-clamp-2 mb-3">{{ card.description }}</p>
                   <div class="flex items-center gap-2 flex-wrap">
                     <span v-if="card.stars" class="inline-flex items-center gap-1 text-xs font-bold text-amber-600 dark:text-amber-400">
                       <Star class="w-3 h-3 fill-current" /> {{ card.stars > 1000 ? (card.stars/1000).toFixed(1) + 'k' : card.stars }}
@@ -600,10 +611,10 @@ watch(heroCards, (cards) => {
         <div class="px-4 pb-3">
           <button
             @click.stop="globalState.isSearchOpen = true"
-            class="w-full flex items-center gap-3 pl-4 pr-5 py-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-left group cursor-pointer active:scale-[0.98] transition-transform shadow-sm"
+            class="btn-glass w-full flex items-center gap-3 pl-4 pr-5 py-3 rounded-2xl bg-card border border-border text-left group cursor-pointer active:scale-[0.98] transition-transform shadow-sm"
           >
-            <Search class="h-4 w-4 text-slate-400 shrink-0" />
-            <span class="text-slate-400 dark:text-slate-500 text-sm">搜索画板、课表、倒计时等工具...</span>
+            <Search class="h-4 w-4 text-muted-foreground shrink-0" />
+            <span class="text-muted-foreground text-sm">搜索画板、课表、倒计时等工具...</span>
           </button>
         </div>
 
@@ -621,19 +632,19 @@ watch(heroCards, (cards) => {
       
       <!-- Sticky Sidebar Navigation -->
       <aside class="w-full md:w-64 shrink-0 md:sticky top-24 hidden md:block">
-        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-4 px-3">资源分类</h3>
+        <h3 class="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-4 px-3">资源分类</h3>
         <div class="space-y-1">
           <button
             @click="activeCategory = 'all'"
             :class="[
               'w-full text-left px-4 py-2.5 rounded-xl text-sm font-medium transition-all flex items-center justify-between',
               activeCategory === 'all'
-                ? 'bg-white dark:bg-slate-800/50 text-emerald-600 dark:text-emerald-400 shadow-sm border border-slate-200/50 dark:border-slate-700/50'
-                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/30'
+                ? 'bg-card/50 text-emerald-600 dark:text-emerald-400 shadow-sm border border-border'
+                : 'text-muted-foreground hover:bg-accent'
             ]"
           >
             <span>🌟 所有资源</span>
-            <span class="text-xs bg-slate-100 dark:bg-slate-800 py-0.5 px-2 rounded-full text-slate-500">{{ stats.totalProjects }}</span>
+            <span class="text-xs bg-secondary py-0.5 px-2 rounded-full text-muted-foreground">{{ stats.totalProjects }}</span>
           </button>
           
           <button
@@ -643,18 +654,18 @@ watch(heroCards, (cards) => {
             :class="[
               'w-full text-left px-4 py-2.5 rounded-xl text-sm font-medium transition-all flex items-center justify-between',
               activeCategory === cat.id
-                ? 'bg-white dark:bg-slate-800/50 text-emerald-600 dark:text-emerald-400 shadow-sm border border-slate-200/50 dark:border-slate-700/50'
-                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/30'
+                ? 'bg-card/50 text-emerald-600 dark:text-emerald-400 shadow-sm border border-border'
+                : 'text-muted-foreground hover:bg-accent'
             ]"
           >
             <span class="truncate pr-2">{{ cat.name.replace(/^[^\s]+\s/, '') }}</span>
-            <span class="text-xs bg-slate-100 dark:bg-slate-800 py-0.5 px-2 rounded-full text-slate-500 shrink-0">{{ cat.projects.length }}</span>
+            <span class="text-xs bg-secondary py-0.5 px-2 rounded-full text-muted-foreground shrink-0">{{ cat.projects.length }}</span>
           </button>
         </div>
       </aside>
 
       <!-- Mobile: Browse Categories Shortcut -->
-      <router-link to="/categories" class="md:hidden w-full mb-4">
+      <router-link to="/categories" class="btn-glass md:hidden w-full mb-4">
         <div class="flex items-center justify-between px-5 py-3 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/20 active:scale-[0.98] transition-transform">
           <div class="flex items-center gap-3">
             <Grid3X3 class="w-5 h-5" />
@@ -670,21 +681,21 @@ watch(heroCards, (cards) => {
       <!-- Main Content Area --> 
       <div class="flex-1 min-w-0">
         <!-- Advanced Filters -->
-        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 bg-white dark:bg-[#111827] p-3 md:p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 bg-white dark:bg-[#111827] p-3 md:p-4 rounded-2xl border border-border shadow-sm">
           <div class="hidden md:flex flex-wrap items-center gap-3">
-            <label class="flex items-center gap-2 cursor-pointer text-sm font-medium text-slate-700 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">
+            <label class="flex items-center gap-2 cursor-pointer text-sm font-medium text-foreground hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">
               <input type="checkbox" v-model="hasBadges" class="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 dark:border-slate-600 dark:bg-slate-700 dark:checked:bg-emerald-500" />
               <Award class="w-4 h-4 text-amber-500" />
               仅显示获奖应用
             </label>
-            <div class="h-4 w-px bg-slate-200 dark:bg-slate-700"></div>
-            <select v-model="activeLanguage" class="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-1.5 text-sm font-medium text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all cursor-pointer">
+            <div class="h-4 w-px bg-border"></div>
+            <select v-model="activeLanguage" class="bg-card border border-border rounded-lg px-3 py-1.5 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all cursor-pointer">
               <option value="all">所有语言</option>
               <option v-for="lang in availableLanguages" :key="lang" :value="lang">{{ lang }}</option>
             </select>
           </div>
           
-          <select v-model="activeSort" class="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-1.5 text-sm font-bold text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all cursor-pointer w-full sm:w-auto">
+          <select v-model="activeSort" class="bg-card border border-border rounded-lg px-3 py-1.5 text-sm font-bold text-muted-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all cursor-pointer w-full sm:w-auto">
             <option value="default">默认排序</option>
             <option value="stars">最多 Stars</option>
             <option value="updated">最近更新</option>
@@ -693,49 +704,49 @@ watch(heroCards, (cards) => {
 
         <div v-if="loading" class="w-full space-y-16">
           <div v-for="i in 2" :key="i" class="animate-pulse">
-            <div class="h-8 bg-slate-200 dark:bg-slate-800 rounded-lg w-48 mb-4"></div>
-            <div class="h-4 bg-slate-200 dark:bg-slate-800 rounded-lg w-96 mb-8 max-w-full"></div>
+            <div class="h-8 bg-muted rounded-lg w-48 mb-4"></div>
+            <div class="h-4 bg-muted rounded-lg w-96 mb-8 max-w-full"></div>
             <div class="grid grid-cols-1 xl:grid-cols-2 gap-5">
-              <div v-for="j in 4" :key="j" class="bg-white dark:bg-[#111827] rounded-2xl border border-slate-200/80 dark:border-slate-800/80 h-full overflow-hidden flex flex-col">
-                <div class="h-32 w-full bg-slate-200 dark:bg-slate-800"></div>
+              <div v-for="j in 4" :key="j" class="bg-white dark:bg-[#111827] rounded-2xl border border-border h-full overflow-hidden flex flex-col">
+                <div class="h-32 w-full bg-muted"></div>
                 <div class="p-6 flex-grow flex flex-col">
                   <div class="flex items-start gap-4 mb-5">
-                    <div class="w-14 h-14 rounded-2xl bg-slate-200 dark:bg-slate-800 shrink-0"></div>
+                    <div class="w-14 h-14 rounded-2xl bg-muted shrink-0"></div>
                     <div class="flex-1 space-y-2 py-1">
-                      <div class="h-5 bg-slate-200 dark:bg-slate-800 rounded w-1/2"></div>
-                      <div class="h-4 bg-slate-200 dark:bg-slate-800 rounded w-1/4"></div>
+                      <div class="h-5 bg-muted rounded w-1/2"></div>
+                      <div class="h-4 bg-muted rounded w-1/4"></div>
                     </div>
                   </div>
                   <div class="space-y-2 mb-6">
-                    <div class="h-4 bg-slate-200 dark:bg-slate-800 rounded w-full"></div>
-                    <div class="h-4 bg-slate-200 dark:bg-slate-800 rounded w-5/6"></div>
+                    <div class="h-4 bg-muted rounded w-full"></div>
+                    <div class="h-4 bg-muted rounded w-5/6"></div>
                   </div>
                   <div class="flex gap-2 mt-auto mb-4">
-                    <div class="h-6 bg-slate-200 dark:bg-slate-800 rounded w-16"></div>
-                    <div class="h-6 bg-slate-200 dark:bg-slate-800 rounded w-16"></div>
-                    <div class="h-6 bg-slate-200 dark:bg-slate-800 rounded w-16"></div>
+                    <div class="h-6 bg-muted rounded w-16"></div>
+                    <div class="h-6 bg-muted rounded w-16"></div>
+                    <div class="h-6 bg-muted rounded w-16"></div>
                   </div>
-                  <div class="pt-5 border-t border-slate-100 dark:border-slate-800/80">
-                    <div class="h-6 bg-slate-200 dark:bg-slate-800 rounded w-full"></div>
+                  <div class="pt-5 border-t border-border">
+                    <div class="h-6 bg-muted rounded w-full"></div>
                   </div>
                 </div>
               </div>
             </div>
           </div>
         </div><div v-else>
-          <div v-if="filteredCategories.length === 0" class="text-center py-32 bg-white dark:bg-slate-900/20 rounded-3xl border border-slate-200 dark:border-slate-800 border-dashed">
+          <div v-if="filteredCategories.length === 0" class="text-center py-32 bg-white dark:bg-slate-900/20 rounded-3xl border border-border border-dashed">
             <div class="text-5xl mb-4 opacity-50">🛸</div>
-            <h3 class="text-xl font-bold text-slate-700 dark:text-slate-300 mb-2">未找到匹配的软件</h3>
-            <p class="text-slate-500">尝试使用其他关键词，或者清除搜索条件。</p>
+            <h3 class="text-xl font-bold text-foreground mb-2">未找到匹配的软件</h3>
+            <p class="text-muted-foreground">尝试使用其他关键词，或者清除搜索条件。</p>
             <button @click="searchTerm = ''" class="mt-6 text-emerald-600 font-medium hover:underline">清除搜索</button>
           </div>
           
           <div v-for="category in filteredCategories" :key="category.id" class="mb-16 last:mb-0">
             <div class="mb-8">
-              <h2 class="text-2xl font-bold mb-2 flex items-center gap-2 text-slate-800 dark:text-slate-100">
+              <h2 class="text-2xl font-bold mb-2 flex items-center gap-2 text-foreground">
                 {{ category.name }}
               </h2>
-              <p class="text-slate-500 dark:text-slate-400">
+              <p class="text-muted-foreground">
                 {{ category.description }}
               </p>
             </div>
@@ -755,7 +766,7 @@ watch(heroCards, (cards) => {
 
                 <div class="h-full flex flex-col">
                 <!-- Banner Image -->
-                <div v-if="project.banner" class="hidden md:block h-32 w-full shrink-0 overflow-hidden bg-slate-100 dark:bg-slate-800 border-b border-slate-100 dark:border-slate-800">
+                <div v-if="project.banner" class="hidden md:block h-32 w-full shrink-0 overflow-hidden bg-secondary border-b border-border">
                   <img loading="lazy" :src="project.banner" :alt="`${project.name} Banner`" class="w-full h-full object-cover" />
                 </div>
 
@@ -786,16 +797,16 @@ watch(heroCards, (cards) => {
                         />
                       </div>
                       <div>
-                        <h3 class="font-bold text-slate-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors line-clamp-1" :class="isZoom(project) ? 'text-xl' : 'text-lg'">
+                        <h3 class="font-bold text-foreground group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors line-clamp-1" :class="isZoom(project) ? 'text-xl' : 'text-lg'">
                           {{ project.name }}
                         </h3>
                         <div class="flex flex-wrap items-center gap-2 mt-1 text-sm">
-                          <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-50/90 dark:bg-slate-900/40 border border-slate-200/60 dark:border-slate-700/60 w-fit">
-                            <img loading="lazy" :src="project.avatar" :alt="project.developer" class="w-5 h-5 rounded-full border border-slate-200 dark:border-slate-700 shrink-0 object-cover" @error="(e) => { (e.target as HTMLImageElement).src = getFallbackImage(project.developer) }" />
-                            <span class="text-slate-600 dark:text-slate-300 font-semibold truncate max-w-[160px]">{{ project.developer }}</span>
+                          <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-card border border-border w-fit">
+                            <img loading="lazy" :src="project.avatar" :alt="project.developer" class="w-5 h-5 rounded-full border border-border shrink-0 object-cover" @error="(e) => { (e.target as HTMLImageElement).src = getFallbackImage(project.developer) }" />
+                            <span class="text-muted-foreground font-semibold truncate max-w-[160px]">{{ project.developer }}</span>
                           </div>
-                          <div v-if="getOrg(project)" class="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-50/90 dark:bg-slate-900/40 border border-slate-200/60 dark:border-slate-700/60 w-fit">
-                            <span class="text-slate-600 dark:text-slate-300 font-semibold truncate max-w-[220px]">{{ getOrg(project) }}</span>
+                          <div v-if="getOrg(project)" class="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-accent/90 dark:bg-slate-900/40 border border-border w-fit">
+                            <span class="text-muted-foreground font-semibold truncate max-w-[220px]">{{ getOrg(project) }}</span>
                           </div>
                         </div>
                       </div>
@@ -808,59 +819,19 @@ watch(heroCards, (cards) => {
                   </div>
 
                   <!-- Description -->
-                  <p class="text-sm text-slate-600 dark:text-slate-300 leading-relaxed mb-4" :class="isZoom(project) ? '' : 'line-clamp-2'">
+                  <p class="text-sm text-muted-foreground leading-relaxed mb-4" :class="isZoom(project) ? '' : 'line-clamp-2'">
                     {{ project.description }}
                   </p>
 
-                  <!-- Tags & Status -->
-                  <div class="flex flex-wrap items-center gap-2 mt-auto mb-4">
-                    <span class="px-2.5 py-1 text-[10px] font-bold rounded-full bg-slate-100/80 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 backdrop-blur-sm border border-white/50 dark:border-slate-700/50 uppercase tracking-wider">
-                      {{ category.name }}
-                    </span>
-                    <span 
-                      v-if="project.language" 
-                      class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold tracking-wider bg-indigo-50 text-indigo-600 border border-indigo-200/50 dark:bg-indigo-500/10 dark:text-indigo-400 dark:border-indigo-500/20"
-                    >
-                      <Code2 class="w-3 h-3" /> {{ project.language }}
-                    </span>
-                    <span 
-                      v-if="project.status" 
-                      class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider border"
-                      :class="project.status === '活跃' ? 'bg-emerald-50 text-emerald-600 border-emerald-200/50 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20' : 'bg-slate-50 text-slate-500 border-slate-200/50 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700'"
-                    >
-                      <Zap class="w-3 h-3" /> {{ project.status }}
-                    </span>
-                    <span 
-                      v-if="project.recommendation" 
-                      class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider border"
-                      :class="{
-                        'bg-blue-50 text-blue-600 border-blue-200/50 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20': project.recommendation === '稳定',
-                        'bg-orange-50 text-orange-600 border-orange-200/50 dark:bg-orange-500/10 dark:text-orange-400 dark:border-orange-500/20': project.recommendation === '不稳定',
-                        'bg-purple-50 text-purple-600 border-purple-200/50 dark:bg-purple-500/10 dark:text-purple-400 dark:border-purple-500/20': project.recommendation === '观望中'
-                      }"
-                    >
-                      <ShieldCheck class="w-3 h-3" /> {{ project.recommendation }}
-                    </span>
-                    <span v-if="project.version" class="hidden md:inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider bg-sky-50 text-sky-600 border border-sky-200/50 dark:bg-sky-500/10 dark:text-sky-400 dark:border-sky-500/20">
-                      <Tag class="w-3 h-3" /> {{ project.version }}
-                    </span>
-                    <span 
-                      v-for="kw in project.keywords.slice(0, project.version ? 1 : 2)" 
-                      :key="kw"
-                      class="hidden md:inline-block px-2 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-xs font-medium border border-slate-200/50 dark:border-slate-700 truncate max-w-[100px]"
-                      :title="`功能特性: ${kw}`"
-                    >
-                      {{ kw }}
-                    </span>
-                  </div>
+                  <ProjectTagRow :tags="cardTagsFor(project, category.name)" class="mt-auto mb-4" />
 
                   <!-- Footer / Actions -->
-                  <div class="hidden md:flex mt-auto pt-5 border-t border-slate-100 dark:border-slate-800/80 items-center justify-between">
+                  <div class="hidden md:flex mt-auto pt-5 border-t border-border items-center justify-between">
                     <!-- Reviews snippet if exists -->
                     <div class="flex-1 min-w-0 pr-4">
                       <div v-if="project.reviews && project.reviews.length > 0" class="flex items-center gap-2 group/review cursor-help">
-                        <MessageCircle class="w-4 h-4 text-slate-400 group-hover/review:text-emerald-500 transition-colors shrink-0" />
-                        <span class="text-xs text-slate-500 group-hover/review:text-emerald-600 transition-colors" :class="isZoom(project) ? 'whitespace-normal' : 'truncate'">
+                        <MessageCircle class="w-4 h-4 text-muted-foreground group-hover/review:text-emerald-500 transition-colors shrink-0" />
+                        <span class="text-xs text-muted-foreground group-hover/review:text-emerald-600 transition-colors" :class="isZoom(project) ? 'whitespace-normal' : 'truncate'">
                           <span class="font-semibold">{{ project.reviews[0].author }}:</span>
                           {{ project.reviews[0].content }}
                         </span>
@@ -870,7 +841,7 @@ watch(heroCards, (cards) => {
                     <button 
                       @click="(e) => toggleComparison(project, e)"
                       class="p-2 rounded-xl transition-colors shrink-0 z-30 relative"
-                      :class="comparisonList.find(p => p.name === project.name) ? 'bg-indigo-100 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-400' : 'bg-slate-100 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:bg-slate-800 dark:hover:bg-indigo-500/10'"
+                      :class="comparisonList.find(p => p.name === project.name) ? 'bg-indigo-100 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-400' : 'bg-secondary text-muted-foreground hover:text-indigo-600 hover:bg-indigo-50 dark:bg-secondary dark:hover:bg-indigo-500/10'"
                       title="加入横向对比"
                     >
                       <Scale class="w-5 h-5" />
@@ -886,22 +857,22 @@ watch(heroCards, (cards) => {
     </main>
 
     <!-- Comparison Floating Bar & Modal -->
-    <div v-if="comparisonList.length > 0" class="fixed bottom-0 left-0 w-full bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-t border-slate-200 dark:border-slate-800 p-4 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)] z-50 flex justify-between items-center transition-all animate-in slide-in-from-bottom-full">
+    <div v-if="comparisonList.length > 0" class="fixed bottom-0 left-0 w-full bg-card backdrop-blur-xl border-t border-border p-4 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)] z-50 flex justify-between items-center transition-all animate-in slide-in-from-bottom-full">
       <div class="max-w-6xl mx-auto w-full flex items-center justify-between">
         <div class="flex items-center gap-4">
-          <span class="font-bold text-slate-700 dark:text-slate-300 hidden sm:inline">横向对比</span>
+          <span class="font-bold text-foreground hidden sm:inline">横向对比</span>
           <div class="flex gap-2">
             <div v-for="p in comparisonList" :key="p.name" class="relative group drop-shadow-sm flex items-center justify-center w-10 h-10">
               <img :src="p.icon || p.avatar" class="w-full h-full object-contain" :title="p.name" />
               <button @click.stop="toggleComparison(p, $event)" class="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-[10px] z-10">×</button>
             </div>
-            <div v-for="i in (3 - comparisonList.length)" :key="'empty'+i" class="w-10 h-10 rounded-lg border-2 border-dashed border-slate-300 dark:border-slate-700 flex items-center justify-center text-slate-400">
+            <div v-for="i in (3 - comparisonList.length)" :key="'empty'+i" class="w-10 h-10 rounded-lg border-2 border-dashed border-border flex items-center justify-center text-muted-foreground">
               <Plus class="w-4 h-4 opacity-50" />
             </div>
           </div>
         </div>
         <div class="flex gap-3">
-          <button @click="clearComparison" class="px-4 py-2 rounded-xl text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 font-medium transition-colors">清空</button>
+          <button @click="clearComparison" class="px-4 py-2 rounded-xl text-muted-foreground hover:bg-accent font-medium transition-colors">清空</button>
           <button @click="router.push('/compare?projects=' + comparisonList.map(p => encodeURIComponent(p.name)).join(','))" class="px-6 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold shadow-lg shadow-indigo-600/20 transition-all disabled:opacity-50" :disabled="comparisonList.length < 2">
             开始对比 ({{ comparisonList.length }}/3)
           </button>

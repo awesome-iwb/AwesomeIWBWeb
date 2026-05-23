@@ -63,6 +63,17 @@ export interface Project {
   releases?: Release[];
   extra?: any;
   developers?: ProjectDeveloper[];
+  registry_tags?: Array<{
+    id: string;
+    slug: string;
+    label: string;
+    group: string;
+    color_variant: string;
+    show_on_card: boolean;
+    show_on_header: boolean;
+    show_in_gallery: boolean;
+    card_priority: number;
+  }>;
 }
 
 export interface Category {

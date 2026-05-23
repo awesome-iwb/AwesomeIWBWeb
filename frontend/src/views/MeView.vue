@@ -2,7 +2,7 @@
 import { computed, ref, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useHead } from '@unhead/vue';
-import { Github, LogIn, LogOut, Shield, Wrench, AlertCircle, Camera, Pencil } from 'lucide-vue-next';
+import { Github, LogIn, LogOut, Shield, Wrench, AlertCircle, Camera, Pencil, Sparkles } from 'lucide-vue-next';
 import { useAuth, getAvatarDisplaySrc } from '../composables/useAuth';
 import { useApi } from '../composables/useApi';
 import { API } from '../api/endpoints';
@@ -18,7 +18,7 @@ useHead({
 
 const router = useRouter();
 const route = useRoute();
-const { user, isAuthenticated, logout, getCasdoorAuthorizeUrl, uploadAvatar, hasCapability, fetchUser, setAvatarSource } = useAuth();
+const { user, isAuthenticated, logout, getCasdoorAuthorizeUrl, uploadAvatar, hasCapability, fetchUser, setAvatarSource, setToken } = useAuth();
 const { apiFetch } = useApi();
 
 const redirectTo = computed(() => {
@@ -82,6 +82,9 @@ const showCropper = ref(false);
 const cropperImageSrc = ref('');
 
 onMounted(async () => {
+  checkDarkMode();
+  checkLiquidGlass();
+
   const authSuccess = route.query.auth as string | undefined;
   const returnTo = route.query.returnTo as string | undefined;
   const nextPath = returnTo && returnTo.startsWith('/') ? returnTo : '/';
@@ -269,6 +272,31 @@ const renameValue = ref('');
 const isRenaming = ref(false);
 const renameError = ref('');
 
+const isDarkMode = ref(false);
+const liquidGlass = ref(false);
+
+const checkDarkMode = () => {
+  isDarkMode.value = document.documentElement.classList.contains('dark');
+};
+
+const checkLiquidGlass = () => {
+  liquidGlass.value = localStorage.getItem('liquidGlass') === 'true';
+  if (liquidGlass.value && !isDarkMode.value) {
+    document.documentElement.setAttribute('data-glass', 'liquid');
+  }
+};
+
+const toggleLiquidGlass = () => {
+  if (isDarkMode.value) return;
+  liquidGlass.value = !liquidGlass.value;
+  localStorage.setItem('liquidGlass', String(liquidGlass.value));
+  if (liquidGlass.value) {
+    document.documentElement.setAttribute('data-glass', 'liquid');
+  } else {
+    document.documentElement.removeAttribute('data-glass');
+  }
+};
+
 const startRename = () => {
   renameValue.value = user.value?.name ?? '';
   renameError.value = '';
@@ -300,6 +328,7 @@ const submitRename = async () => {
       renameError.value = json?.error ?? json?.message ?? '修改失败';
       return;
     }
+    if (json?.token) setToken(json.token);
     showRenameForm.value = false;
     renameValue.value = '';
     await fetchUser();
@@ -322,22 +351,22 @@ const handleLogout = async () => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-[#F8FAFC] dark:bg-[#0B1120] text-slate-900 dark:text-slate-100 font-sans pb-24">
+  <div class="min-h-screen bg-[#F8FAFC] dark:bg-[#0B1120] text-foreground font-sans pb-24">
     <main class="pt-24 px-6 max-w-3xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out-expo">
       <div class="mb-10">
-        <h1 class="text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white mb-3">个人中心</h1>
-        <p class="text-slate-600 dark:text-slate-300">管理你的 Awesome IWB 账户信息。</p>
+        <h1 class="text-4xl font-extrabold tracking-tight text-foreground mb-3">个人中心</h1>
+        <p class="text-muted-foreground">管理你的 Awesome IWB 账户信息。</p>
       </div>
 
-      <div class="bg-white dark:bg-[#111827] rounded-3xl p-6 sm:p-10 border border-slate-200/80 dark:border-slate-800/80 shadow-xl shadow-slate-200/50 dark:shadow-none">
+      <div class="bg-white dark:bg-[#111827] rounded-3xl p-6 sm:p-10 border border-border shadow-xl shadow-slate-200/50 dark:shadow-none">
         <!-- User Profile Header -->
         <div class="flex items-center gap-4">
           <!-- Avatar with upload overlay -->
           <div class="relative group shrink-0">
-            <div class="h-20 w-20 rounded-full bg-slate-200/70 dark:bg-slate-700/70 overflow-hidden">
+            <div class="h-20 w-20 rounded-full bg-muted overflow-hidden">
               <img v-if="user" :src="getAvatarDisplaySrc(user)" class="h-full w-full object-cover" />
               <div v-else class="h-full w-full flex items-center justify-center">
-                <span class="text-2xl font-extrabold text-slate-400">?</span>
+                <span class="text-2xl font-extrabold text-muted-foreground">?</span>
               </div>
             </div>
             <!-- Upload overlay (only when logged in) -->
@@ -359,13 +388,13 @@ const handleLogout = async () => {
             />
           </div>
           <div class="min-w-0">
-            <div class="text-xl font-extrabold text-slate-900 dark:text-white truncate">
+            <div class="text-xl font-extrabold text-foreground truncate">
               {{ user?.name || '未登录' }}
             </div>
             <div v-if="user?.stcn_username" class="text-sm text-emerald-600 dark:text-emerald-400 truncate">
               @{{ user.stcn_username }}
             </div>
-            <div class="text-sm text-slate-500 dark:text-slate-400 truncate">
+            <div class="text-sm text-muted-foreground truncate">
               {{ isAuthenticated ? `身份：${roleLabel}` : '登录后可提交项目并进入对应后台入口' }}
             </div>
           </div>
@@ -388,10 +417,10 @@ const handleLogout = async () => {
             {{ popupStatus }}
           </div>
 
-          <div class="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/40">
-            <div class="text-sm font-extrabold text-slate-800 dark:text-slate-200">智教联盟登录系统</div>
-            <div class="text-sm text-slate-600 dark:text-slate-300 mt-1">普通用户使用智教联盟（STCN）统一身份认证登录，无需额外注册。</div>
-            <div class="text-xs text-slate-500 dark:text-slate-400 mt-2">员工请使用专用 staff 通道登录。</div>
+          <div class="p-4 rounded-2xl border border-border bg-card">
+            <div class="text-sm font-extrabold text-foreground">智教联盟登录系统</div>
+            <div class="text-sm text-muted-foreground mt-1">普通用户使用智教联盟（STCN）统一身份认证登录，无需额外注册。</div>
+            <div class="text-xs text-muted-foreground mt-2">员工请使用专用 staff 通道登录。</div>
           </div>
 
           <button
@@ -408,7 +437,7 @@ const handleLogout = async () => {
             <a
               href="https://github.com/awesome-iwb/awesome-iwb"
               target="_blank"
-              class="flex-1 inline-flex items-center justify-center gap-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 px-6 py-3.5 rounded-2xl font-extrabold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+              class="flex-1 inline-flex items-center justify-center gap-2 bg-secondary text-foreground px-6 py-3.5 rounded-2xl font-extrabold hover:bg-accent transition-colors"
             >
               <Github class="w-5 h-5" />
               GitHub
@@ -419,7 +448,7 @@ const handleLogout = async () => {
           <div v-if="showEmergencyLocalLogin" class="pt-2">
             <button
               @click="router.push('/dontusejy')"
-              class="w-full text-xs text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 transition-colors py-2"
+              class="w-full text-xs text-muted-foreground hover:text-rose-500 dark:hover:text-rose-400 transition-colors py-2"
             >
               本地登录入口
             </button>
@@ -433,10 +462,37 @@ const handleLogout = async () => {
             <div class="text-sm text-rose-700 dark:text-rose-300">{{ logoutError }}</div>
           </div>
           <!-- Profile info card -->
-          <div class="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/40 p-4 space-y-3">
-            <div class="space-y-3 border-t border-slate-200/80 dark:border-slate-800/80 pt-3">
-              <div class="text-sm font-semibold text-slate-700 dark:text-slate-200">头像显示偏好</div>
-              <p class="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+          <div class="rounded-2xl border border-border bg-card/40 p-4 space-y-3">
+
+            <!-- Liquid Glass Toggle -->
+            <div class="space-y-3 border-b border-border pb-3">
+              <div class="text-sm font-semibold text-foreground">外观偏好</div>
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <Sparkles class="w-4 h-4 text-emerald-500" />
+                  <span class="text-sm text-foreground">液态玻璃效果</span>
+                </div>
+                <button
+                  @click="toggleLiquidGlass"
+                  :disabled="isDarkMode"
+                  class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0"
+                  :class="[
+                    liquidGlass ? 'bg-emerald-500' : 'bg-muted',
+                    isDarkMode ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+                  ]"
+                >
+                  <span
+                    class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow-sm"
+                    :class="liquidGlass ? 'translate-x-6' : 'translate-x-1'"
+                  />
+                </button>
+              </div>
+              <p v-if="isDarkMode" class="text-xs text-muted-foreground">暗色模式下暂不支持液态玻璃效果</p>
+            </div>
+
+            <div class="space-y-3 border-t border-border pt-3">
+              <div class="text-sm font-semibold text-foreground">头像显示偏好</div>
+              <p class="text-xs text-muted-foreground leading-relaxed">
                 选择使用智教联盟（OAuth）同步的头像，或本站图床上传的自定义头像；保存后刷新或换设备仍会保持你的选择。
               </p>
               <div class="space-y-2">
@@ -447,7 +503,7 @@ const handleLogout = async () => {
                     value="casdoor"
                     class="mt-1 h-4 w-4 text-emerald-600 border-slate-300 focus:ring-emerald-500"
                   />
-                  <span class="text-sm text-slate-700 dark:text-slate-200 group-hover:text-emerald-700 dark:group-hover:text-emerald-300">使用智教联盟同步头像</span>
+                  <span class="text-sm text-foreground group-hover:text-emerald-700 dark:group-hover:text-emerald-300">使用智教联盟同步头像</span>
                 </label>
                 <label class="flex items-start gap-3 cursor-pointer group">
                   <input
@@ -456,7 +512,7 @@ const handleLogout = async () => {
                     value="upload"
                     class="mt-1 h-4 w-4 text-emerald-600 border-slate-300 focus:ring-emerald-500"
                   />
-                  <span class="text-sm text-slate-700 dark:text-slate-200 group-hover:text-emerald-700 dark:group-hover:text-emerald-300">使用本站图床上传头像</span>
+                  <span class="text-sm text-foreground group-hover:text-emerald-700 dark:group-hover:text-emerald-300">使用本站图床上传头像</span>
                 </label>
               </div>
               <div v-if="avatarSourceError" class="text-sm text-rose-600 dark:text-rose-400">{{ avatarSourceError }}</div>
@@ -471,40 +527,40 @@ const handleLogout = async () => {
               </button>
             </div>
             <div v-if="hasCapability('user:rename')" class="flex items-center justify-between">
-              <span class="text-sm text-slate-500 dark:text-slate-400">用户名</span>
+              <span class="text-sm text-muted-foreground">用户名</span>
               <div v-if="!showRenameForm" class="flex items-center gap-2">
-                <span class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ user?.name }}</span>
-                <button @click="startRename" class="p-1 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400">
+                <span class="text-sm font-medium text-foreground">{{ user?.name }}</span>
+                <button @click="startRename" class="p-1 rounded-lg hover:bg-accent transition-colors text-muted-foreground hover:text-emerald-600 dark:hover:text-emerald-400">
                   <Pencil class="w-3.5 h-3.5" />
                 </button>
               </div>
             </div>
             <div v-if="showRenameForm" class="space-y-3 pt-1">
-              <div class="text-xs text-slate-500 dark:text-slate-400">2-30 位中文、英文、数字、下划线、连字符，30天内只能修改一次</div>
+              <div class="text-xs text-muted-foreground">2-30 位中文、英文、数字、下划线、连字符，30天内只能修改一次</div>
               <input
                 v-model="renameValue"
-                class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-emerald-500 text-base"
+                class="w-full px-4 py-3 rounded-xl border border-border bg-card outline-none focus:border-emerald-500 text-base"
                 placeholder="输入新用户名"
                 @keyup.enter="submitRename"
               />
               <div v-if="renameError" class="text-sm text-rose-600 dark:text-rose-400">{{ renameError }}</div>
               <div class="flex gap-2">
                 <button @click="submitRename" :disabled="isRenaming" class="flex-1 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-sm transition-colors">{{ isRenaming ? '修改中...' : '确认修改' }}</button>
-                <button @click="cancelRename" class="px-4 py-2.5 rounded-xl bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold text-sm hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors">取消</button>
+                <button @click="cancelRename" class="px-4 py-2.5 rounded-xl bg-muted text-foreground font-bold text-sm hover:bg-accent transition-colors">取消</button>
               </div>
             </div>
             <div v-if="user?.email" class="flex items-center justify-between">
-              <span class="text-sm text-slate-500 dark:text-slate-400">邮箱</span>
-              <span class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ user.email }}</span>
+              <span class="text-sm text-muted-foreground">邮箱</span>
+              <span class="text-sm font-medium text-foreground">{{ user.email }}</span>
             </div>
             <div v-if="user?.stcn_username" class="flex items-center justify-between">
-              <span class="text-sm text-slate-500 dark:text-slate-400">STCN 账号</span>
+              <span class="text-sm text-muted-foreground">STCN 账号</span>
               <span class="text-sm font-medium text-emerald-600 dark:text-emerald-400">@{{ user.stcn_username }}</span>
             </div>
             <div class="pt-2">
               <button
                 @click="router.push('/auth/result')"
-                class="w-full inline-flex items-center justify-center gap-2 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 px-4 py-2.5 rounded-xl font-bold border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                class="w-full inline-flex items-center justify-center gap-2 bg-card text-foreground px-4 py-2.5 rounded-xl font-bold border border-border hover:bg-accent transition-colors"
               >
                 查看智教联盟绑定信息
               </button>
@@ -536,7 +592,7 @@ const handleLogout = async () => {
             </button>
             <button
               @click="handleLogout"
-              class="inline-flex items-center justify-center gap-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 px-6 py-3.5 rounded-2xl font-extrabold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+              class="inline-flex items-center justify-center gap-2 bg-secondary text-foreground px-6 py-3.5 rounded-2xl font-extrabold hover:bg-accent transition-colors"
             >
               <LogOut class="w-5 h-5" />
               退出登录

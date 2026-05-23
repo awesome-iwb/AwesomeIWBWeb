@@ -19,7 +19,7 @@ defineProps<{
       <img alt="aiwb-logo" src="/assets/brand/fontlogo/aiwb-font-dark.webp" class="h-6 dark:hidden">
       <img alt="aiwb-logo" src="/assets/brand/fontlogo/aiwb-font-white.webp" class="hidden h-6 dark:block">
     </div>
-    <span v-if="title && variant === 'navbar'" class="font-bold text-slate-800 dark:text-slate-200 sm:hidden">
+    <span v-if="title && variant === 'navbar'" class="font-bold text-foreground sm:hidden">
       {{ title }}
     </span>
   </div>

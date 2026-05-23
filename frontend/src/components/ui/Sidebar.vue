@@ -5,7 +5,7 @@
       border-r border-white/70 dark:border-slate-700/70"
     :class="collapsed ? 'w-16' : 'w-60'"
   >
-    <div class="p-4 border-b border-slate-100 dark:border-slate-700">
+    <div class="p-4 border-b border-border">
       <div v-if="!collapsed" class="flex items-center gap-2.5">
         <img src="/apple-touch-icon.png" alt="Awesome IWB" class="w-8 h-8 object-contain shrink-0" />
         <span class="text-sm font-bold bg-gradient-to-r from-[var(--color-brand-gradient-from)] to-[var(--color-brand-gradient-to)] bg-clip-text text-transparent">{{ brandName }}</span>
@@ -17,7 +17,7 @@
 
     <nav class="flex-1 overflow-y-auto p-3 space-y-1">
       <template v-for="(group, groupIdx) in navGroups" :key="groupIdx">
-        <div v-if="groupIdx > 0" class="my-2 border-t border-slate-100 dark:border-slate-700" />
+        <div v-if="groupIdx > 0" class="my-2 border-t border-border" />
         <router-link
           v-for="item in group"
           :key="item.key"
@@ -27,7 +27,7 @@
           :class="[
             activeKey === item.key
               ? 'bg-[var(--color-brand-500)] text-white shadow-md shadow-[var(--color-brand-shadow)]'
-              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700',
+              : 'text-muted-foreground hover:bg-accent',
             collapsed && 'justify-center px-0',
           ]"
         >
@@ -39,7 +39,7 @@
       <div class="pt-2">
         <button
           @click="collapsed = !collapsed"
-          class="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-medium text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+          class="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-medium text-muted-foreground hover:bg-accent transition-colors"
         >
           <component :is="collapsed ? ChevronRight : ChevronLeft" class="w-4 h-4" />
           <span v-if="!collapsed">收起侧栏</span>
@@ -47,11 +47,14 @@
       </div>
     </nav>
 
-    <div class="p-3 border-t border-slate-100 dark:border-slate-700">
+    <div class="p-3 border-t border-border">
       <div v-if="!collapsed && user" class="flex items-center gap-3">
-        <Avatar :src="user.avatar_url" :name="user.name" size="sm" />
+        <Avatar class="w-8 h-8">
+          <AvatarImage :src="user.avatar_url ?? ''" :alt="user.name ?? ''" />
+          <AvatarFallback>{{ user.name?.charAt(0)?.toUpperCase() || '?' }}</AvatarFallback>
+        </Avatar>
         <div class="flex-1 min-w-0">
-          <p class="text-sm font-medium text-slate-700 dark:text-slate-200 truncate">{{ user.name }}</p>
+          <p class="text-sm font-medium text-foreground truncate">{{ user.name }}</p>
         </div>
         <button
           @click="$emit('logout')"
@@ -61,7 +64,10 @@
         </button>
       </div>
       <div v-else-if="collapsed && user" class="flex justify-center">
-        <Avatar :src="user.avatar_url" :name="user.name" size="sm" />
+        <Avatar class="w-8 h-8">
+          <AvatarImage :src="user.avatar_url ?? ''" :alt="user.name ?? ''" />
+          <AvatarFallback>{{ user.name?.charAt(0)?.toUpperCase() || '?' }}</AvatarFallback>
+        </Avatar>
       </div>
     </div>
   </aside>
@@ -70,7 +76,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { ChevronLeft, ChevronRight, LogOut } from 'lucide-vue-next';
-import { Avatar } from './index';
+import { Avatar, AvatarImage, AvatarFallback } from './avatar';
 
 const props = defineProps<{
   brandName: string;

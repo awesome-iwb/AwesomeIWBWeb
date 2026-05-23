@@ -99,9 +99,13 @@ const toggleDark = () => {
   if (isDark.value) {
     document.documentElement.classList.add('dark');
     localStorage.setItem('theme', 'dark');
+    document.documentElement.removeAttribute('data-glass');
   } else {
     document.documentElement.classList.remove('dark');
     localStorage.setItem('theme', 'light');
+    if (localStorage.getItem('liquidGlass') === 'true') {
+      document.documentElement.setAttribute('data-glass', 'liquid');
+    }
   }
 };
 
@@ -112,6 +116,9 @@ const checkTheme = () => {
   } else {
     isDark.value = false;
     document.documentElement.classList.remove('dark');
+    if (localStorage.getItem('liquidGlass') === 'true') {
+      document.documentElement.setAttribute('data-glass', 'liquid');
+    }
   }
 };
 
@@ -147,7 +154,7 @@ onMounted(() => {
 
 <template>
   <nav class="sticky top-0 z-40 w-full transition-colors duration-300"
-    :class="transparent ? 'bg-transparent border-b-0' : 'border-b border-slate-200/50 dark:border-slate-800/50 bg-white/70 dark:bg-[#0B1120]/70 backdrop-blur-xl backdrop-saturate-150'">
+    :class="transparent ? 'bg-transparent border-b-0' : 'border-b border-border/50 bg-white/70 dark:bg-[#0B1120]/70 backdrop-blur-xl backdrop-saturate-150'">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
       
       <!-- Left: Logo & Links -->
@@ -165,7 +172,7 @@ onMounted(() => {
         </div>
         
         <!-- Desktop Links with Sliding Indicator -->
-        <div v-if="!showBack" class="hidden md:flex items-center gap-2 text-sm font-bold text-slate-500 dark:text-slate-400 relative">
+        <div v-if="!showBack" class="hidden md:flex items-center gap-2 text-sm font-bold text-muted-foreground relative">
           <!-- The sliding green bar -->
           <div 
             class="absolute bottom-0 h-0.5 bg-emerald-500 dark:bg-emerald-400 transition-all duration-300 ease-out"
@@ -186,22 +193,22 @@ onMounted(() => {
       </div>
 
       <!-- Right: Actions -->
-      <div class="flex items-center gap-2 sm:gap-4 text-sm font-medium" :class="transparent ? 'text-white' : 'text-slate-600 dark:text-slate-300'">
+      <div class="flex items-center gap-2 sm:gap-4 text-sm font-medium" :class="transparent ? 'text-white' : 'text-muted-foreground'">
         <!-- Search Button -->
         <div class="overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)]" :class="[hideSearch ? 'w-0 opacity-0 translate-x-4' : 'w-auto opacity-100 translate-x-0']">
           <button 
             @click="emit('openSearch')"
-            class="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700"
+            class="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-secondary hover:bg-accent rounded-lg transition-colors text-muted-foreground border border-border"
           >
             <Search class="w-4 h-4 shrink-0" />
             <span class="text-xs whitespace-nowrap">搜索</span>
-            <kbd class="hidden lg:inline-flex items-center gap-1 font-sans text-[10px] bg-white dark:bg-slate-900 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700 whitespace-nowrap shrink-0">
+            <kbd class="hidden lg:inline-flex items-center gap-1 font-sans text-[10px] bg-card px-1.5 py-0.5 rounded border border-border whitespace-nowrap shrink-0">
               <span class="text-xs">⌘</span>K
             </kbd>
           </button>
 
           <!-- Search Icon Mobile -->
-          <button @click="emit('openSearch')" class="sm:hidden p-2 rounded-lg transition-colors" :class="transparent ? 'hover:bg-white/10' : 'hover:bg-slate-100 dark:hover:bg-slate-800'">
+          <button @click="emit('openSearch')" class="sm:hidden p-2 rounded-lg transition-colors" :class="transparent ? 'hover:bg-white/10' : 'hover:bg-accent'">
             <Search class="w-5 h-5 shrink-0" />
           </button>
         </div>
@@ -213,12 +220,12 @@ onMounted(() => {
           <Plus class="w-4 h-4" /> 提交项目
         </button>
 
-        <button @click="toggleDark" class="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors" aria-label="Toggle Dark Mode">
+        <button @click="toggleDark" class="p-2 hover:bg-accent rounded-lg transition-colors" aria-label="Toggle Dark Mode">
           <Sun v-if="isDark" class="w-5 h-5 text-amber-400" />
           <Moon v-else class="w-5 h-5 text-slate-600" />
         </button>
 
-        <a href="https://github.com/awesome-iwb/awesome-iwb" target="_blank" class="hidden sm:flex p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors">
+        <a href="https://github.com/awesome-iwb/awesome-iwb" target="_blank" class="hidden sm:flex p-2 hover:bg-accent rounded-lg transition-colors">
           <Github class="w-5 h-5" />
         </a>
 
@@ -229,29 +236,29 @@ onMounted(() => {
           @mouseleave="closeUserMenuSoon"
         >
           <button
-            class="h-10 w-10 rounded-full border border-slate-200 dark:border-slate-700 bg-white/80 dark:bg-slate-900/40 hover:bg-slate-50 dark:hover:bg-slate-900/60 transition-colors overflow-hidden flex items-center justify-center"
+            class="h-10 w-10 rounded-full border border-border bg-white/80 dark:bg-slate-900/40 hover:bg-accent transition-colors overflow-hidden flex items-center justify-center"
             @click="isUserMenuOpen = !isUserMenuOpen"
             aria-label="User menu"
           >
             <img v-if="user" :src="getAvatarDisplaySrc(user)" class="h-full w-full object-cover" />
-            <span v-else class="text-sm font-extrabold text-slate-600 dark:text-slate-200">{{ userInitial }}</span>
+            <span v-else class="text-sm font-extrabold text-foreground">{{ userInitial }}</span>
           </button>
 
           <div
             v-if="isUserMenuOpen"
-            class="absolute right-0 top-12 w-72 rounded-2xl border border-slate-200/70 dark:border-slate-800/70 bg-white/90 dark:bg-[#0B1120]/90 backdrop-blur-xl shadow-2xl shadow-slate-900/10 dark:shadow-black/40 overflow-hidden"
+            class="absolute right-0 top-12 w-72 rounded-2xl border border-border bg-white/90 dark:bg-[#0B1120]/90 backdrop-blur-xl shadow-2xl shadow-slate-900/10 dark:shadow-black/40 overflow-hidden"
             @mouseenter="openUserMenu"
             @mouseleave="closeUserMenuSoon"
           >
             <div class="p-4 flex items-center gap-3">
-              <div class="h-10 w-10 rounded-full bg-slate-200/70 dark:bg-slate-700/70 overflow-hidden shrink-0">
+              <div class="h-10 w-10 rounded-full bg-muted overflow-hidden shrink-0">
                 <img v-if="user" :src="getAvatarDisplaySrc(user)" class="h-full w-full object-cover" />
               </div>
               <div class="min-w-0">
-                <div class="text-sm font-extrabold text-slate-800 dark:text-slate-100 truncate">
+                <div class="text-sm font-extrabold text-foreground truncate">
                   {{ user?.name || '未登录' }}
                 </div>
-                <div class="text-xs text-slate-500 dark:text-slate-400 truncate">
+                <div class="text-xs text-muted-foreground truncate">
                   {{ isAuthenticated ? '已登录' : '登录后可提交项目' }}
                 </div>
               </div>
@@ -270,7 +277,7 @@ onMounted(() => {
               <div v-else class="space-y-2">
                 <button
                   @click="closeUserMenuNow(); router.push('/me')"
-                  class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-extrabold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                  class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-secondary text-foreground font-extrabold hover:bg-accent transition-colors"
                 >
                   个人中心
                 </button>
@@ -306,15 +313,15 @@ onMounted(() => {
         <button
           @click="router.push('/me')"
           class="sm:hidden p-2 rounded-lg transition-colors"
-          :class="transparent ? 'hover:bg-white/10' : 'hover:bg-slate-100 dark:hover:bg-slate-800'"
+          :class="transparent ? 'hover:bg-white/10' : 'hover:bg-accent'"
           aria-label="Me"
         >
-          <div class="h-6 w-6 rounded-full overflow-hidden flex items-center justify-center" :class="transparent ? 'bg-white/20 border border-white/30' : 'bg-slate-200/70 dark:bg-slate-700/70'">
+          <div class="h-6 w-6 rounded-full overflow-hidden flex items-center justify-center" :class="transparent ? 'bg-white/20 border border-white/30' : 'bg-muted'">
             <img v-if="user" :src="getAvatarDisplaySrc(user)" class="h-full w-full object-cover" />
-            <span v-else class="text-[10px] font-extrabold text-slate-600 dark:text-slate-200">{{ userInitial }}</span>
+            <span v-else class="text-[10px] font-extrabold text-foreground">{{ userInitial }}</span>
           </div>
         </button>
-        <button @click="isMobileMenuOpen = !isMobileMenuOpen" class="md:hidden p-2 rounded-lg transition-colors" :class="transparent ? 'hover:bg-white/10' : 'hover:bg-slate-100 dark:hover:bg-slate-800'">
+        <button @click="isMobileMenuOpen = !isMobileMenuOpen" class="md:hidden p-2 rounded-lg transition-colors" :class="transparent ? 'hover:bg-white/10' : 'hover:bg-accent'">
           <Menu v-if="!isMobileMenuOpen" class="w-5 h-5" />
           <X v-else class="w-5 h-5" />
         </button>
@@ -322,16 +329,16 @@ onMounted(() => {
     </div>
 
     <!-- Mobile Dropdown Menu -->
-    <div v-if="isMobileMenuOpen" class="md:hidden absolute top-16 left-0 w-full bg-white dark:bg-[#0B1120] border-b border-slate-200 dark:border-slate-800 shadow-xl py-4 px-6 flex flex-col gap-4">
-      <router-link @click="isMobileMenuOpen = false" to="/me" class="text-lg font-bold text-slate-800 dark:text-slate-200">个人中心</router-link>
-      <div class="h-px w-full bg-slate-100 dark:bg-slate-800 my-2"></div>
+    <div v-if="isMobileMenuOpen" class="md:hidden absolute top-16 left-0 w-full bg-white dark:bg-[#0B1120] border-b border-border shadow-xl py-4 px-6 flex flex-col gap-4">
+      <router-link @click="isMobileMenuOpen = false" to="/me" class="text-lg font-bold text-foreground">个人中心</router-link>
+      <div class="h-px w-full bg-secondary my-2"></div>
       <button 
         @click="() => { isMobileMenuOpen = false; $router.push('/submit'); }"
         class="flex items-center justify-center gap-2 w-full py-3 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-xl font-bold"
       >
         <Plus class="w-5 h-5" /> 提交新项目
       </button>
-      <a href="https://github.com/awesome-iwb/awesome-iwb" target="_blank" class="flex items-center justify-center gap-2 w-full py-3 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl font-bold">
+      <a href="https://github.com/awesome-iwb/awesome-iwb" target="_blank" class="flex items-center justify-center gap-2 w-full py-3 bg-secondary text-foreground rounded-xl font-bold">
         <Github class="w-5 h-5" /> GitHub 仓库
       </a>
     </div>

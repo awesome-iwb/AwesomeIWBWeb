@@ -316,10 +316,10 @@ export const casdoorAuthPlugin = new Elysia({ prefix: "/api/auth" })
 
     let user = await findUserByCasdoorId(casdoorId);
     if (user) {
-      // Always refresh IdP avatar URL for preference switching; do not overwrite custom uploads.
+      // Always refresh IdP avatar URL for preference switching; do not overwrite custom uploads
+      // or site-chosen display names (users may rename locally / via admin).
       if (user.avatar_source === "upload") {
         user = await updateUserLogin(user.id, {
-          name,
           email: email || null,
           stcn_user_id: stcnUserId || null,
           stcn_username: stcnUsername || null,
@@ -327,7 +327,6 @@ export const casdoorAuthPlugin = new Elysia({ prefix: "/api/auth" })
         });
       } else {
         user = await updateUserLogin(user.id, {
-          name,
           avatar_url: avatar,
           avatar_source: avatar ? "casdoor" : user.avatar_source,
           email: email || null,

@@ -137,6 +137,41 @@ export async function isDirectUserProjectOwner(projectId: string, userId: string
   return rows.length > 0;
 }
 
+/**
+ * Admin/ops: set a user as the direct project owner (demotes other direct user owners).
+ * Also syncs projects.developer_user_id.
+ */
+export async function assignProjectUserOwner(projectId: string, userId: string): Promise<void> {
+  if (!dbEnabled) return;
+  const db = sql();
+  await db.begin(async (tx) => {
+    await tx`
+      update project_members set role = 'collaborator'
+      where project_id = ${projectId} and org_id is null and role = 'owner' and user_id <> ${userId}
+    `;
+    const existing = await tx<Array<{ role: string }>>`
+      select role from project_members
+      where project_id = ${projectId} and user_id = ${userId} and org_id is null
+      limit 1
+    `;
+    if (existing.length === 0) {
+      await tx`
+        insert into project_members (project_id, user_id, org_id, role)
+        values (${projectId}, ${userId}, null, 'owner')
+      `;
+    } else {
+      await tx`
+        update project_members set role = 'owner'
+        where project_id = ${projectId} and user_id = ${userId} and org_id is null
+      `;
+    }
+    await tx`
+      update projects set developer_user_id = ${userId}, updated_at = now()
+      where id = ${projectId}
+    `;
+  });
+}
+
 /** Insert or upgrade a user row to owner (user-targeted membership only). */
 export async function ensureUserProjectOwnerMembership(projectId: string, userId: string): Promise<void> {
   if (!dbEnabled) return;

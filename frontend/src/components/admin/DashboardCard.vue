@@ -1,13 +1,13 @@
 <template>
-  <div class="bg-white/72 dark:bg-slate-900/62 backdrop-blur-lg rounded-3xl border border-white/70 dark:border-slate-700/70 p-5 shadow-xl shadow-slate-900/8 dark:shadow-black/30">
-    <div class="flex items-center gap-3 mb-3">
-      <div class="w-10 h-10 rounded-xl flex items-center justify-center" :class="iconBgClass">
-        <component :is="icon" class="w-5 h-5" :class="iconTextClass" />
+  <div class="bg-white/72 dark:bg-slate-900/62 backdrop-blur-lg rounded-2xl sm:rounded-3xl border border-white/70 dark:border-slate-700/70 p-3 sm:p-5 shadow-xl shadow-slate-900/8 dark:shadow-black/30" :class="compact ? 'sm:p-3' : ''">
+    <div class="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
+      <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl flex items-center justify-center" :class="iconBgClass">
+        <component :is="icon" class="w-4 h-4 sm:w-5 sm:h-5" :class="iconTextClass" />
       </div>
-      <span class="text-sm font-medium text-slate-500 dark:text-slate-400">{{ label }}</span>
+      <span class="text-xs sm:text-sm font-medium text-muted-foreground">{{ label }}</span>
     </div>
-    <div class="text-2xl font-extrabold text-slate-900 dark:text-white">{{ mainValue }}</div>
-    <div v-if="subValue" class="text-xs text-slate-400 mt-1">{{ subValue }}</div>
+    <div class="text-xl sm:text-2xl font-extrabold text-foreground">{{ mainValue }}</div>
+    <div v-if="subValue" class="text-[10px] sm:text-xs text-muted-foreground mt-0.5 sm:mt-1">{{ subValue }}</div>
   </div>
 </template>
 
@@ -20,6 +20,7 @@ const props = defineProps<{
   subValue?: string;
   icon: any;
   color?: 'emerald' | 'amber' | 'blue' | 'rose' | 'purple' | 'teal' | 'indigo';
+  compact?: boolean;
 }>();
 
 const colorMap: Record<string, { bg: string; text: string }> = {

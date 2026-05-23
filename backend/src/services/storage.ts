@@ -4,8 +4,12 @@ import { appConfig } from "../config";
 
 const DEFAULT_ROOT = path.join(__dirname, "../../runtime/uploads");
 
-function getRoot(): string {
+export function getStorageRoot(): string {
   return appConfig.storage.root || DEFAULT_ROOT;
+}
+
+function getRoot(): string {
+  return getStorageRoot();
 }
 
 function validateKey(key: string): void {
@@ -58,4 +62,47 @@ export function resolveKeyFromUrl(url: string): string | null {
 
 export async function ensureRoot(): Promise<void> {
   await fs.mkdir(getRoot(), { recursive: true });
+}
+
+export function resolveStoragePath(key: string): string {
+  validateKey(key);
+  return path.join(getRoot(), key);
+}
+
+export async function fileExists(key: string): Promise<boolean> {
+  validateKey(key);
+  try {
+    await fs.access(resolveStoragePath(key));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function deleteFile(key: string): Promise<boolean> {
+  validateKey(key);
+  try {
+    await fs.unlink(resolveStoragePath(key));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function moveFile(fromKey: string, toKey: string): Promise<void> {
+  validateKey(fromKey);
+  validateKey(toKey);
+  const fromPath = resolveStoragePath(fromKey);
+  const toPath = resolveStoragePath(toKey);
+  await fs.mkdir(path.dirname(toPath), { recursive: true });
+  await fs.rename(fromPath, toPath);
+}
+
+/** Sidecar thumbnail key: `content/abc.jpg` -> `content/abc.w200.webp` */
+export function thumbSidecarKey(sourceKey: string, width: number): string {
+  validateKey(sourceKey);
+  const dir = path.posix.dirname(sourceKey);
+  const base = path.posix.basename(sourceKey, path.posix.extname(sourceKey));
+  const thumbName = `${base}.w${Math.max(1, Math.floor(width))}.webp`;
+  return dir === "." ? thumbName : `${dir}/${thumbName}`;
 }

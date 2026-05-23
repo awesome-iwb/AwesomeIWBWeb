@@ -160,6 +160,44 @@ async function backfillStories(): Promise<Stats> {
   return stats;
 }
 
+async function backfillOrganizations(): Promise<Stats> {
+  const stats = createStats();
+  const rows = await sql()<
+    Array<{ id: string; avatar_url: string }>
+  >`select id, avatar_url from organizations where avatar_url is not null and avatar_url <> ''`;
+
+  for (const row of rows) {
+    stats.scanned++;
+    if (!row.avatar_url) {
+      stats.skipped++;
+      continue;
+    }
+
+    const fields = [{ url: row.avatar_url, fieldPath: "avatar_url" }];
+
+    if (DRY_RUN) {
+      stats.inserted++;
+      continue;
+    }
+
+    try {
+      const count = await upsertMediaReferencesForEntity({
+        entityType: "organization",
+        entityId: row.id,
+        fields,
+        refType: REF_TYPE,
+      });
+      stats.inserted += count;
+      stats.skipped += 1 - count;
+    } catch (e) {
+      stats.errors++;
+      console.error(`  组织 ${row.id} 回填失败:`, e);
+    }
+  }
+
+  return stats;
+}
+
 async function main() {
   console.log(`=== 媒体引用回填 ${DRY_RUN ? "(dry-run)" : ""} ===\n`);
 
@@ -177,7 +215,11 @@ async function main() {
   const storyStats = await backfillStories();
   printStats("故事", storyStats);
 
-  for (const s of [projectStats, userStats, storyStats]) {
+  console.log("\n4. 回填组织头像引用 (avatar_url)...");
+  const orgStats = await backfillOrganizations();
+  printStats("组织", orgStats);
+
+  for (const s of [projectStats, userStats, storyStats, orgStats]) {
     totalStats.scanned += s.scanned;
     totalStats.inserted += s.inserted;
     totalStats.skipped += s.skipped;

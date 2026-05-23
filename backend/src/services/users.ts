@@ -542,6 +542,7 @@ export async function renameUser(input: {
       }
     }
     user.name = newName;
+    user.token_version += 1;
     user.updated_at = new Date().toISOString();
     memoryUsers.set(userId, user);
     return user;
@@ -582,12 +583,28 @@ export async function renameUser(input: {
     [userId, oldName, newName, changedBy ?? null, source]
   );
 
-  const [updated] = await sql().unsafe(
-    `update users set name = $1, updated_at = now() where id = $2 returning id, casdoor_id, name, avatar_url, avatar_source, external_avatar_url, upload_avatar_url, email, role, stcn_user_id, stcn_username, hzzc_user_id, is_active, token_version, last_login_at, created_at, updated_at`,
+  await sql().unsafe(
+    `update users set name = $1, updated_at = now() where id = $2`,
     [newName, userId]
-  ) as User[];
+  );
 
   await sql()`update users set token_version = token_version + 1 where id = ${userId}`;
 
-  return updated;
+  const fresh = await findUserById(userId);
+  if (!fresh) throw new Error("USER_NOT_FOUND");
+  return fresh;
+}
+
+/** Issue a JWT matching the user's current token_version (e.g. after rename). */
+export async function issueUserAuthToken(userId: string): Promise<{ token: string; user: User } | null> {
+  const row = await findUserById(userId);
+  if (!row || !row.is_active) return null;
+  const { signJwt } = await import("../utils/jwt");
+  const token = signJwt({
+    sub: row.id,
+    name: row.name,
+    role: row.role,
+    tv: row.token_version ?? 0,
+  });
+  return { token, user: row };
 }

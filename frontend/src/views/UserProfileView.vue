@@ -102,7 +102,7 @@ const roleBadgeClass = computed(() => {
   if (label === '运维') return 'bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300';
   if (label === '编者') return 'bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-300';
   if (label === '开发者') return 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300';
-  return 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300';
+  return 'bg-secondary text-muted-foreground';
 });
 
 const fetchProfile = async () => {
@@ -204,7 +204,7 @@ watch(() => route.params.name, async () => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-[#F8FAFC] dark:bg-[#0B1120] text-slate-900 dark:text-slate-100 font-sans pb-24">
+  <div class="min-h-screen bg-[#F8FAFC] dark:bg-[#0B1120] text-foreground font-sans pb-24">
     <main class="pt-24 px-6 max-w-3xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out-expo">
 
       <!-- Loading -->
@@ -215,8 +215,8 @@ watch(() => route.params.name, async () => {
       <!-- 404 -->
       <div v-else-if="notFound" class="text-center py-20">
         <div class="text-6xl mb-4">🔍</div>
-        <h2 class="text-2xl font-extrabold text-slate-900 dark:text-white mb-2">用户不存在</h2>
-        <p class="text-slate-500 dark:text-slate-400 mb-6">找不到名为「{{ userName }}」的用户</p>
+        <h2 class="text-2xl font-extrabold text-foreground mb-2">用户不存在</h2>
+        <p class="text-muted-foreground mb-6">找不到名为「{{ userName }}」的用户</p>
         <button @click="router.push('/')" class="px-6 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition-colors">返回首页</button>
       </div>
 
@@ -232,18 +232,18 @@ watch(() => route.params.name, async () => {
         </div>
 
         <!-- Header -->
-        <div class="bg-white dark:bg-[#111827] rounded-3xl p-6 sm:p-10 border border-slate-200/80 dark:border-slate-800/80 shadow-xl shadow-slate-200/50 dark:shadow-none mb-6">
+        <div class="bg-white dark:bg-[#111827] rounded-3xl p-6 sm:p-10 border border-border shadow-xl shadow-slate-200/50 dark:shadow-none mb-6">
           <div class="flex items-center gap-5">
-            <div class="w-20 h-20 rounded-full bg-slate-200/70 dark:bg-slate-700/70 overflow-hidden shrink-0">
+            <div class="w-20 h-20 rounded-full bg-muted overflow-hidden shrink-0">
               <img v-if="profile.avatar_url" :src="profile.avatar_url" :alt="profile.name" class="w-full h-full object-cover" />
-              <div v-else class="w-full h-full flex items-center justify-center text-2xl font-extrabold text-slate-400">{{ profile.name.charAt(0).toUpperCase() }}</div>
+              <div v-else class="w-full h-full flex items-center justify-center text-2xl font-extrabold text-muted-foreground">{{ profile.name.charAt(0).toUpperCase() }}</div>
             </div>
             <div class="min-w-0">
               <div class="flex items-center gap-3 flex-wrap">
-                <h1 class="text-2xl font-extrabold text-slate-900 dark:text-white truncate">{{ profile.name }}</h1>
+                <h1 class="text-2xl font-extrabold text-foreground truncate">{{ profile.name }}</h1>
                 <span class="inline-flex items-center px-3 py-1 rounded-lg text-xs font-bold" :class="roleBadgeClass">{{ profile.role_label }}</span>
               </div>
-              <div class="flex items-center gap-3 mt-2 text-sm text-slate-500 dark:text-slate-400 flex-wrap">
+              <div class="flex items-center gap-3 mt-2 text-sm text-muted-foreground flex-wrap">
                 <span class="inline-flex items-center gap-1"><FolderKanban class="w-3.5 h-3.5" /> {{ profile.project_count }} 个项目</span>
                 <span>·</span>
                 <span class="inline-flex items-center gap-1"><Building2 class="w-3.5 h-3.5" /> {{ profile.organization_count }} 个组织</span>
@@ -255,14 +255,14 @@ watch(() => route.params.name, async () => {
         </div>
 
         <!-- Tabs -->
-        <div class="bg-white dark:bg-[#111827] rounded-3xl border border-slate-200/80 dark:border-slate-800/80 shadow-xl shadow-slate-200/50 dark:shadow-none overflow-hidden">
-          <div class="flex border-b border-slate-200 dark:border-slate-800">
+        <div class="bg-white dark:bg-[#111827] rounded-3xl border border-border shadow-xl shadow-slate-200/50 dark:shadow-none overflow-hidden">
+          <div class="flex border-b border-border">
             <button
               v-for="tab in (['comments', 'projects', 'organizations'] as const)"
               :key="tab"
               @click="loadTab(tab)"
               class="flex-1 px-4 py-4 text-sm font-bold transition-colors relative"
-              :class="activeTab === tab ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'"
+              :class="activeTab === tab ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground hover:text-foreground'"
             >
               <span class="inline-flex items-center gap-1.5">
                 <MessageSquare v-if="tab === 'comments'" class="w-4 h-4" />
@@ -280,15 +280,15 @@ watch(() => route.params.name, async () => {
               <div v-if="isLoadingComments" class="flex items-center justify-center py-10">
                 <div class="w-6 h-6 border-2 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin"></div>
               </div>
-              <div v-else-if="comments.length === 0" class="text-center py-10 text-slate-400 dark:text-slate-500">
+              <div v-else-if="comments.length === 0" class="text-center py-10 text-muted-foreground">
                 <MessageSquare class="w-10 h-10 mx-auto mb-3 opacity-50" />
                 <p class="text-sm">暂无公开评论</p>
               </div>
               <div v-else class="space-y-4">
-                <div v-for="c in comments" :key="c.id" class="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/30">
-                  <div class="prose prose-sm dark:prose-invert max-w-none text-slate-700 dark:text-slate-300" v-html="renderMarkdown(c.body)"></div>
-                  <div class="flex items-center gap-2 mt-3 text-xs text-slate-500 dark:text-slate-400">
-                    <router-link :to="'/project/' + encodeURIComponent(c.project_name)" class="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-emerald-100 dark:hover:bg-emerald-500/10 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors font-medium">
+                <div v-for="c in comments" :key="c.id" class="p-4 rounded-2xl border border-border bg-card">
+                  <div class="prose prose-sm dark:prose-invert max-w-none text-foreground" v-html="renderMarkdown(c.body)"></div>
+                  <div class="flex items-center gap-2 mt-3 text-xs text-muted-foreground">
+                    <router-link :to="'/project/' + encodeURIComponent(c.project_name)" class="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-secondary hover:bg-emerald-100 dark:hover:bg-emerald-500/10 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors font-medium">
                       <FolderKanban class="w-3 h-3" />
                       {{ c.project_name }}
                     </router-link>
@@ -297,19 +297,19 @@ watch(() => route.params.name, async () => {
                 </div>
               </div>
               <!-- Pagination -->
-              <div v-if="commentsTotal > commentsPageSize" class="flex items-center justify-between mt-6 pt-4 border-t border-slate-200 dark:border-slate-800">
+              <div v-if="commentsTotal > commentsPageSize" class="flex items-center justify-between mt-6 pt-4 border-t border-border">
                 <button
                   @click="commentsPage--; fetchComments()"
                   :disabled="commentsPage <= 1"
-                  class="inline-flex items-center gap-1 px-4 py-2 rounded-xl text-sm font-bold bg-slate-100 dark:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                  class="inline-flex items-center gap-1 px-4 py-2 rounded-xl text-sm font-bold bg-secondary disabled:opacity-40 disabled:cursor-not-allowed hover:bg-accent transition-colors"
                 >
                   <ChevronLeft class="w-4 h-4" /> 上一页
                 </button>
-                <span class="text-sm text-slate-500 dark:text-slate-400">{{ commentsPage }} / {{ totalPages }}</span>
+                <span class="text-sm text-muted-foreground">{{ commentsPage }} / {{ totalPages }}</span>
                 <button
                   @click="commentsPage++; fetchComments()"
                   :disabled="commentsPage >= totalPages"
-                  class="inline-flex items-center gap-1 px-4 py-2 rounded-xl text-sm font-bold bg-slate-100 dark:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                  class="inline-flex items-center gap-1 px-4 py-2 rounded-xl text-sm font-bold bg-secondary disabled:opacity-40 disabled:cursor-not-allowed hover:bg-accent transition-colors"
                 >
                   下一页 <ChevronRight class="w-4 h-4" />
                 </button>
@@ -321,7 +321,7 @@ watch(() => route.params.name, async () => {
               <div v-if="isLoadingProjects" class="flex items-center justify-center py-10">
                 <div class="w-6 h-6 border-2 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin"></div>
               </div>
-              <div v-else-if="projects.length === 0" class="text-center py-10 text-slate-400 dark:text-slate-500">
+              <div v-else-if="projects.length === 0" class="text-center py-10 text-muted-foreground">
                 <FolderKanban class="w-10 h-10 mx-auto mb-3 opacity-50" />
                 <p class="text-sm">暂无参与的项目</p>
               </div>
@@ -330,17 +330,17 @@ watch(() => route.params.name, async () => {
                   v-for="p in projects"
                   :key="p.project_name"
                   :to="'/project/' + encodeURIComponent(p.project_name)"
-                  class="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/30 hover:border-emerald-300 dark:hover:border-emerald-700 transition-colors group"
+                  class="p-4 rounded-2xl border border-border bg-card hover:border-emerald-300 dark:hover:border-emerald-700 transition-colors group"
                 >
                   <div class="flex items-center gap-3 mb-2">
                     <img v-if="p.icon_url" :src="p.icon_url" :alt="p.display_name" class="w-8 h-8 rounded-lg object-cover" />
                     <div v-else class="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400 text-xs font-bold">{{ (p.display_name || p.project_name).charAt(0) }}</div>
                     <div class="min-w-0 flex-1">
-                      <div class="text-sm font-extrabold text-slate-900 dark:text-white truncate group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">{{ p.display_name || p.project_name }}</div>
+                      <div class="text-sm font-extrabold text-foreground truncate group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">{{ p.display_name || p.project_name }}</div>
                     </div>
-                    <span class="text-[10px] px-2 py-0.5 rounded-md font-bold shrink-0" :class="p.role === 'owner' ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'">{{ p.role === 'owner' ? '负责人' : '协作者' }}</span>
+                    <span class="text-[10px] px-2 py-0.5 rounded-md font-bold shrink-0" :class="p.role === 'owner' ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300' : 'bg-secondary text-muted-foreground'">{{ p.role === 'owner' ? '负责人' : '协作者' }}</span>
                   </div>
-                  <p v-if="p.description" class="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">{{ p.description }}</p>
+                  <p v-if="p.description" class="text-xs text-muted-foreground line-clamp-2">{{ p.description }}</p>
                 </router-link>
               </div>
             </div>
@@ -350,7 +350,7 @@ watch(() => route.params.name, async () => {
               <div v-if="isLoadingOrganizations" class="flex items-center justify-center py-10">
                 <div class="w-6 h-6 border-2 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin"></div>
               </div>
-              <div v-else-if="organizations.length === 0" class="text-center py-10 text-slate-400 dark:text-slate-500">
+              <div v-else-if="organizations.length === 0" class="text-center py-10 text-muted-foreground">
                 <Building2 class="w-10 h-10 mx-auto mb-3 opacity-50" />
                 <p class="text-sm">暂无所属组织</p>
               </div>
@@ -358,16 +358,16 @@ watch(() => route.params.name, async () => {
                 <div
                   v-for="o in organizations"
                   :key="o.id"
-                  class="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/30"
+                  class="p-4 rounded-2xl border border-border bg-card"
                 >
                   <div class="flex items-center gap-3">
                     <img v-if="o.avatar_url" :src="o.avatar_url" :alt="o.name" class="w-10 h-10 rounded-xl object-cover" />
                     <div v-else class="w-10 h-10 rounded-xl bg-blue-100 dark:bg-blue-500/20 flex items-center justify-center text-blue-600 dark:text-blue-400 text-sm font-bold">{{ o.name.charAt(0) }}</div>
                     <div class="min-w-0 flex-1">
-                      <div class="text-sm font-extrabold text-slate-900 dark:text-white truncate">{{ o.name }}</div>
-                      <p v-if="o.description" class="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">{{ o.description }}</p>
+                      <div class="text-sm font-extrabold text-foreground truncate">{{ o.name }}</div>
+                      <p v-if="o.description" class="text-xs text-muted-foreground truncate mt-0.5">{{ o.description }}</p>
                     </div>
-                    <span class="text-[10px] px-2 py-0.5 rounded-md font-bold shrink-0" :class="o.role === 'owner' ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300' : o.role === 'admin' ? 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'">{{ o.role === 'owner' ? '所有者' : o.role === 'admin' ? '管理员' : '成员' }}</span>
+                    <span class="text-[10px] px-2 py-0.5 rounded-md font-bold shrink-0" :class="o.role === 'owner' ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300' : o.role === 'admin' ? 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300' : 'bg-secondary text-muted-foreground'">{{ o.role === 'owner' ? '所有者' : o.role === 'admin' ? '管理员' : '成员' }}</span>
                   </div>
                 </div>
               </div>

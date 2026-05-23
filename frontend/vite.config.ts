@@ -16,6 +16,13 @@ const projectRoutes = data.categories.flatMap((c: any) =>
   c.projects.map((p: any) => `/project/${encodeURIComponent(p.name)}`)
 );
 
+/** Published article slugs for SSG (optional; set ARTICLE_SLUGS=slug1,slug2 at build). */
+const articleRoutes = (process.env.ARTICLE_SLUGS ?? '')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean)
+  .map((slug) => `/articles/${encodeURIComponent(slug)}`);
+
 const projectMap: Record<string, any> = {};
 data.categories.forEach((c: any) => {
   c.projects.forEach((p: any) => {
@@ -150,7 +157,11 @@ export default defineConfig({
           },
           {
             // 可变列表 API 禁止 SW 层 NetworkFirst 长缓存（曾导致编辑后最长约 120s 陈旧）。
-            urlPattern: ({ url }) => url.pathname === '/api/stories' || url.pathname === '/api/projects',
+            urlPattern: ({ url }) =>
+              url.pathname === '/api/stories' ||
+              url.pathname === '/api/articles' ||
+              url.pathname.startsWith('/api/articles/') ||
+              url.pathname === '/api/projects',
             handler: 'NetworkOnly',
             method: 'GET'
           }
@@ -182,14 +193,14 @@ export default defineConfig({
     script: 'async',
     formatting: 'minify',
     includedRoutes(paths: string[]) {
-      return paths.filter(i => !i.includes(':')).concat(projectRoutes);
+      return paths.filter(i => !i.includes(':')).concat(projectRoutes, articleRoutes);
     },
     onPageRendered(route: string, html: string) {
       return injectHeadTags(html, route);
     },
     async onFinished() {
       const staticRoutes = ['/', '/today', '/about', '/compare'];
-      const allRoutes = [...staticRoutes, ...projectRoutes];
+      const allRoutes = [...staticRoutes, ...projectRoutes, ...articleRoutes];
       const urls = allRoutes.map(route => `  <url>\n    <loc>${baseUrl}${route}</loc>\n    <changefreq>weekly</changefreq>\n    <priority>${route === '/' ? '1.0' : route.startsWith('/project/') ? '0.8' : '0.6'}</priority>\n  </url>`).join('\n');
       const sitemap = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>`;
       const distDir = path.resolve(__dirname, 'dist');

@@ -9,7 +9,10 @@
     "migrate:from-json": "bun run src/scripts/migrate-runtime-to-pg.ts",
     "import:data-json": "bun run src/scripts/import-data-json.ts",
     "import:feishu-base": "bun run src/scripts/import-feishu-base.ts",
-    "sync:feishu-base": "bun run src/scripts/sync-feishu-base.ts"
+    "sync:feishu-base": "bun run src/scripts/sync-feishu-base.ts",
+    "media:migrate-namespaces": "bun run src/scripts/migrate-upload-namespaces.ts",
+    "media:purge-orphans": "bun run src/scripts/purge-orphan-media.ts",
+    "media:backfill-refs": "bun run src/scripts/backfill-media-references.ts"
   },
   "dependencies": {
     "@elysiajs/cors": "^1.4.2",
@@ -17,7 +20,8 @@
     "@sinclair/typebox": "^0.34.49",
     "argon2": "^0.44.0",
     "elysia": "latest",
-    "postgres": "^3.4.7"
+    "postgres": "^3.4.7",
+    "sharp": "^0.34.5"
   },
   "devDependencies": {
     "bun-types": "latest"

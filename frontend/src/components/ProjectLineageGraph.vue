@@ -188,13 +188,13 @@ const handleChartClick = (params: any) => {
 </script>
 
 <template>
-  <section v-if="graphData" class="mt-12 pt-10 border-t border-slate-200 dark:border-slate-800">
-    <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-2 flex items-center gap-2">
+  <section v-if="graphData" class="mt-12 pt-10 border-t border-border">
+    <h2 class="text-2xl font-bold text-foreground mb-2 flex items-center gap-2">
       <GitMerge class="w-6 h-6 text-emerald-500" /> 生态网状图
     </h2>
-    <p class="text-slate-500 mb-8">基于真实的 GitHub 派生关系以及插件生态。你可以拖拽节点，或点击其他节点跳转。</p>
+    <p class="text-muted-foreground mb-8">基于真实的 GitHub 派生关系以及插件生态。你可以拖拽节点，或点击其他节点跳转。</p>
     
-    <div class="bg-white dark:bg-[#111827] rounded-3xl p-4 sm:p-8 border border-slate-200/80 dark:border-slate-800/80 shadow-sm">
+    <div class="bg-white dark:bg-[#111827] rounded-3xl p-4 sm:p-8 border border-border shadow-sm">
       <div class="w-full h-[400px]">
         <ClientOnly>
           <VChart class="w-full h-full" :option="option" autoresize @click="handleChartClick" />

@@ -33,16 +33,23 @@ useHead({
 
 const { apiFetch } = useApi();
 
+type AiUsageState = 'unknown' | 'under50' | 'over50';
+
 const form = ref({
   name: '',
   developer: '',
   githubUrl: '',
   description: '',
-  tags: '',
+  featureTags: '',
   category: '🛠️ 辅助类软件与实用工具',
-  status: '活跃',
-  recommendation: '稳定'
+  ai_usage_state: 'unknown' as AiUsageState,
 });
+
+const aiUsageOptions: { value: AiUsageState; label: string }[] = [
+  { value: 'unknown', label: '未知' },
+  { value: 'under50', label: '未超过 50%' },
+  { value: 'over50', label: '超过 50%' },
+];
 
 const iconUrl = ref('');
 const bannerUrl = ref('');
@@ -154,15 +161,14 @@ const handleSubmit = async () => {
   submitError.value = '';
   
   try {
-    const payload: any = {
+    const payload: Record<string, string> = {
       name: form.value.name,
       developer: form.value.developer,
       github_url: form.value.githubUrl,
       description: form.value.description,
-      keywords: form.value.tags,
+      keywords: form.value.featureTags,
       category: form.value.category,
-      status: form.value.status,
-      recommendation: form.value.recommendation,
+      ai_usage_state: form.value.ai_usage_state,
     };
     if (iconUrl.value) payload.icon = iconUrl.value;
     if (bannerUrl.value) payload.banner = bannerUrl.value;
@@ -191,7 +197,7 @@ const handleSubmit = async () => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-[#F8FAFC] dark:bg-[#0B1120] text-slate-900 dark:text-slate-100 font-sans pb-24">
+  <div class="min-h-screen bg-[#F8FAFC] dark:bg-[#0B1120] text-foreground font-sans pb-24">
 
     <main class="pt-24 px-6 max-w-3xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out-expo">
       
@@ -206,7 +212,7 @@ const handleSubmit = async () => {
           </div>
           
           <div class="relative shrink-0 group drop-shadow-xl">
-            <div class="w-20 h-20 sm:w-36 sm:h-36 z-10 flex items-center justify-center relative rounded-2xl sm:rounded-3xl overflow-hidden bg-slate-100 dark:bg-slate-800">
+            <div class="w-20 h-20 sm:w-36 sm:h-36 z-10 flex items-center justify-center relative rounded-2xl sm:rounded-3xl overflow-hidden bg-secondary">
               <img 
                 v-if="iconUrl"
                 :src="iconUrl" 
@@ -217,59 +223,59 @@ const handleSubmit = async () => {
                 :src="getFallbackImage(form.name)" 
                 class="w-full h-full object-contain opacity-50"
               />
-              <ImageIcon v-else class="w-8 h-8 sm:w-12 sm:h-12 text-slate-300 dark:text-slate-600 absolute" />
+              <ImageIcon v-else class="w-8 h-8 sm:w-12 sm:h-12 text-muted-foreground absolute" />
             </div>
           </div>
 
           <div class="flex-1 flex flex-col w-full text-center sm:text-left">
-            <h1 class="text-2xl sm:text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white mb-2 leading-tight">
+            <h1 class="text-2xl sm:text-4xl font-extrabold tracking-tight text-foreground mb-2 leading-tight">
               {{ form.name || '项目名称' }}
             </h1>
             
             <div class="flex items-center gap-3 mb-3 justify-center sm:justify-start">
-              <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100 dark:bg-slate-800/80 border border-slate-200/50 dark:border-slate-700 w-fit">
+              <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-secondary border border-border w-fit">
                 <img 
                   :src="getFallbackImage(form.developer || '?')" 
                   class="w-5 h-5 rounded-full object-cover"
                 />
-                <span class="text-sm font-semibold text-slate-700 dark:text-slate-300">{{ form.developer || '开发者' }}</span>
+                <span class="text-sm font-semibold text-muted-foreground">{{ form.developer || '开发者' }}</span>
               </div>
             </div>
             
             <div class="flex flex-wrap gap-1.5 mb-4 justify-center sm:justify-start">
-              <span v-for="tag in form.tags.split(/[,，、\s]+/).filter(t => t.trim()).slice(0,3)" :key="tag" class="px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-medium border border-emerald-200/50 dark:border-emerald-500/20">
+              <span v-for="tag in form.featureTags.split(/[,，、\s]+/).filter(t => t.trim()).slice(0,3)" :key="tag" class="px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-medium border border-emerald-200/50 dark:border-emerald-500/20">
                 {{ tag }}
               </span>
-              <span v-if="!form.tags" class="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-400 text-xs font-medium border border-dashed border-slate-300 dark:border-slate-700">
-                功能特性预览
+              <span v-if="!form.featureTags" class="px-2 py-0.5 rounded-md bg-secondary text-muted-foreground text-xs font-medium border border-dashed border-border">
+                画廊标签预览
               </span>
             </div>
           </div>
         </div>
 
         <!-- Form Section -->
-        <div class="bg-white dark:bg-[#111827] rounded-3xl p-4 sm:p-10 border border-slate-200/80 dark:border-slate-800/80 shadow-xl shadow-slate-200/50 dark:shadow-none">
-          <h2 class="text-xl font-bold mb-8 flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-4">
+        <div class="bg-white dark:bg-[#111827] rounded-3xl p-4 sm:p-10 border border-border shadow-xl shadow-slate-200/50 dark:shadow-none">
+          <h2 class="text-xl font-bold mb-8 flex items-center gap-2 border-b border-border pb-4">
             <Layers class="w-5 h-5 text-emerald-500" /> 填写项目信息
           </h2>
           
           <!-- Image Upload Section -->
           <div class="mb-8 space-y-4">
-            <div class="text-sm font-bold text-slate-700 dark:text-slate-300">项目图片</div>
+            <div class="text-sm font-bold text-foreground">项目图片</div>
             
             <div class="flex gap-4">
               <div class="w-28 sm:w-36 shrink-0 space-y-1.5">
-                <div class="text-xs font-medium text-slate-500 dark:text-slate-400">图标</div>
+                <div class="text-xs font-medium text-muted-foreground">图标</div>
                 <div class="relative group">
                   <div 
-                    class="w-full aspect-square rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 flex flex-col items-center justify-center cursor-pointer hover:border-emerald-400 dark:hover:border-emerald-500 transition-colors overflow-hidden"
+                    class="w-full aspect-square rounded-2xl border-2 border-dashed border-border bg-card flex flex-col items-center justify-center cursor-pointer hover:border-emerald-400 dark:hover:border-emerald-500 transition-colors overflow-hidden"
                     :class="iconUrl ? 'border-solid border-emerald-300 dark:border-emerald-500/40' : ''"
                     @click="triggerIconUpload"
                   >
                     <img v-if="iconUrl" :src="iconUrl" class="w-full h-full object-cover" />
                     <template v-else>
-                      <Upload class="w-6 h-6 text-slate-300 dark:text-slate-600 mb-1" />
-                      <div class="text-xs font-medium text-slate-400 dark:text-slate-500">图标</div>
+                      <Upload class="w-6 h-6 text-muted-foreground mb-1" />
+                      <div class="text-xs font-medium text-muted-foreground">图标</div>
                     </template>
                   </div>
                   <button 
@@ -284,18 +290,18 @@ const handleSubmit = async () => {
               </div>
 
               <div class="flex-1 space-y-1.5">
-                <div class="text-xs font-medium text-slate-500 dark:text-slate-400">Banner 横幅图</div>
+                <div class="text-xs font-medium text-muted-foreground">Banner 横幅图</div>
                 <div class="relative group">
                   <div 
-                    class="w-full aspect-video rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 flex flex-col items-center justify-center cursor-pointer hover:border-emerald-400 dark:hover:border-emerald-500 transition-colors overflow-hidden"
+                    class="w-full aspect-video rounded-2xl border-2 border-dashed border-border bg-card flex flex-col items-center justify-center cursor-pointer hover:border-emerald-400 dark:hover:border-emerald-500 transition-colors overflow-hidden"
                     :class="bannerUrl ? 'border-solid border-emerald-300 dark:border-emerald-500/40' : ''"
                     @click="triggerBannerUpload"
                   >
                     <img v-if="bannerUrl" :src="bannerUrl" class="w-full h-full object-cover" />
                     <template v-else>
-                      <Upload class="w-6 h-6 text-slate-300 dark:text-slate-600 mb-1" />
-                      <div class="text-xs font-medium text-slate-400 dark:text-slate-500">点击上传 Banner</div>
-                      <div class="text-[10px] text-slate-400 dark:text-slate-600 mt-0.5">16:9 横幅图</div>
+                      <Upload class="w-6 h-6 text-muted-foreground mb-1" />
+                      <div class="text-xs font-medium text-muted-foreground">点击上传 Banner</div>
+                      <div class="text-[10px] text-muted-foreground mt-0.5">16:9 横幅图</div>
                     </template>
                   </div>
                   <button 
@@ -313,38 +319,48 @@ const handleSubmit = async () => {
 
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <div class="space-y-2">
-              <label class="text-sm font-bold text-slate-700 dark:text-slate-300">项目名称 <span class="text-red-500">*</span></label>
-              <input v-model="form.name" type="text" placeholder="例如: ClassIsland" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all" />
+              <label class="text-sm font-bold text-foreground">项目名称 <span class="text-red-500">*</span></label>
+              <input v-model="form.name" type="text" placeholder="例如: ClassIsland" class="w-full bg-card border border-border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all" />
             </div>
             
             <div class="space-y-2">
-              <label class="text-sm font-bold text-slate-700 dark:text-slate-300">开发者 GitHub 用户名 <span class="text-red-500">*</span></label>
-              <input v-model="form.developer" type="text" placeholder="例如: HelloWRC" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all" />
+              <label class="text-sm font-bold text-foreground">开发者 GitHub 用户名 <span class="text-red-500">*</span></label>
+              <input v-model="form.developer" type="text" placeholder="例如: HelloWRC" class="w-full bg-card border border-border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all" />
             </div>
           </div>
 
           <div class="space-y-2 mb-6">
-            <label class="text-sm font-bold text-slate-700 dark:text-slate-300">GitHub 仓库地址 <span class="text-red-500">*</span></label>
-            <input v-model="form.githubUrl" type="url" placeholder="例如: https://github.com/ClassIsland/ClassIsland" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all" />
+            <label class="text-sm font-bold text-muted-foreground">GitHub 仓库地址 <span class="text-red-500">*</span></label>
+            <input v-model="form.githubUrl" type="url" placeholder="例如: https://github.com/ClassIsland/ClassIsland" class="w-full bg-card border border-border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all" />
           </div>
 
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <div class="space-y-2">
-              <label class="text-sm font-bold text-slate-700 dark:text-slate-300">所属分类</label>
-              <select v-model="form.category" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all appearance-none">
+              <label class="text-sm font-bold text-muted-foreground">所属分类</label>
+              <select v-model="form.category" class="w-full bg-card border border-border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all appearance-none">
                 <option v-for="cat in categories" :key="cat" :value="cat">{{ cat }}</option>
               </select>
             </div>
             
             <div class="space-y-2">
-              <label class="text-sm font-bold text-slate-700 dark:text-slate-300">功能特性 (逗号或空格分隔)</label>
-              <input v-model="form.tags" type="text" placeholder="例如: 课程表 提醒 桌面工具" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all" />
+              <label class="text-sm font-bold text-foreground">项目 AI 率是否超过 50%</label>
+              <select v-model="form.ai_usage_state" class="w-full bg-card border border-border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all appearance-none">
+                <option v-for="opt in aiUsageOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+              </select>
             </div>
           </div>
 
+          <div class="space-y-2 mb-6">
+            <label class="text-sm font-bold text-foreground">功能特性标签（逗号或空格分隔）</label>
+            <input v-model="form.featureTags" type="text" placeholder="例如: 课程表 提醒 桌面工具" class="w-full bg-card border border-border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all" />
+            <p class="text-xs text-muted-foreground leading-relaxed">
+              审核通过后将显示在项目详情侧栏「项目标签」画廊；列表卡片上的状态、版本、星标等系统标签由 GitHub 同步自动生成，无需填写推荐或稳定性标签。
+            </p>
+          </div>
+
           <div class="space-y-2 mb-8">
-            <label class="text-sm font-bold text-slate-700 dark:text-slate-300">项目简介</label>
-            <textarea v-model="form.description" rows="4" placeholder="一句话介绍这个项目是做什么的..." class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all resize-none"></textarea>
+            <label class="text-sm font-bold text-muted-foreground">项目简介</label>
+            <textarea v-model="form.description" rows="4" placeholder="一句话介绍这个项目是做什么的..." class="w-full bg-card border border-border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all resize-none"></textarea>
           </div>
 
           <div v-if="submitError" class="mb-6 p-4 rounded-xl bg-red-50 text-red-600 border border-red-200 dark:bg-red-500/10 dark:border-red-500/20 text-sm font-bold">
@@ -370,7 +386,7 @@ const handleSubmit = async () => {
           </div>
           
           <h2 class="text-2xl font-extrabold text-center mb-2">提交成功！</h2>
-          <p class="text-center text-slate-500 dark:text-slate-400 mb-8">
+          <p class="text-center text-muted-foreground mb-8">
             你的收录请求已进入审核队列，管理员会尽快审核。
           </p>
 
@@ -380,7 +396,7 @@ const handleSubmit = async () => {
             </div>
             <button 
               @click="isSubmitted = false; submissionId = ''; iconUrl = ''; bannerUrl = ''" 
-              class="flex-1 inline-flex items-center justify-center gap-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-6 py-3.5 rounded-xl font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+              class="flex-1 inline-flex items-center justify-center gap-2 bg-secondary text-muted-foreground px-6 py-3.5 rounded-xl font-bold hover:bg-accent transition-colors"
             >
               继续提交
             </button>

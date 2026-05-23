@@ -76,7 +76,7 @@ const getFallbackImage = (name: string) => {
 </script>
 
 <template>
-  <div v-if="featuredProjects.length > 0" class="relative w-full overflow-hidden rounded-[2rem] bg-slate-900 shadow-2xl shadow-slate-200/50 dark:shadow-none border border-slate-200/50 dark:border-slate-800 group" @mouseenter="stopAutoPlay" @mouseleave="startAutoPlay">
+  <div v-if="featuredProjects.length > 0" class="relative w-full overflow-hidden rounded-[2rem] bg-slate-900 shadow-2xl shadow-slate-200/50 dark:shadow-none border border-border group" @mouseenter="stopAutoPlay" @mouseleave="startAutoPlay">
     
     <!-- Slides Container -->
     <div 

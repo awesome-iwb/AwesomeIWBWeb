@@ -1,12 +1,12 @@
 <template>
   <div class="flex flex-col h-full min-h-0 gap-4">
-    <div class="shrink-0 flex flex-wrap gap-2">
+    <div class="shrink-0 flex gap-2 overflow-x-auto pb-1 -webkit-overflow-scrolling-touch scrollbar-hide">
       <button
         v-if="hasCapability('submission:read')"
         type="button"
         @click="goTab('projects')"
-        class="px-5 py-2.5 rounded-xl text-sm font-bold transition-colors"
-        :class="activeTab === 'projects' ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/20' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'"
+        class="px-4 py-2.5 sm:px-5 sm:py-2.5 rounded-xl text-sm font-bold transition-colors flex-shrink-0 min-h-[44px]"
+        :class="activeTab === 'projects' ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/20' : 'bg-secondary text-muted-foreground hover:bg-accent'"
       >
         项目
       </button>
@@ -14,8 +14,8 @@
         v-if="hasCapability('moderation:read')"
         type="button"
         @click="goTab('comments')"
-        class="px-5 py-2.5 rounded-xl text-sm font-bold transition-colors"
-        :class="activeTab === 'comments' ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/20' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'"
+        class="px-4 py-2.5 sm:px-5 sm:py-2.5 rounded-xl text-sm font-bold transition-colors flex-shrink-0 min-h-[44px]"
+        :class="activeTab === 'comments' ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/20' : 'bg-secondary text-muted-foreground hover:bg-accent'"
       >
         评论
       </button>
@@ -23,8 +23,8 @@
         v-if="hasCapability('moderation:read') || hasCapability('feedback:manage')"
         type="button"
         @click="goTab('bugs')"
-        class="px-5 py-2.5 rounded-xl text-sm font-bold transition-colors"
-        :class="activeTab === 'bugs' ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/20' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'"
+        class="px-4 py-2.5 sm:px-5 sm:py-2.5 rounded-xl text-sm font-bold transition-colors flex-shrink-0 min-h-[44px]"
+        :class="activeTab === 'bugs' ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/20' : 'bg-secondary text-muted-foreground hover:bg-accent'"
       >
         Bug / 反馈
       </button>
@@ -38,10 +38,10 @@
       <ModerationView locked-kind="comment" />
     </div>
 
-    <div v-else-if="activeTab === 'bugs'" class="flex-1 min-h-0 overflow-y-auto space-y-8">
+    <div v-else-if="activeTab === 'bugs'" class="flex-1 min-h-0 overflow-y-auto space-y-4 sm:space-y-8">
       <ModerationView v-if="hasCapability('moderation:read')" locked-kind="bug" />
-      <div v-if="hasCapability('feedback:manage')" class="max-w-5xl mx-auto">
-        <p v-if="hasCapability('moderation:read')" class="text-sm font-bold text-slate-600 dark:text-slate-300 mb-2">
+      <div v-if="hasCapability('feedback:manage')" class="max-w-5xl mx-auto px-2 sm:px-0">
+        <p v-if="hasCapability('moderation:read')" class="text-sm font-bold text-muted-foreground mb-2">
           反馈跟进（全站工单）
         </p>
         <CommentPanel project-name="__admin__" variant="ops" initial-tab="bug" />

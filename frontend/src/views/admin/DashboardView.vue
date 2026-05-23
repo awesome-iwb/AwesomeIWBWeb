@@ -1,36 +1,36 @@
 <template>
-  <div class="space-y-4 lg:space-y-6 max-w-full overflow-x-hidden">
+  <div class="space-y-3 sm:space-y-4 lg:space-y-6 max-w-full overflow-x-hidden">
     <ui-LoadingSpinner v-if="loading" brand="admin" />
 
     <template v-else>
       <div class="flex gap-2 overflow-x-auto pb-1 -webkit-overflow-scrolling-touch lg:hidden max-w-full">
-        <div v-if="hasCapability('project:read')" class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 flex-shrink-0">
+        <div v-if="hasCapability('project:read')" class="flex items-center gap-1.5 px-3 py-2 rounded-full bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 flex-shrink-0">
           <Package class="w-3.5 h-3.5" /><span class="text-xs font-bold">{{ data.projects?.total ?? '—' }}</span><span class="text-[10px]">项目</span>
         </div>
-        <div v-if="hasCapability('submission:read')" class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 flex-shrink-0">
+        <div v-if="hasCapability('submission:read')" class="flex items-center gap-1.5 px-3 py-2 rounded-full bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 flex-shrink-0">
           <ClipboardCheck class="w-3.5 h-3.5" /><span class="text-xs font-bold">{{ data.pendingSubmissions?.count ?? '—' }}</span><span class="text-[10px]">待审</span>
         </div>
-        <div v-if="hasCapability('moderation:read')" class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 flex-shrink-0">
+        <div v-if="hasCapability('moderation:read')" class="flex items-center gap-1.5 px-3 py-2 rounded-full bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 flex-shrink-0">
           <Shield class="w-3.5 h-3.5" /><span class="text-xs font-bold">{{ moderationTotal }}</span><span class="text-[10px]">举报</span>
         </div>
-        <div v-if="hasCapability('feedback:manage')" class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 flex-shrink-0">
+        <div v-if="hasCapability('feedback:manage')" class="flex items-center gap-1.5 px-3 py-2 rounded-full bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 flex-shrink-0">
           <MessageSquare class="w-3.5 h-3.5" /><span class="text-xs font-bold">{{ data.openFeedback?.count ?? '—' }}</span><span class="text-[10px]">反馈</span>
         </div>
-        <div v-if="hasCapability('user:read')" class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-teal-50 dark:bg-teal-500/10 text-teal-600 dark:text-teal-400 flex-shrink-0">
+        <div v-if="hasCapability('user:read')" class="flex items-center gap-1.5 px-3 py-2 rounded-full bg-teal-50 dark:bg-teal-500/10 text-teal-600 dark:text-teal-400 flex-shrink-0">
           <Users class="w-3.5 h-3.5" /><span class="text-xs font-bold">{{ data.users?.total ?? '—' }}</span><span class="text-[10px]">用户</span>
         </div>
-        <div v-if="hasCapability('media:read')" class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex-shrink-0">
+        <div v-if="hasCapability('media:read')" class="flex items-center gap-1.5 px-3 py-2 rounded-full bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex-shrink-0">
           <ImageIcon class="w-3.5 h-3.5" /><span class="text-xs font-bold">{{ data.media?.total ?? '—' }}</span><span class="text-[10px]">媒体</span>
         </div>
-        <div v-if="hasCapability('story:manage')" class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 flex-shrink-0">
+        <div v-if="hasCapability('story:manage')" class="flex items-center gap-1.5 px-3 py-2 rounded-full bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 flex-shrink-0">
           <FileText class="w-3.5 h-3.5" /><span class="text-xs font-bold">{{ data.stories?.total ?? '—' }}</span><span class="text-[10px]">文章</span>
         </div>
-        <div v-if="canViewAnalytics && analytics" class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex-shrink-0">
+        <div v-if="canViewAnalytics && analytics" class="flex items-center gap-1.5 px-3 py-2 rounded-full bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex-shrink-0">
           <BarChart3 class="w-3.5 h-3.5" /><span class="text-xs font-bold">{{ analytics.pv.today }}</span><span class="text-[10px]">今日PV</span>
         </div>
       </div>
 
-      <div class="hidden lg:grid lg:grid-cols-4 gap-4">
+      <div class="hidden lg:grid lg:grid-cols-4 gap-3 sm:gap-4">
         <DashboardCard v-if="hasCapability('project:read')" label="项目总数" :main-value="data.projects?.total ?? '—'" :sub-value="data.projects ? `本周新增 ${data.projects.newThisWeek}` : ''" :icon="Package" color="blue" />
         <DashboardCard v-if="hasCapability('submission:read')" label="待审核提交" :main-value="data.pendingSubmissions?.count ?? '—'" :icon="ClipboardCheck" color="amber" />
         <DashboardCard v-if="hasCapability('moderation:read')" label="待审核内容" :main-value="moderationTotal" :sub-value="data.pendingModeration ? `评论 ${data.pendingModeration.comments} / Bug ${data.pendingModeration.bugs}` : ''" :icon="Shield" color="rose" />
@@ -42,77 +42,77 @@
       </div>
 
       <LazySection v-if="canViewAnalytics" @visible="visibleSections.analytics = true">
-        <div v-if="visibleSections.analytics" class="bg-white/72 dark:bg-slate-900/62 backdrop-blur-lg rounded-3xl border border-white/70 dark:border-slate-700/70 shadow-xl shadow-slate-900/8 dark:shadow-black/30 overflow-hidden">
-          <div class="px-4 lg:px-5 py-3 lg:py-4 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
+        <div v-if="visibleSections.analytics" class="bg-white/72 dark:bg-slate-900/62 backdrop-blur-lg rounded-2xl sm:rounded-3xl border border-white/70 dark:border-slate-700/70 shadow-xl shadow-slate-900/8 dark:shadow-black/30 overflow-hidden">
+          <div class="px-3 sm:px-4 lg:px-5 py-2.5 sm:py-3 lg:py-4 border-b border-border flex items-center justify-between">
             <h3 class="font-bold text-sm lg:text-base flex items-center gap-2"><BarChart3 class="w-4 h-4 text-indigo-500" />数据分析</h3>
             <router-link to="/admin/analytics" class="text-xs text-emerald-600 dark:text-emerald-400 font-medium">查看完整分析 →</router-link>
           </div>
 
-          <div v-if="analyticsLoading" class="flex items-center justify-center py-16">
+          <div v-if="analyticsLoading" class="flex items-center justify-center py-12 sm:py-16">
             <div class="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
           </div>
 
-          <div v-else-if="analytics" class="p-4 lg:p-5 space-y-4">
-            <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              <div class="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-3">
-                <div class="text-[10px] lg:text-xs text-slate-500 dark:text-slate-400 mb-0.5">页面浏览</div>
-                <div class="text-lg lg:text-2xl font-bold text-slate-900 dark:text-white">{{ formatNum(analytics.pv.total) }}</div>
+          <div v-else-if="analytics" class="p-3 sm:p-4 lg:p-5 space-y-3 sm:space-y-4">
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
+              <div class="bg-card/50 rounded-xl p-2.5 sm:p-3">
+                <div class="text-[10px] lg:text-xs text-muted-foreground mb-0.5">页面浏览</div>
+                <div class="text-base sm:text-lg lg:text-2xl font-bold text-foreground">{{ formatNum(analytics.pv.total) }}</div>
                 <div class="text-[10px] text-slate-400 mt-0.5">今日 {{ formatNum(analytics.pv.today) }} · 本周 {{ formatNum(analytics.pv.thisWeek) }}</div>
               </div>
-              <div class="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-3">
-                <div class="text-[10px] lg:text-xs text-slate-500 dark:text-slate-400 mb-0.5">独立访客</div>
-                <div class="text-lg lg:text-2xl font-bold text-slate-900 dark:text-white">{{ formatNum(analytics.uv.total) }}</div>
+              <div class="bg-card/50 rounded-xl p-2.5 sm:p-3">
+                <div class="text-[10px] lg:text-xs text-muted-foreground mb-0.5">独立访客</div>
+                <div class="text-base sm:text-lg lg:text-2xl font-bold text-foreground">{{ formatNum(analytics.uv.total) }}</div>
                 <div class="text-[10px] text-slate-400 mt-0.5">今日 {{ formatNum(analytics.uv.today) }} · 本周 {{ formatNum(analytics.uv.thisWeek) }}</div>
               </div>
-              <div class="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-3">
-                <div class="text-[10px] lg:text-xs text-slate-500 dark:text-slate-400 mb-0.5">项目点击</div>
-                <div class="text-lg lg:text-2xl font-bold text-slate-900 dark:text-white">{{ formatNum(analytics.clicks.total) }}</div>
+              <div class="bg-card/50 rounded-xl p-2.5 sm:p-3">
+                <div class="text-[10px] lg:text-xs text-muted-foreground mb-0.5">项目点击</div>
+                <div class="text-base sm:text-lg lg:text-2xl font-bold text-foreground">{{ formatNum(analytics.clicks.total) }}</div>
                 <div class="text-[10px] text-slate-400 mt-0.5">今日 {{ formatNum(analytics.clicks.today) }}</div>
               </div>
-              <div class="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-3">
-                <div class="text-[10px] lg:text-xs text-slate-500 dark:text-slate-400 mb-0.5">搜索次数</div>
-                <div class="text-lg lg:text-2xl font-bold text-slate-900 dark:text-white">{{ formatNum(analytics.searches.total) }}</div>
+              <div class="bg-card/50 rounded-xl p-2.5 sm:p-3">
+                <div class="text-[10px] lg:text-xs text-muted-foreground mb-0.5">搜索次数</div>
+                <div class="text-base sm:text-lg lg:text-2xl font-bold text-foreground">{{ formatNum(analytics.searches.total) }}</div>
                 <div class="text-[10px] text-slate-400 mt-0.5">今日 {{ formatNum(analytics.searches.today) }}</div>
               </div>
             </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
               <div>
-                <h4 class="font-semibold text-xs lg:text-sm mb-2 text-slate-700 dark:text-slate-300">浏览趋势</h4>
-                <div class="h-48 lg:h-56">
+                <h4 class="font-semibold text-xs lg:text-sm mb-2 text-muted-foreground">浏览趋势</h4>
+                <div class="h-40 sm:h-48 lg:h-56">
                   <VChart :option="pvTrendOption" autoresize class="w-full h-full" />
                 </div>
               </div>
               <div>
-                <h4 class="font-semibold text-xs lg:text-sm mb-2 text-slate-700 dark:text-slate-300">页面热力图</h4>
-                <div class="h-48 lg:h-56">
+                <h4 class="font-semibold text-xs lg:text-sm mb-2 text-muted-foreground">页面热力图</h4>
+                <div class="h-40 sm:h-48 lg:h-56">
                   <VChart :option="heatmapOption" autoresize class="w-full h-full" />
                 </div>
               </div>
             </div>
           </div>
 
-          <div v-else-if="analyticsError" class="text-center py-12 text-rose-500 dark:text-rose-400 text-sm">{{ analyticsError }}</div>
-          <div v-else class="text-center py-12 text-slate-400 text-sm">暂无分析数据</div>
+          <div v-else-if="analyticsError" class="text-center py-10 sm:py-12 text-rose-500 dark:text-rose-400 text-sm">{{ analyticsError }}</div>
+          <div v-else class="text-center py-10 sm:py-12 text-slate-400 text-sm">暂无分析数据</div>
       </div>
       </LazySection>
 
       <LazySection v-if="hasCapability('story:manage') && data.stories?.recent?.length" @visible="visibleSections.stories = true">
-        <div v-if="visibleSections.stories" class="bg-white/72 dark:bg-slate-900/62 backdrop-blur-lg rounded-3xl border border-white/70 dark:border-slate-700/70 shadow-xl shadow-slate-900/8 dark:shadow-black/30 overflow-hidden">
-          <div class="px-4 lg:px-5 py-3 lg:py-4 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
+        <div v-if="visibleSections.stories" class="bg-white/72 dark:bg-slate-900/62 backdrop-blur-lg rounded-2xl sm:rounded-3xl border border-white/70 dark:border-slate-700/70 shadow-xl shadow-slate-900/8 dark:shadow-black/30 overflow-hidden">
+          <div class="px-3 sm:px-4 lg:px-5 py-2.5 sm:py-3 lg:py-4 border-b border-border flex items-center justify-between">
             <h3 class="font-bold text-sm lg:text-base flex items-center gap-2"><FileText class="w-4 h-4 text-blue-500" />最近文章</h3>
             <router-link to="/admin/stories" class="text-xs text-emerald-600 dark:text-emerald-400 font-medium">全部 →</router-link>
           </div>
           <div class="divide-y divide-slate-100 dark:divide-slate-700">
-            <router-link v-for="story in data.stories.recent" :key="story.id" to="/admin/stories" class="flex items-center gap-3 px-4 lg:px-5 py-3 active:bg-slate-100 dark:active:bg-slate-700 transition-colors">
-              <div v-if="story.cover" class="w-12 h-12 lg:w-14 lg:h-14 rounded-lg lg:rounded-xl overflow-hidden flex-shrink-0 bg-slate-100 dark:bg-slate-700">
+            <router-link v-for="story in data.stories.recent" :key="story.id" to="/admin/stories" class="flex items-center gap-3 px-3 sm:px-4 lg:px-5 py-3 active:bg-slate-100 dark:active:bg-slate-700 transition-colors min-h-[56px]">
+              <div v-if="story.cover" class="w-12 h-12 lg:w-14 lg:h-14 rounded-lg lg:rounded-xl overflow-hidden flex-shrink-0 bg-secondary">
                 <img :src="story.cover" :alt="story.title" class="w-full h-full object-cover" loading="lazy" decoding="async" />
               </div>
               <div v-else class="w-12 h-12 lg:w-14 lg:h-14 rounded-lg lg:rounded-xl flex-shrink-0 bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/40 dark:to-indigo-900/40 flex items-center justify-center">
                 <FileText class="w-5 h-5 text-blue-400" />
               </div>
               <div class="flex-1 min-w-0">
-                <div class="font-semibold text-sm truncate text-slate-900 dark:text-white">{{ story.title }}</div>
+                <div class="font-semibold text-sm truncate text-foreground">{{ story.title }}</div>
                 <div class="text-xs text-slate-400 mt-0.5">
                   <span v-if="story.author">{{ story.author }}</span>
                   <span v-if="story.author && story.created_at"> · </span>
@@ -125,24 +125,24 @@
       </LazySection>
 
       <LazySection v-if="hasCapability('project:read') && data.projects?.recent?.length" @visible="visibleSections.projects = true">
-        <div v-if="visibleSections.projects" class="bg-white/72 dark:bg-slate-900/62 backdrop-blur-lg rounded-3xl border border-white/70 dark:border-slate-700/70 shadow-xl shadow-slate-900/8 dark:shadow-black/30 overflow-hidden">
-          <div class="px-4 lg:px-5 py-3 lg:py-4 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
+        <div v-if="visibleSections.projects" class="bg-white/72 dark:bg-slate-900/62 backdrop-blur-lg rounded-2xl sm:rounded-3xl border border-white/70 dark:border-slate-700/70 shadow-xl shadow-slate-900/8 dark:shadow-black/30 overflow-hidden">
+          <div class="px-3 sm:px-4 lg:px-5 py-2.5 sm:py-3 lg:py-4 border-b border-border flex items-center justify-between">
             <h3 class="font-bold text-sm lg:text-base flex items-center gap-2"><Package class="w-4 h-4 text-blue-500" />最近项目</h3>
             <router-link to="/admin/projects" class="text-xs text-emerald-600 dark:text-emerald-400 font-medium">全部 →</router-link>
           </div>
           <div class="divide-y divide-slate-100 dark:divide-slate-700">
-            <router-link v-for="proj in data.projects.recent" :key="proj.slug" to="/admin/projects" class="flex items-center gap-3 px-4 lg:px-5 py-3 active:bg-slate-100 dark:active:bg-slate-700 transition-colors">
-              <div class="w-9 h-9 lg:w-10 lg:h-10 rounded-lg lg:rounded-xl overflow-hidden flex-shrink-0 bg-slate-100 dark:bg-slate-700">
+            <router-link v-for="proj in data.projects.recent" :key="proj.slug" to="/admin/projects" class="flex items-center gap-3 px-3 sm:px-4 lg:px-5 py-3 active:bg-slate-100 dark:active:bg-slate-700 transition-colors min-h-[56px]">
+              <div class="w-9 h-9 lg:w-10 lg:h-10 rounded-lg lg:rounded-xl overflow-hidden flex-shrink-0 bg-secondary">
                 <img v-if="proj.icon" :src="proj.icon" :alt="proj.name" class="w-full h-full object-cover" loading="lazy" decoding="async" />
                 <div v-else class="w-full h-full flex items-center justify-center text-slate-400"><Package class="w-4 h-4" /></div>
               </div>
               <div class="flex-1 min-w-0">
-                <div class="font-semibold text-sm truncate text-slate-900 dark:text-white">{{ proj.name }}</div>
+                <div class="font-semibold text-sm truncate text-foreground">{{ proj.name }}</div>
                 <div class="text-xs text-slate-400 mt-0.5 truncate">{{ proj.description || proj.developer }}</div>
               </div>
               <div class="hidden sm:flex items-center gap-2 flex-shrink-0">
                 <span v-if="proj.stars" class="text-xs text-amber-500 font-medium">⭐ {{ proj.stars }}</span>
-                <span v-if="proj.language" class="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-500 font-mono">{{ proj.language }}</span>
+                <span v-if="proj.language" class="text-[10px] px-1.5 py-0.5 rounded bg-secondary text-slate-500 font-mono">{{ proj.language }}</span>
               </div>
             </router-link>
           </div>
@@ -150,34 +150,36 @@
       </LazySection>
 
       <LazySection v-if="hasCapability('submission:read') && data.pendingSubmissions?.recent?.length" @visible="visibleSections.submissions = true">
-        <div v-if="visibleSections.submissions" class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
-          <div class="px-4 lg:px-5 py-3 lg:py-4 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
+        <div v-if="visibleSections.submissions" class="bg-card rounded-xl sm:rounded-2xl border border-border shadow-sm overflow-hidden">
+          <div class="px-3 sm:px-4 lg:px-5 py-2.5 sm:py-3 lg:py-4 border-b border-border flex items-center justify-between">
             <h3 class="font-bold text-sm lg:text-base flex items-center gap-2"><ClipboardCheck class="w-4 h-4 text-amber-500" />最近提交</h3>
             <router-link to="/admin/review?tab=projects" class="text-xs text-emerald-600 dark:text-emerald-400 font-medium">全部 →</router-link>
           </div>
           <div class="divide-y divide-slate-100 dark:divide-slate-700">
-            <router-link v-for="sub in data.pendingSubmissions.recent" :key="sub.id" to="/admin/review?tab=projects" class="flex items-center gap-3 px-4 lg:px-5 py-3 active:bg-slate-100 dark:active:bg-slate-700 transition-colors">
+            <router-link v-for="sub in data.pendingSubmissions.recent" :key="sub.id" to="/admin/review?tab=projects" class="flex items-center gap-3 px-3 sm:px-4 lg:px-5 py-3 active:bg-slate-100 dark:active:bg-slate-700 transition-colors min-h-[56px]">
               <div class="w-9 h-9 rounded-lg flex-shrink-0 flex items-center justify-center" :class="sub.status === 'pending' ? 'bg-amber-100 dark:bg-amber-500/20' : sub.status === 'approved' ? 'bg-emerald-100 dark:bg-emerald-500/20' : 'bg-rose-100 dark:bg-rose-500/20'">
                 <ClipboardCheck class="w-4 h-4" :class="sub.status === 'pending' ? 'text-amber-500' : sub.status === 'approved' ? 'text-emerald-500' : 'text-rose-500'" />
               </div>
               <div class="flex-1 min-w-0">
-                <div class="font-semibold text-sm truncate text-slate-900 dark:text-white">{{ sub.payload?.name || '未命名提交' }}</div>
+                <div class="font-semibold text-sm truncate text-foreground">{{ sub.payload?.name || '未命名提交' }}</div>
                 <div class="text-xs text-slate-400 mt-0.5">{{ sub.payload?.developer || '' }} · {{ formatTime(sub.created_at) }}</div>
               </div>
-              <ui-StatusBadge :status="sub.status" />
+              <Badge :variant="getStatusConfig(sub.status).variant" :class="getStatusConfig(sub.status).class">
+                {{ getStatusConfig(sub.status).label }}
+              </Badge>
             </router-link>
           </div>
         </div>
       </LazySection>
 
       <LazySection v-if="hasCapability('media:read') && data.media?.recent?.length" @visible="visibleSections.media = true">
-        <div v-if="visibleSections.media" class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
-          <div class="px-4 lg:px-5 py-3 lg:py-4 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
+        <div v-if="visibleSections.media" class="bg-card rounded-xl sm:rounded-2xl border border-border shadow-sm overflow-hidden">
+          <div class="px-3 sm:px-4 lg:px-5 py-2.5 sm:py-3 lg:py-4 border-b border-border flex items-center justify-between">
             <h3 class="font-bold text-sm lg:text-base flex items-center gap-2"><ImageIcon class="w-4 h-4 text-emerald-500" />最近上传</h3>
             <router-link to="/admin/media" class="text-xs text-emerald-600 dark:text-emerald-400 font-medium">全部 →</router-link>
           </div>
-          <div class="p-3 lg:p-4 grid grid-cols-3 lg:grid-cols-6 gap-2 lg:gap-3">
-            <div v-for="img in mobileMedia" :key="img.id" class="aspect-square rounded-lg lg:rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-700">
+          <div class="p-2.5 sm:p-3 lg:p-4 grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-2 sm:gap-3">
+            <div v-for="img in mobileMedia" :key="img.id" class="aspect-square rounded-lg lg:rounded-xl overflow-hidden bg-secondary">
               <img :src="img.url" alt="" class="w-full h-full object-cover" loading="lazy" decoding="async" />
             </div>
           </div>
@@ -185,19 +187,19 @@
       </LazySection>
 
       <LazySection v-if="hasCapability('user:read') && data.users?.recent?.length" @visible="visibleSections.users = true">
-        <div v-if="visibleSections.users" class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
-          <div class="px-4 lg:px-5 py-3 lg:py-4 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
+        <div v-if="visibleSections.users" class="bg-card rounded-xl sm:rounded-2xl border border-border shadow-sm overflow-hidden">
+          <div class="px-3 sm:px-4 lg:px-5 py-2.5 sm:py-3 lg:py-4 border-b border-border flex items-center justify-between">
             <h3 class="font-bold text-sm lg:text-base flex items-center gap-2"><Users class="w-4 h-4 text-teal-500" />最近用户</h3>
             <router-link to="/admin/users" class="text-xs text-emerald-600 dark:text-emerald-400 font-medium">全部 →</router-link>
           </div>
           <div class="divide-y divide-slate-100 dark:divide-slate-700">
-            <router-link v-for="u in data.users.recent" :key="u.id" to="/admin/users" class="flex items-center gap-3 px-4 lg:px-5 py-2.5 active:bg-slate-100 dark:active:bg-slate-700 transition-colors">
-              <div class="w-7 h-7 rounded-full overflow-hidden bg-slate-100 dark:bg-slate-700 flex-shrink-0">
+            <router-link v-for="u in data.users.recent" :key="u.id" to="/admin/users" class="flex items-center gap-3 px-3 sm:px-4 lg:px-5 py-2.5 active:bg-slate-100 dark:active:bg-slate-700 transition-colors min-h-[48px]">
+              <div class="w-7 h-7 rounded-full overflow-hidden bg-secondary flex-shrink-0">
                 <img v-if="u.avatar_url" :src="u.avatar_url" :alt="u.name" class="w-full h-full object-cover" loading="lazy" decoding="async" />
                 <div v-else class="w-full h-full flex items-center justify-center text-[10px] font-bold text-slate-400">{{ (u.name || '?')[0].toUpperCase() }}</div>
               </div>
-              <span class="font-medium text-sm text-slate-900 dark:text-white flex-1 min-w-0 truncate">{{ u.name }}</span>
-              <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-500 font-medium flex-shrink-0">{{ u.role }}</span>
+              <span class="font-medium text-sm text-foreground flex-1 min-w-0 truncate">{{ u.name }}</span>
+              <span class="text-[10px] px-1.5 py-0.5 rounded bg-secondary text-slate-500 font-medium flex-shrink-0">{{ u.role }}</span>
               <span class="text-xs text-slate-400 flex-shrink-0 hidden sm:inline">{{ formatTime(u.created_at) }}</span>
             </router-link>
           </div>
@@ -205,19 +207,19 @@
       </LazySection>
 
       <LazySection v-if="hasCapability('feedback:manage') && data.openFeedback?.recent?.length" @visible="visibleSections.feedback = true">
-        <div v-if="visibleSections.feedback" class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
-          <div class="px-4 lg:px-5 py-3 lg:py-4 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
+        <div v-if="visibleSections.feedback" class="bg-card rounded-xl sm:rounded-2xl border border-border shadow-sm overflow-hidden">
+          <div class="px-3 sm:px-4 lg:px-5 py-2.5 sm:py-3 lg:py-4 border-b border-border flex items-center justify-between">
             <h3 class="font-bold text-sm lg:text-base flex items-center gap-2"><MessageSquare class="w-4 h-4 text-purple-500" />最近反馈</h3>
             <router-link to="/admin/review?tab=bugs" class="text-xs text-emerald-600 dark:text-emerald-400 font-medium">全部 →</router-link>
           </div>
           <div class="divide-y divide-slate-100 dark:divide-slate-700">
-            <router-link v-for="fb in data.openFeedback.recent" :key="fb.id" to="/admin/review?tab=bugs" class="flex items-start gap-2.5 px-4 lg:px-5 py-2.5 active:bg-slate-100 dark:active:bg-slate-700 transition-colors">
+            <router-link v-for="fb in data.openFeedback.recent" :key="fb.id" to="/admin/review?tab=bugs" class="flex items-start gap-2.5 px-3 sm:px-4 lg:px-5 py-2.5 active:bg-slate-100 dark:active:bg-slate-700 transition-colors min-h-[48px]">
               <div class="w-7 h-7 rounded-lg flex-shrink-0 flex items-center justify-center mt-0.5" :class="fb.kind === 'bug' ? 'bg-rose-100 dark:bg-rose-500/20' : 'bg-blue-100 dark:bg-blue-500/20'">
                 <Bug v-if="fb.kind === 'bug'" class="w-3.5 h-3.5 text-rose-500" />
                 <MessageSquare v-else class="w-3.5 h-3.5 text-blue-500" />
               </div>
               <div class="flex-1 min-w-0">
-                <div class="font-semibold text-sm text-slate-900 dark:text-white truncate">{{ fb.title || fb.body?.slice(0, 50) || '无标题' }}</div>
+                <div class="font-semibold text-sm text-foreground truncate">{{ fb.title || fb.body?.slice(0, 50) || '无标题' }}</div>
                 <div class="text-xs text-slate-400 mt-0.5">{{ fb.project_name }} · {{ fb.actor_username }}</div>
               </div>
             </router-link>
@@ -226,25 +228,25 @@
       </LazySection>
 
       <LazySection v-if="hasCapability('audit:read') && data.recentActivity?.length" @visible="visibleSections.audit = true">
-        <div v-if="visibleSections.audit" class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
-          <div class="px-4 lg:px-5 py-3 lg:py-4 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
+        <div v-if="visibleSections.audit" class="bg-card rounded-xl sm:rounded-2xl border border-border shadow-sm overflow-hidden">
+          <div class="px-3 sm:px-4 lg:px-5 py-2.5 sm:py-3 lg:py-4 border-b border-border flex items-center justify-between">
             <h3 class="font-bold text-sm lg:text-base flex items-center gap-2"><ScrollText class="w-4 h-4 text-slate-400" />审计日志</h3>
             <router-link to="/admin/audit" class="text-xs text-emerald-600 dark:text-emerald-400 font-medium">全部 →</router-link>
           </div>
           <div class="divide-y divide-slate-100 dark:divide-slate-700">
-            <div v-for="(item, i) in data.recentActivity" :key="i" class="flex items-center gap-2.5 px-4 lg:px-5 py-2 text-sm">
+            <div v-for="(item, i) in data.recentActivity" :key="i" class="flex items-center gap-2.5 px-3 sm:px-4 lg:px-5 py-2 text-sm min-h-[40px]">
               <div class="w-5 h-5 rounded-full flex-shrink-0 flex items-center justify-center" :class="activityIconClass(item.action)">
                 <component :is="activityIcon(item.action)" class="w-3 h-3" />
               </div>
-              <span class="text-slate-700 dark:text-slate-300 font-medium text-xs">{{ item.actor }}</span>
-              <span class="text-slate-500 dark:text-slate-400 text-xs truncate">{{ item.action }}</span>
+              <span class="text-muted-foreground font-medium text-xs">{{ item.actor }}</span>
+              <span class="text-muted-foreground text-xs truncate">{{ item.action }}</span>
               <span class="text-slate-400 text-[10px] ml-auto whitespace-nowrap flex-shrink-0">{{ formatTime(item.created_at) }}</span>
             </div>
           </div>
         </div>
       </LazySection>
 
-      <ui-EmptyState v-if="!hasAnyData" :icon="LayoutDashboard" title="暂无数据" description="请检查权限配置" container-class="py-20" />
+      <ui-EmptyState v-if="!hasAnyData" :icon="LayoutDashboard" title="暂无数据" description="请检查权限配置" container-class="py-16 sm:py-20" />
     </template>
   </div>
 </template>
@@ -253,7 +255,8 @@
 import { ref, onMounted, computed, reactive, defineComponent, h, onBeforeUnmount } from 'vue';
 import { useAuth } from '../../composables/useAuth';
 import { adminFetch, formatBytes } from '../../composables/useAdminFetch';
-import { LoadingSpinner as uiLoadingSpinner, EmptyState as uiEmptyState, StatusBadge as uiStatusBadge } from '../../components/ui';
+import { LoadingSpinner as uiLoadingSpinner, EmptyState as uiEmptyState } from '../../components/ui';
+import { Badge, getStatusConfig } from '../../components/ui/badge';
 import DashboardCard from '../../components/admin/DashboardCard.vue';
 import { Package, ClipboardCheck, Shield, MessageSquare, Users, Image as ImageIcon, FileText, ScrollText, LayoutDashboard, Bug, Eye, Trash2, Edit3, Plus, CheckCircle, XCircle, BarChart3 } from 'lucide-vue-next';
 import * as echarts from 'echarts/core';
@@ -441,7 +444,7 @@ const activityIconClass = (action: string) => {
   if (action.includes('delete') || action.includes('remove')) return 'bg-rose-100 dark:bg-rose-500/20 text-rose-500';
   if (action.includes('approve')) return 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-500';
   if (action.includes('reject')) return 'bg-amber-100 dark:bg-amber-500/20 text-amber-500';
-  return 'bg-slate-100 dark:bg-slate-700 text-slate-400';
+  return 'bg-secondary text-slate-400';
 };
 
 onMounted(async () => {

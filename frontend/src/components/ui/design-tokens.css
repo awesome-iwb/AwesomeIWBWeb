@@ -45,6 +45,35 @@
   --color-danger: #f43f5e;
   --color-info: #3b82f6;
   --color-special: #a855f7;
+
+  /* G2 连续圆角系统 */
+  --radius-sm-g2: 0.625rem;
+  --radius-md-g2: 1rem;
+  --radius-lg-g2: 1.5rem;
+  --radius-btn-g2: 0.625rem;
+  --radius-btn-lg-g2: 0.875rem;
+  --radius-input-g2: 0.75rem;
+
+  /* 间距系统 */
+  --space-xs: 0.25rem;
+  --space-sm: 0.5rem;
+  --space-md: 1rem;
+  --space-lg: 1.5rem;
+  --space-xl: 2rem;
+  --space-2xl: 3rem;
+
+  /* 触控规范 */
+  --touch-min-height: 2.75rem;
+  --touch-min-width: 2.75rem;
+  --touch-btn-height: 3rem;
+  --touch-input-height: 3rem;
+
+  /* 背景悬停色 */
+  --color-bg-hover: #f1f5f9;
+
+  /* 字体层级 */
+  --font-size-mobile-base: 1rem;
+  --font-size-desktop-base: 0.875rem;
 }
 
 [data-brand="dev"] {
@@ -72,4 +101,5 @@
   --color-text-primary: #ffffff;
   --color-text-secondary: #94a3b8;
   --color-text-tertiary: #64748b;
+  --color-bg-hover: #1e293b;
 }

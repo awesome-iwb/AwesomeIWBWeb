@@ -29,40 +29,35 @@
         <div v-else-if="error" class="p-3 rounded-xl bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-300 text-sm">
           {{ error }}
         </div>
-        <div v-else class="space-y-2">
-          <button
+        <div v-else class="space-y-1.5">
+          <div
             v-for="l in auditPage.items"
             :key="l.id"
-            type="button"
-            class="w-full text-left p-3 rounded-xl border transition-all duration-200 flex gap-3"
+            class="w-full text-left p-3 rounded-xl border cursor-pointer transition-all duration-200 flex gap-3"
             :class="selectedLogId === l.id
-              ? 'bg-emerald-500 text-white border-emerald-500 shadow-md shadow-emerald-500/20'
-              : 'bg-slate-50 dark:bg-slate-900/50 border-transparent hover:border-emerald-300'"
+              ? 'bg-[var(--color-brand-50)] dark:bg-[var(--color-brand-500)]/10 border-l-[3px] border-l-[var(--color-brand-500)] border-y border-r border-transparent'
+              : 'bg-card/50 border-transparent hover:bg-accent/80'"
             @click="selectLog(l)"
           >
             <div
               class="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-              :class="selectedLogId === l.id ? 'bg-white/20' : present(l).iconClass"
+              :class="present(l).iconClass"
             >
               <component :is="present(l).icon" class="w-4 h-4" />
             </div>
             <div class="flex-1 min-w-0">
-              <div class="font-bold text-sm truncate">{{ present(l).title }}</div>
-              <div
-                class="text-xs mt-0.5 truncate"
-                :class="selectedLogId === l.id ? 'text-white/80' : 'text-slate-500 dark:text-slate-400'"
-              >
+              <div class="font-medium text-sm truncate text-foreground">{{ present(l).title }}</div>
+              <div class="text-xs text-muted-foreground truncate mt-0.5">
                 {{ present(l).actorLabel }} · {{ formatDateTime(l.created_at) }}
               </div>
               <div
                 v-if="present(l).changeLines[0]"
-                class="text-xs mt-1 truncate"
-                :class="selectedLogId === l.id ? 'text-white/70' : 'text-slate-400'"
+                class="text-xs text-slate-400 truncate mt-0.5"
               >
                 {{ present(l).changeLines[0] }}
               </div>
             </div>
-          </button>
+          </div>
           <ui-EmptyState v-if="auditPage.items.length === 0" :icon="ScrollText" title="暂无日志" />
         </div>
       </template>
@@ -71,9 +66,9 @@
         <div
           v-if="selectedLog"
           :key="selectedLog.id"
-          class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden"
+          class="bg-card rounded-2xl border border-border shadow-sm overflow-hidden"
         >
-          <div class="p-4 lg:p-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50">
+          <div class="p-4 lg:p-6 border-b border-border bg-accent/50 dark:bg-slate-900/50">
             <div class="flex items-start gap-4">
               <div
                 class="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0"
@@ -82,22 +77,22 @@
                 <component :is="present(selectedLog).icon" class="w-6 h-6" />
               </div>
               <div class="flex-1 min-w-0">
-                <h2 class="text-lg lg:text-xl font-bold text-slate-900 dark:text-white leading-snug">
+                <h2 class="text-lg lg:text-xl font-bold text-foreground leading-snug">
                   {{ present(selectedLog).title }}
                 </h2>
-                <p class="text-sm text-slate-600 dark:text-slate-300 mt-1">
+                <p class="text-sm text-muted-foreground mt-1">
                   {{ present(selectedLog).subtitle }}
                 </p>
-                <div class="flex flex-wrap items-center gap-2 mt-3 text-xs text-slate-500 dark:text-slate-400">
-                  <span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-700/80">
+                <div class="flex flex-wrap items-center gap-2 mt-3 text-xs text-muted-foreground">
+                  <span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-secondary/80">
                     <User class="w-3.5 h-3.5" />
                     {{ present(selectedLog).actorLabel }}
                   </span>
-                  <span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-700/80">
+                  <span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-secondary/80">
                     <Clock class="w-3.5 h-3.5" />
                     {{ formatDateTime(selectedLog.created_at) }}
                   </span>
-                  <span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-700/80">
+                  <span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-secondary/80">
                     <component :is="entityTypeIcon(selectedLog.entity_type)" class="w-3.5 h-3.5" />
                     {{ present(selectedLog).objectLabel }}
                   </span>
@@ -108,26 +103,26 @@
 
           <div class="p-4 lg:p-6 space-y-5">
             <section v-if="present(selectedLog).changeLines.length">
-              <h3 class="text-sm font-extrabold text-slate-800 dark:text-slate-200 mb-2">变更摘要</h3>
+              <h3 class="text-sm font-extrabold text-foreground mb-2">变更摘要</h3>
               <ul class="space-y-2">
                 <li
                   v-for="(line, i) in present(selectedLog).changeLines"
                   :key="i"
-                  class="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-200 p-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-700"
+                  class="flex items-start gap-2 text-sm text-foreground p-3 rounded-xl bg-card/50 border border-border"
                 >
                   <Pencil class="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
                   <span>{{ line }}</span>
                 </li>
               </ul>
             </section>
-            <section v-else class="text-sm text-slate-500 dark:text-slate-400 py-2">
+            <section v-else class="text-sm text-muted-foreground py-2">
               本条记录未包含结构化变更字段，可展开下方技术详情查看原始数据。
             </section>
 
-            <section class="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+            <section class="rounded-xl border border-border overflow-hidden">
               <button
                 type="button"
-                class="w-full flex items-center justify-between gap-2 px-4 py-3 text-sm font-bold text-slate-700 dark:text-slate-200 bg-slate-50 dark:bg-slate-900/50 hover:bg-slate-100 dark:hover:bg-slate-900 transition-colors"
+                class="w-full flex items-center justify-between gap-2 px-4 py-3 text-sm font-bold text-foreground bg-card/50 hover:bg-accent transition-colors"
                 @click="showTechnical = !showTechnical"
               >
                 <span class="inline-flex items-center gap-2">
@@ -136,7 +131,7 @@
                 </span>
                 <ChevronDown class="w-4 h-4 transition-transform duration-200" :class="showTechnical ? 'rotate-180' : ''" />
               </button>
-              <div v-show="showTechnical" class="p-4 border-t border-slate-200 dark:border-slate-700 bg-slate-950 text-slate-200 text-xs font-mono overflow-x-auto max-h-80 overflow-y-auto">
+              <div v-show="showTechnical" class="p-4 border-t border-border bg-slate-950 text-slate-200 text-xs font-mono overflow-x-auto max-h-80 overflow-y-auto">
                 <pre class="whitespace-pre-wrap break-all">{{ formatAuditDiffJson(selectedLog.diff) }}</pre>
                 <div class="mt-3 pt-3 border-t border-slate-700 text-slate-400 space-y-1">
                   <div>action: {{ selectedLog.action }}</div>
@@ -152,7 +147,7 @@
     </template>
 
     <template #empty-detail>
-      <div class="flex items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl min-h-[400px]">
+      <div class="flex items-center justify-center border-2 border-dashed border-border rounded-2xl min-h-[400px]">
         <div class="text-center px-6">
           <ScrollText class="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto mb-3" />
           <p class="text-slate-400 mb-2">从左侧选择一条审计记录</p>

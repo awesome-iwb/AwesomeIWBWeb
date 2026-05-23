@@ -3,31 +3,34 @@
     <ui-LoadingSpinner v-if="loading" brand="dev" />
 
     <template v-else-if="project">
-      <div class="flex items-center justify-between">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div class="flex items-center gap-3">
-          <ui-Avatar :src="project.icon" :name="project.name" size="md" rounded="default" />
+          <Avatar class="w-10 h-10 rounded-xl">
+            <AvatarImage :src="project.icon" :alt="project.name" />
+            <AvatarFallback>{{ project.name?.charAt(0)?.toUpperCase() || '?' }}</AvatarFallback>
+          </Avatar>
           <div>
-            <h2 class="text-lg font-bold text-slate-900 dark:text-white">{{ project.name }}</h2>
-            <div class="text-xs text-slate-400">{{ project.slug }}</div>
+            <h2 class="text-lg font-bold text-foreground">{{ project.name }}</h2>
+            <div class="text-xs text-muted-foreground">{{ project.slug }}</div>
           </div>
         </div>
-        <button v-if="hasCapability('dev:project_edit')" @click="saveProject" :disabled="isSaving" class="px-4 py-2 rounded-xl bg-blue-500 hover:bg-blue-600 text-white text-sm font-bold shadow-lg shadow-blue-500/20 transition-all disabled:opacity-50">
+        <button v-if="hasCapability('dev:project_edit')" @click="saveProject" :disabled="isSaving" class="px-4 py-3 sm:py-2 min-h-[48px] sm:min-h-[44px] rounded-xl bg-blue-500 hover:bg-blue-600 text-white text-sm font-bold shadow-lg shadow-blue-500/20 transition-all disabled:opacity-50">
           {{ isSaving ? '保存中...' : '保存修改' }}
         </button>
       </div>
 
-      <div v-if="hasCapability('dev:project_edit')" class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
-        <div class="p-4 lg:p-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50">
-          <h3 class="font-bold text-sm text-slate-700 dark:text-slate-300">项目信息</h3>
+      <div v-if="hasCapability('dev:project_edit')" class="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
+        <div class="p-4 sm:p-6 border-b border-border bg-accent/50 dark:bg-slate-900/50">
+          <h3 class="font-bold text-sm text-muted-foreground">项目信息</h3>
         </div>
-        <div class="p-4 lg:p-6 space-y-4">
+        <div class="p-4 sm:p-6 space-y-4">
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div>
-              <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">软件名称</label>
-              <input type="text" v-model="draft.name" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-blue-500 text-base" />
+              <label class="block text-sm font-bold text-muted-foreground mb-2">软件名称</label>
+              <input type="text" v-model="draft.name" class="w-full px-4 py-3 sm:py-2.5 rounded-xl border border-border bg-card outline-none focus:border-blue-500 text-base sm:text-sm min-h-[48px]" />
             </div>
             <div class="space-y-1">
-              <label class="block text-sm font-bold text-slate-700 dark:text-slate-300">主要开发者（平台账号）</label>
+              <label class="block text-sm font-bold text-muted-foreground">主要开发者（平台账号）</label>
               <SearchSelect
                 v-if="canEditPrimaryDeveloper"
                 :key="`lead-${projectId}`"
@@ -40,14 +43,14 @@
               />
               <div
                 v-else
-                class="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm text-slate-600 dark:text-slate-400"
+                class="px-4 py-3 sm:py-2.5 rounded-xl border border-border bg-card text-sm text-muted-foreground min-h-[48px] flex items-center"
               >
                 {{ project?.developer_user_name || project?.developer || '未指定' }}
               </div>
             </div>
           </div>
           <div class="space-y-1" v-if="hasCapability('dev:org_manage')">
-            <label class="block text-sm font-bold text-slate-700 dark:text-slate-300">所属组织</label>
+            <label class="block text-sm font-bold text-muted-foreground">所属组织</label>
             <SearchSelect
               :key="`org-${projectId}`"
               v-model="draft.organization_id"
@@ -58,64 +61,64 @@
             />
           </div>
           <div class="space-y-1" v-else>
-            <label class="block text-sm font-bold text-slate-700 dark:text-slate-300">所属组织</label>
-            <div class="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm text-slate-600 dark:text-slate-400">
+            <label class="block text-sm font-bold text-muted-foreground">所属组织</label>
+            <div class="px-4 py-3 sm:py-2.5 rounded-xl border border-border bg-card text-sm text-muted-foreground min-h-[48px] flex items-center">
               {{ project?.organization_name || '未指定' }}
             </div>
           </div>
           <div>
-            <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">简介</label>
-            <textarea v-model="draft.description" rows="3" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-blue-500 resize-none text-base"></textarea>
+            <label class="block text-sm font-bold text-muted-foreground mb-2">简介</label>
+            <textarea v-model="draft.description" rows="3" class="w-full px-4 py-3 sm:py-2.5 rounded-xl border border-border bg-card outline-none focus:border-blue-500 resize-none text-base sm:text-sm"></textarea>
           </div>
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div>
-              <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">GitHub 仓库</label>
-              <input type="text" v-model="draft.github_url" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-blue-500 text-base" />
+              <label class="block text-sm font-bold text-muted-foreground mb-2">GitHub 仓库</label>
+              <input type="text" v-model="draft.github_url" class="w-full px-4 py-3 sm:py-2.5 rounded-xl border border-border bg-card outline-none focus:border-blue-500 text-base sm:text-sm min-h-[48px]" />
             </div>
             <div>
-              <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">编程语言</label>
-              <input type="text" v-model="draft.language" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-blue-500 text-base" />
+              <label class="block text-sm font-bold text-muted-foreground mb-2">编程语言</label>
+              <input type="text" v-model="draft.language" class="w-full px-4 py-3 sm:py-2.5 rounded-xl border border-border bg-card outline-none focus:border-blue-500 text-base sm:text-sm min-h-[48px]" />
             </div>
           </div>
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div>
-              <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">状态</label>
-              <input type="text" v-model="draft.status" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-blue-500 text-base" />
+              <label class="block text-sm font-bold text-muted-foreground mb-2">状态</label>
+              <input type="text" v-model="draft.status" class="w-full px-4 py-3 sm:py-2.5 rounded-xl border border-border bg-card outline-none focus:border-blue-500 text-base sm:text-sm min-h-[48px]" />
             </div>
             <div>
-              <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">版本</label>
-              <input type="text" v-model="draft.version" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-blue-500 text-base" />
+              <label class="block text-sm font-bold text-muted-foreground mb-2">版本</label>
+              <input type="text" v-model="draft.version" class="w-full px-4 py-3 sm:py-2.5 rounded-xl border border-border bg-card outline-none focus:border-blue-500 text-base sm:text-sm min-h-[48px]" />
             </div>
           </div>
           <div>
-            <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">关键词（逗号分隔）</label>
-            <input type="text" v-model="draft.keywords" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-blue-500 text-base" />
+            <label class="block text-sm font-bold text-muted-foreground mb-2">关键词（逗号分隔）</label>
+            <input type="text" v-model="draft.keywords" class="w-full px-4 py-3 sm:py-2.5 rounded-xl border border-border bg-card outline-none focus:border-blue-500 text-base sm:text-sm min-h-[48px]" />
           </div>
         </div>
       </div>
 
       <div
         v-if="canEditOwnerAdminFields"
-        class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden"
+        class="bg-card rounded-2xl border border-border shadow-sm overflow-hidden"
       >
-        <div class="p-4 lg:p-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50">
-          <h3 class="font-bold text-sm text-slate-700 dark:text-slate-300">展示素材与扩展信息</h3>
-          <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">仅项目负责人且具备「项目管理者」权限时可编辑（图标、横幅、星级与备案相关 JSON 等）。</p>
+        <div class="p-4 sm:p-6 border-b border-border bg-accent/50 dark:bg-slate-900/50">
+          <h3 class="font-bold text-sm text-muted-foreground">展示素材与扩展信息</h3>
+          <p class="text-xs text-muted-foreground mt-1">仅项目负责人且具备「项目管理者」权限时可编辑（图标、横幅、星级与备案相关 JSON 等）。</p>
         </div>
-        <div class="p-4 lg:p-6 space-y-4">
+        <div class="p-4 sm:p-6 space-y-4">
           <ProjectMediaFields v-model:icon="draft.icon" v-model:banner="draft.banner" />
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div>
-              <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">AI 使用率标签</label>
-              <select v-model="draft.ai_usage_state" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-blue-500 text-base">
+              <label class="block text-sm font-bold text-muted-foreground mb-2">AI 使用率标签</label>
+              <select v-model="draft.ai_usage_state" class="w-full px-4 py-3 sm:py-2.5 rounded-xl border border-border bg-card outline-none focus:border-blue-500 text-base sm:text-sm min-h-[48px]">
                 <option value="unknown">未知</option>
                 <option value="under50">未超过 50%</option>
                 <option value="over50">超过 50%</option>
               </select>
             </div>
             <div>
-              <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">稳定性标签</label>
-              <select v-model="draft.recommendation" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-blue-500 text-base">
+              <label class="block text-sm font-bold text-muted-foreground mb-2">稳定性标签</label>
+              <select v-model="draft.recommendation" class="w-full px-4 py-3 sm:py-2.5 rounded-xl border border-border bg-card outline-none focus:border-blue-500 text-base sm:text-sm min-h-[48px]">
                 <option value="">无</option>
                 <option value="稳定">稳定</option>
                 <option value="不稳定">不稳定</option>
@@ -123,60 +126,67 @@
               </select>
             </div>
             <div class="lg:col-span-2">
-              <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Star 数量</label>
-              <input type="number" v-model.number="draft.stars" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-blue-500 text-base" />
+              <label class="block text-sm font-bold text-muted-foreground mb-2">Star 数量</label>
+              <input type="number" v-model.number="draft.stars" class="w-full px-4 py-3 sm:py-2.5 rounded-xl border border-border bg-card outline-none focus:border-blue-500 text-base sm:text-sm min-h-[48px]" />
             </div>
           </div>
           <div>
-            <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">扩展信息（JSON，可含备案图 URL 等）</label>
+            <label class="block text-sm font-bold text-muted-foreground mb-2">扩展信息（JSON，可含备案图 URL 等）</label>
             <textarea
               v-model="extraJsonText"
               rows="8"
-              class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:border-blue-500 font-mono text-sm"
+              class="w-full px-4 py-3 sm:py-2.5 rounded-xl border border-border bg-card outline-none focus:border-blue-500 font-mono text-sm"
               spellcheck="false"
             ></textarea>
           </div>
         </div>
       </div>
 
-      <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
-        <div class="p-4 lg:p-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50 flex items-center justify-between">
-          <h3 class="font-bold text-sm text-slate-700 dark:text-slate-300">项目成员</h3>
-          <button v-if="hasCapability('dev:project_admin')" @click="showAddMember = true" class="px-3 py-1.5 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-xs font-bold transition-colors">邀请协作者</button>
+      <div class="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
+        <div class="p-4 sm:p-6 border-b border-border bg-accent/50 dark:bg-slate-900/50 flex items-center justify-between">
+          <h3 class="font-bold text-sm text-muted-foreground">项目成员</h3>
+          <button v-if="hasCapability('dev:project_admin')" @click="showAddMember = true" class="px-3 py-2 min-h-[44px] rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-xs font-bold transition-colors">邀请协作者</button>
         </div>
-        <div class="p-4 lg:p-6 space-y-2">
-          <div v-if="members.length === 0" class="text-sm text-slate-400 text-center py-4">暂无成员</div>
-          <div v-for="m in members" :key="m.id || m.user_id" class="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-900/50">
-            <ui-Avatar :src="m.user_avatar_url" :name="m.user_name" size="sm" />
+        <div class="p-4 sm:p-6 space-y-2">
+          <div v-if="members.length === 0" class="text-sm text-muted-foreground text-center py-4">暂无成员</div>
+          <div v-for="m in members" :key="m.id || m.user_id" class="flex items-center gap-3 p-3 rounded-xl bg-card/50 min-h-[48px]">
+            <Avatar class="w-8 h-8">
+              <AvatarImage :src="m.user_avatar_url" :alt="m.user_name" />
+              <AvatarFallback>{{ m.user_name?.charAt(0)?.toUpperCase() || '?' }}</AvatarFallback>
+            </Avatar>
             <div class="flex-1 min-w-0">
-              <div class="text-sm font-bold text-slate-800 dark:text-white truncate">{{ m.user_name || m.user_id }}</div>
+              <div class="text-sm font-bold text-foreground truncate">{{ m.user_name || m.user_id }}</div>
             </div>
-            <span class="px-2 py-0.5 rounded text-xs font-bold" :class="m.role === 'owner' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400'">{{ m.role === 'owner' ? '负责人' : '协作者' }}</span>
-            <button v-if="hasCapability('dev:project_admin') && m.role !== 'owner'" @click="removeMember(m)" class="text-xs text-rose-500 hover:underline">移除</button>
-            <button v-if="hasCapability('dev:project_admin') && m.role !== 'owner'" @click="transferOwnership(m)" class="text-xs text-blue-500 hover:underline">转让</button>
-          </div>
-        </div>
-      </div>
-
-      <div v-if="showAddMember" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="showAddMember = false">
-        <div class="bg-white dark:bg-slate-800 rounded-2xl p-6 w-full max-w-md mx-4 shadow-xl">
-          <h3 class="font-bold text-lg text-slate-800 dark:text-white mb-4">邀请协作者</h3>
-          <SearchSelect
-            v-model="newMemberId"
-            :search-fn="searchProjectUsers"
-            placeholder="至少输入 1 个字符搜索用户"
-          />
-          <div class="flex gap-3 mt-4">
-            <button @click="addMember" :disabled="!newMemberId" class="flex-1 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-sm disabled:opacity-50 transition-colors">确认邀请</button>
-            <button @click="showAddMember = false; newMemberId = null" class="flex-1 px-4 py-2 rounded-xl bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-sm transition-colors">取消</button>
+            <span class="px-2 py-0.5 rounded text-xs font-bold" :class="m.role === 'owner' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' : 'bg-secondary text-muted-foreground'">{{ m.role === 'owner' ? '负责人' : '协作者' }}</span>
+            <button v-if="hasCapability('dev:project_admin') && m.role !== 'owner'" @click="removeMember(m)" class="text-xs text-rose-500 hover:underline px-2 py-1.5 min-h-[44px]">移除</button>
+            <button v-if="hasCapability('dev:project_admin') && m.role !== 'owner'" @click="transferOwnership(m)" class="text-xs text-blue-500 hover:underline px-2 py-1.5 min-h-[44px]">转让</button>
           </div>
         </div>
       </div>
     </template>
 
-    <div v-else class="text-center py-20 text-slate-400">
+    <div v-else class="text-center py-20 text-muted-foreground">
       <p class="text-sm">项目不存在或无权访问</p>
     </div>
+
+    <Dialog v-model:open="showAddMember">
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>邀请协作者</DialogTitle>
+        </DialogHeader>
+        <div class="space-y-4">
+          <SearchSelect
+            v-model="newMemberId"
+            :search-fn="searchProjectUsers"
+            placeholder="至少输入 1 个字符搜索用户"
+          />
+          <div class="flex gap-3">
+            <button @click="addMember" :disabled="!newMemberId" class="flex-1 px-4 py-3 min-h-[48px] rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-sm disabled:opacity-50 transition-colors">确认邀请</button>
+            <button @click="showAddMember = false; newMemberId = null" class="flex-1 px-4 py-3 min-h-[48px] rounded-xl bg-muted text-muted-foreground font-bold text-sm transition-colors">取消</button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   </div>
 </template>
 
@@ -188,7 +198,9 @@ import { API } from '../../api/endpoints';
 import { useAuth } from '../../composables/useAuth';
 import SearchSelect from '../../components/admin/SearchSelect.vue';
 import ProjectMediaFields from '../../components/shared/ProjectMediaFields.vue';
-import { LoadingSpinner as uiLoadingSpinner, Avatar as uiAvatar } from '../../components/ui';
+import { LoadingSpinner as uiLoadingSpinner } from '../../components/ui';
+import { Avatar, AvatarImage, AvatarFallback } from '../../components/ui/avatar';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 const route = useRoute();
 const { hasCapability, user: authUser } = useAuth();

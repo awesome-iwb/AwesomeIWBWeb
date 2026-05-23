@@ -1,0 +1,1 @@
+30 3 * * * root UPLOADS_SOURCE_DIR=/opt/awesomeiwb/backend/runtime/uploads /opt/awesomeiwb/deploy/backup-uploads.sh >> /var/log/awesomeiwb/backup.log 2>&1

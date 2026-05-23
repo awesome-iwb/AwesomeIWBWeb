@@ -13,45 +13,47 @@
     @back="selectedMediaId = null; mediaDraft = null"
   >
     <template #detail>
-      <div v-if="mediaDraft" class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col">
-        <div class="p-4 lg:p-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50">
+      <div v-if="mediaDraft" class="bg-card rounded-2xl border border-border shadow-sm overflow-hidden flex flex-col">
+        <div class="p-4 lg:p-6 border-b border-border bg-accent/50 dark:bg-slate-900/50">
           <div class="flex items-center gap-3">
             <div>
-              <h2 class="text-lg lg:text-xl font-bold text-slate-800 dark:text-white">媒体详情</h2>
-              <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">{{ mediaDraft.id }}</p>
+              <h2 class="text-lg lg:text-xl font-bold text-foreground">媒体详情</h2>
+              <p class="text-xs text-muted-foreground mt-1">{{ mediaDraft.id }}</p>
             </div>
           </div>
         </div>
         <div class="flex-1 overflow-y-auto p-4 lg:p-6 space-y-4">
           <div v-if="mediaError" class="p-3 rounded-xl bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-300 text-sm">{{ mediaError }}</div>
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div class="rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 p-4">
-              <img v-if="mediaDraft.url" :src="mediaDraft.url" class="w-full h-56 object-contain rounded-xl bg-white dark:bg-slate-800" />
-              <div v-else class="w-full h-56 rounded-xl bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-slate-500">无预览</div>
+            <div class="rounded-2xl border border-border bg-card/50 p-4">
+              <img v-if="mediaDraft.url" :src="mediaThumbUrl(mediaDraft.url, 400)" class="w-full h-56 object-contain rounded-xl bg-card" />
+              <div v-else class="w-full h-56 rounded-xl bg-muted flex items-center justify-center text-slate-500">无预览</div>
             </div>
             <div class="space-y-3">
-              <div class="text-sm"><span class="font-bold text-slate-700 dark:text-slate-300">URL：</span><a :href="mediaDraft.url" target="_blank" class="text-emerald-500 break-all hover:underline">{{ mediaDraft.url || '-' }}</a></div>
-              <div class="text-sm"><span class="font-bold text-slate-700 dark:text-slate-300">MIME：</span>{{ mediaDraft.mime || '-' }}</div>
-              <div class="text-sm"><span class="font-bold text-slate-700 dark:text-slate-300">大小：</span>{{ formatBytes(mediaDraft.size) }}</div>
-              <div class="text-sm"><span class="font-bold text-slate-700 dark:text-slate-300">状态：</span>{{ mediaDraft.deleted_at ? '已删除' : '正常' }}</div>
-              <div class="text-sm"><span class="font-bold text-slate-700 dark:text-slate-300">创建时间：</span>{{ formatDateTime(mediaDraft.created_at) }}</div>
+              <div class="text-sm"><span class="font-bold text-muted-foreground">URL：</span><a :href="mediaDraft.url" target="_blank" class="text-emerald-500 break-all hover:underline">{{ mediaDraft.url || '-' }}</a></div>
+              <div class="text-sm"><span class="font-bold text-muted-foreground">来源：</span>{{ sourceLabel(mediaDraft.source) }}</div>
+              <div class="text-sm"><span class="font-bold text-muted-foreground">MIME：</span>{{ mediaDraft.mime || '-' }}</div>
+              <div class="text-sm"><span class="font-bold text-muted-foreground">尺寸：</span>{{ formatDimensions(mediaDraft.width, mediaDraft.height) }}</div>
+              <div class="text-sm"><span class="font-bold text-muted-foreground">大小：</span>{{ formatBytes(mediaDraft.size) }}</div>
+              <div class="text-sm"><span class="font-bold text-muted-foreground">状态：</span>{{ mediaDraft.deleted_at ? '已删除' : '正常' }}</div>
+              <div class="text-sm"><span class="font-bold text-muted-foreground">创建时间：</span>{{ formatDateTime(mediaDraft.created_at) }}</div>
               <div class="text-sm">
-                <span class="font-bold text-slate-700 dark:text-slate-300">标签：</span>
+                <span class="font-bold text-muted-foreground">标签：</span>
                 <div class="mt-1">
                   <MediaTagInput v-model="mediaDraftTags" @update:model-value="saveMediaTags" />
                 </div>
               </div>
               <div class="text-sm">
-                <span class="font-bold text-slate-700 dark:text-slate-300">引用：</span>
+                <span class="font-bold text-muted-foreground">引用：</span>
                 <button @click="toggleInlineRefs" class="ml-2 text-emerald-500 hover:underline text-xs">
                   {{ showInlineRefs ? '收起引用' : `查看引用 (${inlineRefCount})` }}
                 </button>
               </div>
-              <div v-if="showInlineRefs" class="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 p-3 max-h-48 overflow-y-auto space-y-2">
+              <div v-if="showInlineRefs" class="rounded-xl border border-border bg-card/50 p-3 max-h-48 overflow-y-auto space-y-2">
                 <div v-if="inlineRefLoading" class="text-xs text-slate-400 text-center py-4">加载中...</div>
                 <div v-else-if="inlineRefs.length === 0" class="text-xs text-slate-400 text-center py-4">暂无引用</div>
-                <div v-else v-for="(refItem, idx) in inlineRefs" :key="idx" class="p-2 rounded-lg border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-950">
-                  <pre class="text-[10px] whitespace-pre-wrap break-words text-slate-700 dark:text-slate-200">{{ JSON.stringify(refItem, null, 2) }}</pre>
+                <div v-else v-for="(refItem, idx) in inlineRefs" :key="idx" class="p-2 rounded-lg border border-border bg-card">
+                  <pre class="text-[10px] whitespace-pre-wrap break-words text-foreground">{{ JSON.stringify(refItem, null, 2) }}</pre>
                 </div>
               </div>
               <div class="flex flex-wrap gap-2 pt-2">
@@ -65,7 +67,7 @@
     </template>
 
     <template #empty-detail>
-      <div class="flex items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl min-h-[400px]">
+      <div class="flex items-center justify-center border-2 border-dashed border-border rounded-2xl min-h-[400px]">
         <div class="text-center">
           <p class="text-slate-400 mb-2">从列表选择媒体文件</p>
         </div>
@@ -78,23 +80,35 @@
           v-model="mediaQuery.q"
           @keyup.enter="mediaQuery.page = 1; fetchMediaList()"
           type="text"
-          class="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-emerald-500 text-sm"
+          class="w-full px-3 py-2.5 rounded-xl border border-border bg-card outline-none focus:border-emerald-500 text-sm"
           placeholder="搜索 URL / MIME / 文件名"
         />
         <div class="grid grid-cols-2 gap-2">
           <select
             v-model="mediaQuery.status"
             @change="mediaQuery.page = 1; fetchMediaList()"
-            class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-emerald-500 text-sm"
+            class="w-full px-3 py-2 rounded-xl border border-border bg-card outline-none focus:border-emerald-500 text-sm"
           >
             <option value="all">全部状态</option>
             <option value="active">正常</option>
             <option value="deleted">已删除</option>
           </select>
           <select
+            v-model="mediaQuery.source"
+            @change="mediaQuery.page = 1; fetchMediaList()"
+            class="w-full px-3 py-2 rounded-xl border border-border bg-card outline-none focus:border-emerald-500 text-sm"
+          >
+            <option value="all">全部来源</option>
+            <option value="upload">通用素材</option>
+            <option value="avatar">用户头像</option>
+            <option value="project">项目媒体</option>
+          </select>
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <select
             v-model="mediaQuery.mime"
             @change="mediaQuery.page = 1; fetchMediaList()"
-            class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-emerald-500 text-sm"
+            class="w-full px-3 py-2 rounded-xl border border-border bg-card outline-none focus:border-emerald-500 text-sm"
           >
             <option value="">全部类型</option>
             <option value="image/png">image/png</option>
@@ -103,18 +117,18 @@
             <option value="image/gif">image/gif</option>
             <option value="image/svg+xml">image/svg+xml</option>
           </select>
+          <select
+            v-model="mediaQuery.tag"
+            @change="mediaQuery.page = 1; fetchMediaList()"
+            class="w-full px-3 py-2 rounded-xl border border-border bg-card outline-none focus:border-emerald-500 text-sm"
+          >
+            <option value="">全部标签</option>
+            <option v-for="t in allTags" :key="t" :value="t">{{ t }}</option>
+          </select>
         </div>
-        <select
-          v-model="mediaQuery.tag"
-          @change="mediaQuery.page = 1; fetchMediaList()"
-          class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-emerald-500 text-sm"
-        >
-          <option value="">全部标签</option>
-          <option v-for="t in allTags" :key="t" :value="t">{{ t }}</option>
-        </select>
         <div class="flex gap-2">
           <button @click="mediaQuery.page = 1; fetchMediaList()" class="flex-1 px-3 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold transition-colors">搜索</button>
-          <button @click="resetMediaQuery" class="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-sm font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">重置</button>
+          <button @click="resetMediaQuery" class="px-3 py-2 rounded-xl bg-secondary text-foreground text-sm font-bold hover:bg-accent transition-colors">重置</button>
         </div>
         <MediaBatchActions
           :selected-ids="selectedIds"
@@ -126,7 +140,7 @@
     </template>
 
     <template #list>
-      <div class="space-y-2">
+      <div class="space-y-1.5">
         <div v-if="mediaLoading" class="text-sm text-slate-400 text-center py-10">
           <ui-LoadingSpinner />
         </div>
@@ -135,7 +149,7 @@
           v-for="m in mediaPage.items"
           :key="m.id"
           class="p-3 rounded-xl border cursor-pointer transition-all duration-200 flex items-center gap-3"
-          :class="selectedMediaId === m.id ? 'bg-emerald-500 text-white border-emerald-500 shadow-md shadow-emerald-500/20' : 'bg-slate-50 dark:bg-slate-900/50 border-transparent hover:border-emerald-300'"
+          :class="selectedMediaId === m.id ? 'bg-[var(--color-brand-50)] dark:bg-[var(--color-brand-500)]/10 border-l-[3px] border-l-[var(--color-brand-500)] border-y border-r border-transparent' : 'bg-card/50 border-transparent hover:bg-accent/80'"
         >
           <input
             type="checkbox"
@@ -144,26 +158,27 @@
             class="w-4 h-4 rounded border-slate-300 text-emerald-500 focus:ring-emerald-500 shrink-0"
           />
           <div @click="selectMedia(m)" class="flex items-center gap-3 flex-1 min-w-0">
-            <img v-if="m.url" :src="m.url" class="w-8 h-8 rounded bg-white object-cover shrink-0" />
-            <div v-else class="w-8 h-8 rounded bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-xs font-bold text-slate-500 shrink-0">?</div>
+            <img v-if="m.url" :src="mediaThumbUrl(m.url, 128)" class="w-8 h-8 rounded bg-white object-cover shrink-0" />
+            <div v-else class="w-8 h-8 rounded bg-muted flex items-center justify-center text-xs font-bold text-slate-500 shrink-0">?</div>
             <div class="flex-1 min-w-0">
-              <div class="font-medium truncate text-sm">{{ m.mime || '未知类型' }}</div>
-              <div class="text-xs opacity-80 truncate">{{ m.url || '-' }}</div>
-              <div v-if="m.tags?.length" class="flex flex-wrap gap-1 mt-1">
+              <div class="font-medium text-sm truncate text-foreground flex items-center gap-2">
+                <span>{{ m.mime || '未知类型' }}</span>
+                <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-secondary text-muted-foreground">{{ sourceLabel(m.source) }}</span>
+              </div>
+              <div class="text-xs text-muted-foreground truncate mt-0.5">{{ m.url || '-' }}</div>
+              <div v-if="m.tags?.length" class="flex flex-wrap gap-1 mt-0.5">
                 <span
                   v-for="tag in m.tags.slice(0, 3)"
                   :key="tag"
-                  class="px-1.5 py-0 rounded-full text-[10px] font-medium"
-                  :class="selectedMediaId === m.id ? 'bg-emerald-400/30 text-white' : 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300'"
+                  class="px-1.5 py-0 rounded-full text-[10px] font-medium bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300"
                 >{{ tag }}</span>
                 <span v-if="m.tags.length > 3" class="text-[10px] opacity-60">+{{ m.tags.length - 3 }}</span>
               </div>
             </div>
             <span
-              v-if="m._refCount !== undefined"
-              class="text-[10px] px-1.5 py-0.5 rounded-full shrink-0"
-              :class="selectedMediaId === m.id ? 'bg-white/20 text-white' : 'bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-300'"
-            >{{ m._refCount }} 引用</span>
+              v-if="typeof m.ref_count === 'number'"
+              class="text-[10px] px-1.5 py-0.5 rounded-full shrink-0 bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-300"
+            >{{ m.ref_count }} 引用</span>
           </div>
         </div>
         <ui-EmptyState v-if="!mediaLoading && mediaPage.items.length === 0" title="暂无数据" />
@@ -172,18 +187,18 @@
   </ui-ListDetailLayout>
 
   <div v-if="showBatchTagDialog" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-    <div class="w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-2xl overflow-hidden">
-      <div class="p-6 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
-        <div class="text-xl font-extrabold text-slate-900 dark:text-white">批量打标签</div>
-        <button @click="showBatchTagDialog = false" class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold">关闭</button>
+    <div class="w-full max-w-md bg-card rounded-3xl border border-border shadow-2xl overflow-hidden">
+      <div class="p-6 border-b border-border flex items-center justify-between">
+        <div class="text-xl font-extrabold text-foreground">批量打标签</div>
+        <button @click="showBatchTagDialog = false" class="px-4 py-2 rounded-xl bg-secondary text-foreground font-bold">关闭</button>
       </div>
       <div class="p-6 space-y-4">
         <div>
-          <label class="text-sm font-bold text-slate-700 dark:text-slate-300 block mb-1">添加标签</label>
+          <label class="text-sm font-bold text-muted-foreground block mb-1">添加标签</label>
           <MediaTagInput v-model="batchTagsToAdd" />
         </div>
         <div>
-          <label class="text-sm font-bold text-slate-700 dark:text-slate-300 block mb-1">移除标签</label>
+          <label class="text-sm font-bold text-muted-foreground block mb-1">移除标签</label>
           <MediaTagInput v-model="batchTagsToRemove" />
         </div>
         <div v-if="batchTagError" class="p-3 rounded-xl bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-300 text-sm">{{ batchTagError }}</div>
@@ -201,6 +216,7 @@ import { adminFetch, formatAdminError, formatBytes, formatDateTime } from '../..
 import MediaTagInput from '../../components/admin/MediaTagInput.vue';
 import MediaBatchActions from '../../components/admin/MediaBatchActions.vue';
 import { ListDetailLayout as uiListDetailLayout, EmptyState as uiEmptyState, LoadingSpinner as uiLoadingSpinner } from '../../components/ui';
+import { Image as ImageIcon } from 'lucide-vue-next';
 
 onMounted(() => {
   fetchMediaList();
@@ -212,8 +228,9 @@ const mediaPage = ref<{ items: any[]; page: number; pageSize: number; total: num
   pageSize: 20,
   total: 0
 });
-const mediaQuery = ref<{ status: 'all' | 'active' | 'deleted'; q: string; page: number; pageSize: number; mime: string; tag: string }>({
+const mediaQuery = ref<{ status: 'all' | 'active' | 'deleted'; source: 'all' | 'upload' | 'avatar' | 'project'; q: string; page: number; pageSize: number; mime: string; tag: string }>({
   status: 'all',
+  source: 'upload',
   q: '',
   page: 1,
   pageSize: 20,
@@ -245,18 +262,47 @@ const mediaDraftTags = ref<string[]>([]);
 
 watch(mediaDraft, (draft) => {
   mediaDraftTags.value = Array.isArray(draft?.tags) ? [...draft.tags] : [];
+  inlineRefCount.value = typeof draft?.ref_count === 'number' ? draft.ref_count : 0;
   showInlineRefs.value = false;
   inlineRefs.value = [];
-  inlineRefCount.value = 0;
 }, { immediate: true });
 
 
+const sourceLabel = (source: unknown): string => {
+  const value = String(source ?? '').trim();
+  if (value === 'avatar') return '头像';
+  if (value === 'project') return '项目';
+  if (value === 'upload') return '素材';
+  return value || '未知';
+};
+
+const formatDimensions = (width: unknown, height: unknown): string => {
+  const w = Number(width);
+  const h = Number(height);
+  if (Number.isFinite(w) && w > 0 && Number.isFinite(h) && h > 0) return `${w} × ${h}`;
+  return '-';
+};
+
+const mediaThumbUrl = (url: unknown, width: number): string => {
+  const text = String(url ?? '').trim();
+  if (!text) return '';
+  if (!text.startsWith('/api/uploads/')) return text;
+  const joiner = text.includes('?') ? '&' : '?';
+  return `${text}${joiner}w=${width}`;
+};
+
+const normalizeMediaItem = (item: any) => ({
+  ...item,
+  ref_count: typeof item?.ref_count === 'number' ? item.ref_count : Number(item?.ref_count ?? 0),
+  tags: Array.isArray(item?.tags) ? item.tags : [],
+});
+
 const normalizeMediaPage = (json: any) => {
-  const items = Array.isArray(json?.items)
+  const items = (Array.isArray(json?.items)
     ? json.items
     : Array.isArray(json)
       ? json
-      : [];
+      : []).map(normalizeMediaItem);
   const page = Number(json?.page ?? mediaQuery.value.page ?? 1);
   const pageSize = Number(json?.pageSize ?? mediaQuery.value.pageSize ?? 20);
   const total = Number(json?.total ?? items.length ?? 0);
@@ -274,6 +320,7 @@ const fetchMediaList = async () => {
   try {
     const qs = new URLSearchParams();
     if (mediaQuery.value.status && mediaQuery.value.status !== 'all') qs.set('status', mediaQuery.value.status);
+    if (mediaQuery.value.source && mediaQuery.value.source !== 'all') qs.set('source', mediaQuery.value.source);
     if (mediaQuery.value.q.trim()) qs.set('q', mediaQuery.value.q.trim());
     if (mediaQuery.value.mime) qs.set('mime', mediaQuery.value.mime);
     if (mediaQuery.value.tag) qs.set('tag', mediaQuery.value.tag);
@@ -286,7 +333,6 @@ const fetchMediaList = async () => {
     }
     mediaPage.value = normalizeMediaPage(json);
     collectAllTags(mediaPage.value.items);
-    await fetchRefCountBatch(mediaPage.value.items);
   } catch (err: unknown) {
     mediaPage.value = { items: [], page: mediaQuery.value.page, pageSize: mediaQuery.value.pageSize, total: 0 };
     mediaError.value = formatAdminError({ message: err instanceof Error ? err.message : '' }, '获取媒体列表失败');
@@ -309,27 +355,11 @@ const collectAllTags = (items: any[]) => {
   allTags.value = Array.from(existing).sort();
 };
 
-const fetchRefCountBatch = async (items: any[]) => {
-  const promises = items.map(async (item) => {
-    try {
-      const res = await adminFetch(`/api/admin/media/${item.id}/references`);
-      if (res.ok) {
-        const json = await res.json().catch(() => ({}));
-        const refs = Array.isArray(json?.items) ? json.items : Array.isArray(json) ? json : [];
-        item._refCount = refs.length;
-      } else {
-        item._refCount = 0;
-      }
-    } catch {
-      item._refCount = 0;
-    }
-  });
-  await Promise.allSettled(promises);
-};
 
 const selectMedia = (media: any) => {
   selectedMediaId.value = media?.id ?? null;
-  mediaDraft.value = media ? { ...media } : null;
+  mediaDraft.value = media ? normalizeMediaItem({ ...media }) : null;
+  inlineRefCount.value = mediaDraft.value?.ref_count ?? 0;
   mediaError.value = '';
 };
 
@@ -340,7 +370,7 @@ const onPageChange = async (newPage: number) => {
 };
 
 const resetMediaQuery = async () => {
-  mediaQuery.value = { status: 'all', q: '', page: 1, pageSize: 20, mime: '', tag: '' };
+  mediaQuery.value = { status: 'all', source: 'upload', q: '', page: 1, pageSize: 20, mime: '', tag: '' };
   await fetchMediaList();
 };
 

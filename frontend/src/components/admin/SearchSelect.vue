@@ -1,41 +1,47 @@
 <template>
   <div ref="containerRef" class="relative">
-    <div class="flex items-center rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 transition-colors focus-within:border-emerald-500">
+    <div class="flex items-center rounded-xl border border-border bg-card transition-colors focus-within:border-emerald-500 min-h-[48px] md:min-h-[40px]">
       <input
         v-model="inputText"
         @input="onInput"
         @focus="onFocus"
         :placeholder="selectedLabel || placeholder"
-        class="w-full px-3 py-2 rounded-xl bg-transparent text-sm text-slate-700 dark:text-slate-300 outline-none placeholder:text-slate-400 dark:placeholder:text-slate-500"
+        class="w-full px-3 py-2 rounded-xl bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
       />
       <button
         v-if="clearable && modelValue"
         @click="clear"
-        class="flex-shrink-0 px-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+        class="flex-shrink-0 px-3 md:px-2 py-2 text-muted-foreground hover:text-foreground transition-colors"
       >
-        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 md:w-4 md:h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
     <div
       v-if="dropdownOpen"
-      class="absolute left-0 right-0 top-full mt-1 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-lg z-50 overflow-hidden"
+      class="fixed inset-x-0 bottom-0 top-auto md:absolute md:left-0 md:right-0 md:top-full md:bottom-auto md:mt-1 md:rounded-xl rounded-t-xl border border-border bg-card shadow-[0_-4px_20px_rgba(0,0,0,0.15)] md:shadow-lg z-50 overflow-hidden max-h-[80vh] md:max-h-60"
     >
-      <div v-if="loading" class="px-3 py-2 text-sm text-slate-400">搜索中...</div>
-      <div v-else-if="results.length > 0" class="max-h-60 overflow-y-auto py-1">
+      <div class="flex items-center justify-between px-4 py-3 md:hidden border-b border-border">
+        <span class="text-base font-medium text-foreground">选择选项</span>
+        <button @click="dropdownOpen = false" class="p-2 -mr-2 text-muted-foreground hover:text-foreground">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div v-if="loading" class="px-4 py-4 md:px-3 md:py-2 text-sm text-slate-400">搜索中...</div>
+      <div v-else-if="results.length > 0" class="overflow-y-auto py-1" :class="isMobile ? 'max-h-[calc(80vh-60px)]' : 'max-h-60'">
         <button
           v-for="item in results"
           :key="item.id"
           @click="selectItem(item)"
-          class="w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
+          class="w-full flex items-center gap-3 md:gap-2 px-4 md:px-3 py-3.5 md:py-2 text-sm md:text-sm text-left hover:bg-accent transition-colors min-h-[44px]"
         >
-          <img v-if="item.avatar" :src="item.avatar" class="w-6 h-6 rounded-full object-cover flex-shrink-0" />
+          <img v-if="item.avatar" :src="item.avatar" class="w-8 h-8 md:w-6 md:h-6 rounded-full object-cover flex-shrink-0" />
           <div class="min-w-0 flex-1 flex flex-col text-left">
-            <span class="text-slate-700 dark:text-slate-300 truncate">{{ item.label }}</span>
-            <span v-if="item.subtitle" class="text-xs text-slate-400 dark:text-slate-500 truncate">{{ item.subtitle }}</span>
+            <span class="text-base md:text-sm text-foreground truncate">{{ item.label }}</span>
+            <span v-if="item.subtitle" class="text-sm md:text-xs text-muted-foreground truncate">{{ item.subtitle }}</span>
           </div>
         </button>
       </div>
-      <div v-else-if="inputText.length > 0" class="px-3 py-2 text-sm text-slate-400">无匹配结果</div>
+      <div v-else-if="inputText.length > 0" class="px-4 py-4 md:px-3 md:py-2 text-sm text-muted-foreground">无匹配结果</div>
     </div>
   </div>
 </template>
@@ -66,6 +72,11 @@ const results = ref<SearchItem[]>([]);
 const loading = ref(false);
 const dropdownOpen = ref(false);
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+const isMobile = computed(() => {
+  if (typeof window === 'undefined') return false;
+  return window.innerWidth < 768;
+});
 
 const onInput = () => {
   if (debounceTimer) clearTimeout(debounceTimer);

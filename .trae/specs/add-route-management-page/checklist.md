@@ -1,0 +1,15 @@
+- [x] pages 数据库表已创建，包含所有必需字段
+- [x] pages 服务支持 list/create/update/remove/sync 操作
+- [x] pages 服务同时支持 DB 模式和 JSON 模式
+- [x] 5 个 API 端点已注册（GET/POST/PUT/DELETE/sync）
+- [x] apiRegistry.ts 包含 5 个新 API 注册项
+- [x] capabilities.ts 包含 route:manage 权限（ops.system 类目）
+- [x] 前端路由 /admin/routes 已注册，meta 包含 requiresCapability: 'route:manage'
+- [x] AdminLayout 侧边栏包含"路由管理"导航项，cap 为 route:manage
+- [x] RoutesView.vue 使用 ListDetailLayout 布局
+- [x] 列表区域按分组显示路由，支持分组筛选和搜索
+- [x] 详情区域可编辑标题、备注、分组、图标、权限、可见性、排序
+- [x] 同步路由按钮可正常调用 sync API 并刷新列表
+- [x] 手机端使用胶囊化列表交互，底栏导航包含路由管理入口
+- [x] vite build 构建成功
+- [x] vue-tsc 类型检查通过

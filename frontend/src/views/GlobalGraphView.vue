@@ -174,7 +174,7 @@ const handleChartClick = (params: any) => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-[#F8FAFC] dark:bg-[#0B1120] text-slate-900 dark:text-slate-100 font-sans pb-20 flex flex-col">
+  <div class="min-h-screen bg-[#F8FAFC] dark:bg-[#0B1120] text-foreground font-sans pb-20 flex flex-col">
     
     <main class="pt-24 px-4 sm:px-6 w-full flex-1 flex flex-col max-w-7xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out-expo">
       
@@ -182,39 +182,39 @@ const handleChartClick = (params: any) => {
         <div class="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-indigo-50 dark:bg-indigo-500/10 text-indigo-500 mb-6 shadow-inner border border-indigo-100 dark:border-indigo-500/20">
           <Network class="w-10 h-10" />
         </div>
-        <h1 class="text-4xl md:text-5xl font-extrabold tracking-tight text-slate-900 dark:text-white mb-4">全网生态关联图谱</h1>
-        <p class="text-lg text-slate-500 dark:text-slate-400 max-w-2xl mx-auto">以真正的网状图形式，展示开源项目间的 Fork 派生与插件依赖关系。支持自由拖拽缩放。</p>
+        <h1 class="text-4xl md:text-5xl font-extrabold tracking-tight text-foreground mb-4">全网生态关联图谱</h1>
+        <p class="text-lg text-muted-foreground max-w-2xl mx-auto">以真正的网状图形式，展示开源项目间的 Fork 派生与插件依赖关系。支持自由拖拽缩放。</p>
       </div>
 
-      <div v-if="loading" class="flex-1 w-full bg-white dark:bg-[#111827] rounded-3xl border border-slate-200/80 dark:border-slate-800/80 shadow-2xl shadow-slate-200/30 dark:shadow-none overflow-hidden relative min-h-[600px] flex items-center justify-center">
+      <div v-if="loading" class="flex-1 w-full bg-white dark:bg-[#111827] rounded-3xl border border-border shadow-2xl shadow-slate-200/30 dark:shadow-none overflow-hidden relative min-h-[600px] flex items-center justify-center">
         <div class="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 opacity-20"></div>
         <div class="animate-pulse flex flex-col items-center gap-6">
           <div class="relative w-48 h-48">
-            <div class="absolute inset-0 border-4 border-slate-200 dark:border-slate-800 rounded-full"></div>
-            <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-12 bg-slate-200 dark:bg-slate-800 rounded-full"></div>
-            <div class="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-8 bg-slate-200 dark:bg-slate-800 rounded-full"></div>
-            <div class="absolute bottom-0 left-1/2 -translate-x-1/2 w-10 h-10 bg-slate-200 dark:bg-slate-800 rounded-full"></div>
-            <div class="absolute top-1/2 left-0 -translate-y-1/2 w-6 h-6 bg-slate-200 dark:bg-slate-800 rounded-full"></div>
-            <div class="absolute top-1/2 right-0 -translate-y-1/2 w-14 h-14 bg-slate-200 dark:bg-slate-800 rounded-full"></div>
+            <div class="absolute inset-0 border-4 border-border rounded-full"></div>
+            <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-12 bg-muted rounded-full"></div>
+            <div class="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-8 bg-muted rounded-full"></div>
+            <div class="absolute bottom-0 left-1/2 -translate-x-1/2 w-10 h-10 bg-muted rounded-full"></div>
+            <div class="absolute top-1/2 left-0 -translate-y-1/2 w-6 h-6 bg-muted rounded-full"></div>
+            <div class="absolute top-1/2 right-0 -translate-y-1/2 w-14 h-14 bg-muted rounded-full"></div>
             <!-- Lines -->
-            <div class="absolute top-1/4 left-1/2 w-px h-1/4 bg-slate-200 dark:bg-slate-800 origin-bottom transform rotate-45"></div>
-            <div class="absolute top-1/2 left-1/4 w-1/4 h-px bg-slate-200 dark:bg-slate-800"></div>
-            <div class="absolute top-1/2 left-1/2 w-1/4 h-px bg-slate-200 dark:bg-slate-800"></div>
+            <div class="absolute top-1/4 left-1/2 w-px h-1/4 bg-muted origin-bottom transform rotate-45"></div>
+            <div class="absolute top-1/2 left-1/4 w-1/4 h-px bg-muted"></div>
+            <div class="absolute top-1/2 left-1/2 w-1/4 h-px bg-muted"></div>
           </div>
-          <div class="h-4 bg-slate-200 dark:bg-slate-800 rounded w-32"></div>
+          <div class="h-4 bg-muted rounded w-32"></div>
         </div>
       </div>
 
-      <div v-else-if="!graphData || graphData.nodes.length === 0" class="text-center py-20 text-slate-500 shrink-0">
+      <div v-else-if="!graphData || graphData.nodes.length === 0" class="text-center py-20 text-muted-foreground shrink-0">
         暂未发现有任何连结关系的项目。
       </div>
 
-      <div v-else class="flex-1 w-full bg-white dark:bg-[#111827] rounded-3xl border border-slate-200/80 dark:border-slate-800/80 shadow-2xl shadow-slate-200/30 dark:shadow-none overflow-hidden relative min-h-[600px]">
+      <div v-else class="flex-1 w-full bg-white dark:bg-[#111827] rounded-3xl border border-border shadow-2xl shadow-slate-200/30 dark:shadow-none overflow-hidden relative min-h-[600px]">
         <div class="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 opacity-50 z-10"></div>
         
         <!-- Controls -->
-        <div class="absolute top-4 right-4 z-10 flex items-center gap-2 bg-white/80 dark:bg-slate-800/80 backdrop-blur px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-          <span class="text-sm font-medium text-slate-600 dark:text-slate-300">节点大小取决于:</span>
+        <div class="absolute top-4 right-4 z-10 flex items-center gap-2 bg-card backdrop-blur px-4 py-2 rounded-xl border border-border shadow-sm">
+          <span class="text-sm font-medium text-muted-foreground">节点大小取决于:</span>
           <select v-model="sizeMetric" class="bg-transparent text-sm font-bold text-indigo-600 dark:text-indigo-400 focus:outline-none cursor-pointer">
             <option value="connections">生态关联度 (默认)</option>
             <option value="stars">Star 数量</option>

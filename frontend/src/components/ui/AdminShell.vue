@@ -1,7 +1,8 @@
 <template>
   <div
     :data-brand="brand"
-    class="h-dvh bg-[var(--color-bg-page)] text-[var(--color-text-primary)] flex overflow-hidden"
+    class="h-dvh bg-[var(--color-bg-page)] text-foreground flex overflow-hidden"
+    style="padding-bottom: env(safe-area-inset-bottom); padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right);"
   >
     <ui-Sidebar
       :brand-name="brandName"
@@ -21,7 +22,11 @@
         @back="router.back()"
       />
 
-      <main class="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4 pb-20 lg:p-6 lg:pb-6">
+      <main
+        ref="mainRef"
+        class="flex-1 min-h-0 overflow-y-auto overflow-x-hidden pt-2 pb-20 px-3 lg:pt-4 lg:pb-6 lg:px-6"
+        :style="mainStyle"
+      >
         <router-view class="block" />
       </main>
     </div>
@@ -37,10 +42,46 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref, onMounted, onUnmounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useMediaQuery } from '@vueuse/core';
 import { Sidebar as uiSidebar, BackHeader as uiBackHeader, BottomNav as uiBottomNav } from './index';
+
+const mainRef = ref<HTMLElement | null>(null);
+const keyboardHeight = ref(0);
+
+const mainStyle = computed(() => {
+  if (keyboardHeight.value > 0) {
+    return {
+      paddingBottom: `calc(var(--space-md) + ${keyboardHeight.value}px)`,
+    };
+  }
+  return {};
+});
+
+void mainRef;
+
+const handleVisualViewport = () => {
+  if (!window.visualViewport) return;
+  const vv = window.visualViewport;
+  const diff = window.innerHeight - vv.height;
+  keyboardHeight.value = diff > 100 ? diff : 0;
+};
+
+onMounted(() => {
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', handleVisualViewport);
+    window.visualViewport.addEventListener('scroll', handleVisualViewport);
+    handleVisualViewport();
+  }
+});
+
+onUnmounted(() => {
+  if (window.visualViewport) {
+    window.visualViewport.removeEventListener('resize', handleVisualViewport);
+    window.visualViewport.removeEventListener('scroll', handleVisualViewport);
+  }
+});
 
 export type NavItem = {
   key: string;

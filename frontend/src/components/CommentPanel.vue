@@ -304,7 +304,7 @@ const statusLabel = (s?: IssueStatus) => {
 const statusClass = (s?: IssueStatus) => {
   if (s === 'done') return 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-200/60 dark:border-emerald-500/20';
   if (s === 'doing') return 'bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-200/60 dark:border-amber-500/20';
-  return 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200/60 dark:border-slate-700';
+  return 'bg-card text-foreground border-border';
 };
 
 const requireLogin = () => {
@@ -504,14 +504,14 @@ const handleIssueClick = (id: string) => {
       <button
         @click="tab = 'comment'"
         class="px-4 py-2 rounded-full font-extrabold transition-colors inline-flex items-center gap-2"
-        :class="tab === 'comment' ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'"
+        :class="tab === 'comment' ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900' : 'bg-secondary text-muted-foreground hover:bg-accent'"
       >
         <MessageSquare class="w-4 h-4" /> 评论
       </button>
       <button
         @click="tab = 'bug'"
         class="px-4 py-2 rounded-full font-extrabold transition-colors inline-flex items-center gap-2"
-        :class="tab === 'bug' ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'"
+        :class="tab === 'bug' ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900' : 'bg-secondary text-muted-foreground hover:bg-accent'"
       >
         <Bug class="w-4 h-4" /> Bug 反馈
       </button>
@@ -525,31 +525,31 @@ const handleIssueClick = (id: string) => {
           v-model="commentBody"
           ref="commentEl"
           rows="4"
-          class="w-full px-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 outline-none focus:border-emerald-500 resize-none"
+          class="w-full px-4 py-3 rounded-2xl border border-border bg-card outline-none focus:border-emerald-500 resize-none"
           placeholder="支持 Markdown：例如 **加粗**、`代码`、- 列表、[链接](...)"
         ></textarea>
 
         <div class="flex flex-wrap items-center gap-2">
-          <button type="button" @click="onBold('comment')" class="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-extrabold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors inline-flex items-center gap-2">
+          <button type="button" @click="onBold('comment')" class="px-3 py-2 rounded-xl bg-secondary text-foreground font-extrabold hover:bg-accent transition-colors inline-flex items-center gap-2">
             <Bold class="w-4 h-4" /> 加粗
           </button>
-          <button type="button" @click="onItalic('comment')" class="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-extrabold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors inline-flex items-center gap-2">
+          <button type="button" @click="onItalic('comment')" class="px-3 py-2 rounded-xl bg-secondary text-foreground font-extrabold hover:bg-accent transition-colors inline-flex items-center gap-2">
             <Italic class="w-4 h-4" /> 斜体
           </button>
-          <button type="button" @click="onCode('comment')" class="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-extrabold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors inline-flex items-center gap-2">
+          <button type="button" @click="onCode('comment')" class="px-3 py-2 rounded-xl bg-secondary text-foreground font-extrabold hover:bg-accent transition-colors inline-flex items-center gap-2">
             <Code class="w-4 h-4" /> 行内代码
           </button>
-          <button type="button" @click="onLink('comment')" class="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-extrabold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors inline-flex items-center gap-2">
+          <button type="button" @click="onLink('comment')" class="px-3 py-2 rounded-xl bg-secondary text-foreground font-extrabold hover:bg-accent transition-colors inline-flex items-center gap-2">
             <LinkIcon class="w-4 h-4" /> 链接
           </button>
-          <button type="button" @click="onImage('comment')" class="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-extrabold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors inline-flex items-center gap-2">
+          <button type="button" @click="onImage('comment')" class="px-3 py-2 rounded-xl bg-secondary text-foreground font-extrabold hover:bg-accent transition-colors inline-flex items-center gap-2">
             <ImageIcon class="w-4 h-4" /> 插入图片
           </button>
         </div>
 
-        <div v-if="!isAuthenticated" class="p-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/40 text-slate-700 dark:text-slate-200">
+        <div v-if="!isAuthenticated" class="p-4 rounded-2xl border border-border bg-card text-foreground">
           <div class="font-extrabold">需要登录</div>
-          <div class="text-sm text-slate-600 dark:text-slate-300 mt-1">使用智教联盟登录系统登录后即可发布。</div>
+          <div class="text-sm text-muted-foreground mt-1">使用智教联盟登录系统登录后即可发布。</div>
           <button
             @click="router.push({ path: '/me', query: { redirect: route.fullPath } })"
             class="mt-3 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold transition-colors"
@@ -576,8 +576,8 @@ const handleIssueClick = (id: string) => {
 
       <!-- Comments List -->
       <div class="space-y-3">
-        <div v-if="comments.length === 0" class="text-center py-10 text-slate-500">暂无评论</div>
-        <div v-for="e in comments" :key="e.id" class="p-5 rounded-2xl border" :class="e.moderation_status === 'pending' ? 'border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800/50 opacity-70' : 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/30'">
+        <div v-if="comments.length === 0" class="text-center py-10 text-muted-foreground">暂无评论</div>
+        <div v-for="e in comments" :key="e.id" class="p-5 rounded-2xl border" :class="e.moderation_status === 'pending' ? 'border-border bg-secondary opacity-70' : 'border-border bg-card'">
           <div class="flex items-center justify-between gap-3">
             <div class="flex items-center gap-3 min-w-0">
               <router-link :to="'/u/' + encodeURIComponent(e.author)" class="shrink-0">
@@ -585,11 +585,11 @@ const handleIssueClick = (id: string) => {
                 <div v-else class="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-700 dark:text-emerald-300 text-sm font-extrabold">{{ e.author.charAt(0).toUpperCase() }}</div>
               </router-link>
               <div class="min-w-0">
-                <router-link :to="'/u/' + encodeURIComponent(e.author)" class="font-extrabold text-slate-900 dark:text-white truncate hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">{{ e.author }}</router-link>
-                <div class="text-xs text-slate-500 dark:text-slate-400">{{ formatTime(e.created_at) }}</div>
+                <router-link :to="'/u/' + encodeURIComponent(e.author)" class="font-extrabold text-foreground truncate hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">{{ e.author }}</router-link>
+                <div class="text-xs text-muted-foreground">{{ formatTime(e.created_at) }}</div>
               </div>
             </div>
-            <div v-if="e.moderation_status === 'pending'" class="shrink-0 px-2.5 py-1 rounded-full border text-xs font-extrabold bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-600">
+            <div v-if="e.moderation_status === 'pending'" class="shrink-0 px-2.5 py-1 rounded-full border text-xs font-extrabold bg-muted text-muted-foreground border-border">
               审核中
             </div>
             <div v-else-if="e.moderation_status === 'rejected'" class="shrink-0 px-2.5 py-1 rounded-full border text-xs font-extrabold bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-200/60 dark:border-rose-500/20">
@@ -597,7 +597,7 @@ const handleIssueClick = (id: string) => {
             </div>
           </div>
           <div class="mt-3 prose prose-sm prose-slate dark:prose-invert max-w-none" v-html="renderMarkdown(e.body)"></div>
-          <div v-if="e.moderation_status === 'pending'" class="mt-2 text-xs text-slate-500 dark:text-slate-400">
+          <div v-if="e.moderation_status === 'pending'" class="mt-2 text-xs text-muted-foreground">
             此评论正在审核中，仅您自己可见
           </div>
           <div v-else-if="e.moderation_status === 'rejected'" class="mt-2 text-xs text-rose-500 dark:text-rose-400">
@@ -611,16 +611,16 @@ const handleIssueClick = (id: string) => {
     <div v-else-if="tab === 'bug'" class="space-y-6">
       <!-- Issue Form -->
       <div class="space-y-3">
-        <div class="text-lg font-extrabold text-slate-900 dark:text-white">新建 Issue</div>
-        <div class="text-sm text-slate-500">提交后默认"未解决"，之后可在详情里调整状态。</div>
+        <div class="text-lg font-extrabold text-foreground">新建 Issue</div>
+        <div class="text-sm text-muted-foreground">提交后默认"未解决"，之后可在详情里调整状态。</div>
 
         <input
           v-model="issueTitle"
-          class="w-full px-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 outline-none focus:border-emerald-500"
+          class="w-full px-4 py-3 rounded-2xl border border-border bg-card outline-none focus:border-emerald-500"
           placeholder="标题（例如：启动后白屏）"
         />
         <div>
-          <div class="text-sm font-extrabold text-slate-700 dark:text-slate-300 mb-2">标签</div>
+          <div class="text-sm font-extrabold text-foreground mb-2">标签</div>
           <div class="flex flex-wrap gap-2">
             <button
               v-for="l in ISSUE_LABELS"
@@ -628,7 +628,7 @@ const handleIssueClick = (id: string) => {
               type="button"
               @click="issueLabels.includes(l.id) ? issueLabels = issueLabels.filter(x => x !== l.id) : issueLabels = [...issueLabels, l.id]"
               class="px-3 py-1.5 rounded-full border text-sm font-extrabold transition-colors"
-              :class="issueLabels.includes(l.id) ? labelColorClass(l.color) : 'bg-white/70 dark:bg-slate-900/40 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-900/60'"
+              :class="issueLabels.includes(l.id) ? labelColorClass(l.color) : 'bg-card text-foreground border-border hover:bg-accent'"
             >
               {{ l.name }}
             </button>
@@ -638,31 +638,31 @@ const handleIssueClick = (id: string) => {
           v-model="issueBody"
           ref="issueEl"
           rows="5"
-          class="w-full px-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 outline-none focus:border-emerald-500 resize-none"
+          class="w-full px-4 py-3 rounded-2xl border border-border bg-card outline-none focus:border-emerald-500 resize-none"
           placeholder="正文（支持 Markdown）：复现步骤、期望结果、实际结果、截图链接…"
         ></textarea>
 
         <div class="flex flex-wrap items-center gap-2">
-          <button type="button" @click="onBold('issue')" class="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-extrabold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors inline-flex items-center gap-2">
+          <button type="button" @click="onBold('issue')" class="px-3 py-2 rounded-xl bg-secondary text-foreground font-extrabold hover:bg-accent transition-colors inline-flex items-center gap-2">
             <Bold class="w-4 h-4" /> 加粗
           </button>
-          <button type="button" @click="onItalic('issue')" class="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-extrabold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors inline-flex items-center gap-2">
+          <button type="button" @click="onItalic('issue')" class="px-3 py-2 rounded-xl bg-secondary text-foreground font-extrabold hover:bg-accent transition-colors inline-flex items-center gap-2">
             <Italic class="w-4 h-4" /> 斜体
           </button>
-          <button type="button" @click="onCode('issue')" class="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-extrabold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors inline-flex items-center gap-2">
+          <button type="button" @click="onCode('issue')" class="px-3 py-2 rounded-xl bg-secondary text-foreground font-extrabold hover:bg-accent transition-colors inline-flex items-center gap-2">
             <Code class="w-4 h-4" /> 行内代码
           </button>
-          <button type="button" @click="onLink('issue')" class="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-extrabold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors inline-flex items-center gap-2">
+          <button type="button" @click="onLink('issue')" class="px-3 py-2 rounded-xl bg-secondary text-foreground font-extrabold hover:bg-accent transition-colors inline-flex items-center gap-2">
             <LinkIcon class="w-4 h-4" /> 链接
           </button>
-          <button type="button" @click="onImage('issue')" class="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-extrabold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors inline-flex items-center gap-2">
+          <button type="button" @click="onImage('issue')" class="px-3 py-2 rounded-xl bg-secondary text-foreground font-extrabold hover:bg-accent transition-colors inline-flex items-center gap-2">
             <ImageIcon class="w-4 h-4" /> 插入图片
           </button>
         </div>
 
-        <div v-if="!isAuthenticated" class="p-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/40 text-slate-700 dark:text-slate-200">
+        <div v-if="!isAuthenticated" class="p-4 rounded-2xl border border-border bg-card text-foreground">
           <div class="font-extrabold">需要登录</div>
-          <div class="text-sm text-slate-600 dark:text-slate-300 mt-1">使用智教联盟登录系统登录后即可提交 Issue。</div>
+          <div class="text-sm text-muted-foreground mt-1">使用智教联盟登录系统登录后即可提交 Issue。</div>
           <button
             @click="router.push({ path: '/me', query: { redirect: route.fullPath } })"
             class="mt-3 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold transition-colors"
@@ -688,20 +688,20 @@ const handleIssueClick = (id: string) => {
       </div>
 
       <!-- Issue Filter -->
-      <div class="flex items-center justify-between gap-3 pt-4 border-t border-slate-200 dark:border-slate-800">
-        <div class="text-sm font-extrabold text-slate-700 dark:text-slate-300">筛选</div>
+      <div class="flex items-center justify-between gap-3 pt-4 border-t border-border">
+        <div class="text-sm font-extrabold text-foreground">筛选</div>
         <div class="flex items-center gap-2">
           <button
             @click="issueFilter = 'open'"
             class="px-3 py-1.5 rounded-full font-extrabold transition-colors border"
-            :class="issueFilter === 'open' ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-slate-900 dark:border-white' : 'bg-slate-50 dark:bg-slate-900/40 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700'"
+            :class="issueFilter === 'open' ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-slate-900 dark:border-white' : 'bg-card text-foreground border-border'"
           >
             未解决
           </button>
           <button
             @click="issueFilter = 'closed'"
             class="px-3 py-1.5 rounded-full font-extrabold transition-colors border"
-            :class="issueFilter === 'closed' ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-slate-900 dark:border-white' : 'bg-slate-50 dark:bg-slate-900/40 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700'"
+            :class="issueFilter === 'closed' ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-slate-900 dark:border-white' : 'bg-card/40 text-foreground border-border'"
           >
             已解决
           </button>
@@ -716,7 +716,7 @@ const handleIssueClick = (id: string) => {
           :key="i.id"
           @click="i.moderation_status === 'pending' ? undefined : handleIssueClick(i.id)"
           class="w-full text-left p-4 rounded-2xl border transition-colors"
-          :class="i.moderation_status === 'pending' ? 'border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800/50 opacity-70 cursor-default' : 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/30 hover:bg-white dark:hover:bg-slate-900/50'"
+          :class="i.moderation_status === 'pending' ? 'border-border bg-secondary opacity-70 cursor-default' : 'border-border bg-card hover:bg-accent'"
         >
           <div class="flex items-start gap-3">
             <div class="mt-0.5">
@@ -724,8 +724,8 @@ const handleIssueClick = (id: string) => {
               <CheckCircle2 v-else class="w-5 h-5 text-slate-400" />
             </div>
             <div class="min-w-0 flex-1">
-              <div class="font-extrabold text-slate-900 dark:text-white truncate">{{ i.title }}</div>
-              <div class="text-xs text-slate-500 dark:text-slate-400 mt-1">
+              <div class="font-extrabold text-foreground truncate">{{ i.title }}</div>
+              <div class="text-xs text-muted-foreground mt-1">
                 <router-link :to="'/u/' + encodeURIComponent(i.author)" class="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">{{ i.author }}</router-link> · {{ formatTime(i.created_at) }}
               </div>
               <div v-if="i.labels?.length" class="mt-2 flex flex-wrap gap-1.5">
@@ -735,7 +735,7 @@ const handleIssueClick = (id: string) => {
                   {{ ISSUE_LABELS.find(x => x.id === lid)?.name ?? lid }}
                 </span>
               </div>
-              <div v-if="i.moderation_status === 'pending'" class="mt-2 text-xs text-slate-500 dark:text-slate-400">
+              <div v-if="i.moderation_status === 'pending'" class="mt-2 text-xs text-muted-foreground">
                 此 Bug 反馈正在审核中，仅您自己可见
               </div>
               <div v-else-if="i.moderation_status === 'rejected'" class="mt-2 text-xs text-rose-500 dark:text-rose-400">
@@ -746,7 +746,7 @@ const handleIssueClick = (id: string) => {
               <div class="px-2.5 py-1 rounded-full border text-xs font-extrabold" :class="statusClass(i.status)">
                 {{ statusLabel(i.status) }}
               </div>
-              <div v-if="i.moderation_status === 'pending'" class="px-2.5 py-1 rounded-full border text-xs font-extrabold bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-600">
+              <div v-if="i.moderation_status === 'pending'" class="px-2.5 py-1 rounded-full border text-xs font-extrabold bg-muted text-muted-foreground border-border">
                 审核中
               </div>
               <div v-else-if="i.moderation_status === 'rejected'" class="px-2.5 py-1 rounded-full border text-xs font-extrabold bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-200/60 dark:border-rose-500/20">
@@ -782,17 +782,17 @@ const handleIssueClick = (id: string) => {
         >
           <div
             v-if="isModalOpen"
-            class="w-full max-w-2xl max-h-[85vh] bg-white dark:bg-[#0B1120] rounded-3xl shadow-2xl flex flex-col border border-slate-200 dark:border-slate-800 overflow-hidden"
+            class="w-full max-w-2xl max-h-[85vh] bg-white dark:bg-[#0B1120] rounded-3xl shadow-2xl flex flex-col border border-border overflow-hidden"
             @click.stop
           >
             <!-- Modal Header -->
-            <div class="flex items-center justify-between gap-4 px-6 py-4 border-b border-slate-200 dark:border-slate-800 shrink-0">
-              <div class="font-extrabold text-slate-900 dark:text-white truncate max-w-xs">
+            <div class="flex items-center justify-between gap-4 px-6 py-4 border-b border-border shrink-0">
+              <div class="font-extrabold text-foreground truncate max-w-xs">
                 {{ selectedIssue?.title }}
               </div>
               <button
                 @click="closeModal"
-                class="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                class="p-2 rounded-xl hover:bg-accent transition-colors"
                 aria-label="Close"
               >
                 <X class="w-5 h-5" />
@@ -805,8 +805,8 @@ const handleIssueClick = (id: string) => {
                 <!-- Issue Header Info -->
                 <div class="flex items-start justify-between gap-4">
                   <div class="min-w-0 flex-1">
-                    <div class="text-xl font-extrabold text-slate-900 dark:text-white">{{ selectedIssue.title }}</div>
-                    <div class="text-sm text-slate-500 mt-1">{{ selectedIssue.author }} · {{ formatTime(selectedIssue.created_at) }}</div>
+                    <div class="text-xl font-extrabold text-foreground">{{ selectedIssue.title }}</div>
+                    <div class="text-sm text-muted-foreground mt-1">{{ selectedIssue.author }} · {{ formatTime(selectedIssue.created_at) }}</div>
                   </div>
                   <div class="px-3 py-1.5 rounded-full border text-sm font-extrabold shrink-0" :class="statusClass(selectedIssue.status)">
                     {{ statusLabel(selectedIssue.status) }}
@@ -815,11 +815,11 @@ const handleIssueClick = (id: string) => {
 
                 <!-- Status Control -->
                 <div v-if="canManageIssue(selectedIssue)" class="flex items-center gap-3">
-                  <span class="text-sm font-extrabold text-slate-700 dark:text-slate-300">状态：</span>
+                  <span class="text-sm font-extrabold text-muted-foreground">状态：</span>
                   <select
                     :value="selectedIssue.status"
                     @change="setIssueStatus(selectedIssue.id, ($event.target as HTMLSelectElement).value as any)"
-                    class="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-700 dark:text-slate-200 font-extrabold outline-none"
+                    class="px-3 py-2 rounded-xl border border-border bg-card text-foreground font-extrabold outline-none"
                   >
                     <option value="open">未处理</option>
                     <option value="doing">处理中</option>
@@ -829,7 +829,7 @@ const handleIssueClick = (id: string) => {
 
                 <!-- Labels -->
                 <div class="space-y-2">
-                  <div class="text-sm font-extrabold text-slate-700 dark:text-slate-300">标签</div>
+                  <div class="text-sm font-extrabold text-muted-foreground">标签</div>
                   <div class="flex flex-wrap gap-2">
                     <button
                       v-for="l in ISSUE_LABELS"
@@ -838,7 +838,7 @@ const handleIssueClick = (id: string) => {
                       :disabled="!canManageIssue(selectedIssue)"
                       @click="toggleIssueLabel(l.id)"
                       class="px-3 py-1.5 rounded-full border text-sm font-extrabold transition-colors disabled:opacity-50"
-                      :class="selectedIssueLabels.includes(l.id) ? labelColorClass(l.color) : 'bg-white/70 dark:bg-slate-900/40 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-900/60'"
+                      :class="selectedIssueLabels.includes(l.id) ? labelColorClass(l.color) : 'bg-card text-foreground border-border hover:bg-accent'"
                     >
                       {{ l.name }}
                     </button>
@@ -857,8 +857,8 @@ const handleIssueClick = (id: string) => {
               </div>
 
               <!-- Replies Section -->
-              <div class="border-t border-slate-200 dark:border-slate-800 pt-6 space-y-4">
-                <div class="text-lg font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+              <div class="border-t border-border pt-6 space-y-4">
+                <div class="text-lg font-extrabold text-foreground flex items-center gap-2">
                   <Reply class="w-5 h-5" />
                   回复
                 </div>
@@ -868,7 +868,7 @@ const handleIssueClick = (id: string) => {
                   <textarea
                     v-model="replyBody"
                     rows="3"
-                    class="w-full px-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 outline-none focus:border-emerald-500 resize-none"
+                    class="w-full px-4 py-3 rounded-2xl border border-border bg-card outline-none focus:border-emerald-500 resize-none"
                     placeholder="写下你的回复..."
                   ></textarea>
                   <button
@@ -880,9 +880,9 @@ const handleIssueClick = (id: string) => {
                     回复
                   </button>
                 </div>
-                <div v-else class="p-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/40 text-slate-700 dark:text-slate-200">
+                <div v-else class="p-4 rounded-2xl border border-border bg-card/40 text-foreground">
                   <div class="font-extrabold">需要登录</div>
-                  <div class="text-sm text-slate-600 dark:text-slate-300 mt-1">登录后即可回复。</div>
+                  <div class="text-sm text-muted-foreground mt-1">登录后即可回复。</div>
                   <button
                     @click="router.push({ path: '/me', query: { redirect: route.fullPath } })"
                     class="mt-3 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold transition-colors"
@@ -904,7 +904,7 @@ const handleIssueClick = (id: string) => {
                   <div
                     v-for="r in replies"
                     :key="r.id"
-                    class="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/30"
+                    class="p-4 rounded-2xl border border-border bg-card/30"
                   >
                     <div class="flex items-center justify-between gap-3">
                       <div class="flex items-center gap-2.5">
@@ -912,9 +912,9 @@ const handleIssueClick = (id: string) => {
                           <img v-if="r.actor_avatar_url" :src="r.actor_avatar_url" :alt="r.actor_username" class="w-6 h-6 rounded-full object-cover" />
                           <div v-else class="w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-700 dark:text-emerald-300 text-xs font-extrabold">{{ r.actor_username.charAt(0).toUpperCase() }}</div>
                         </router-link>
-                        <router-link :to="'/u/' + encodeURIComponent(r.actor_username)" class="font-extrabold text-slate-900 dark:text-white hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">{{ r.actor_username }}</router-link>
+                        <router-link :to="'/u/' + encodeURIComponent(r.actor_username)" class="font-extrabold text-foreground hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">{{ r.actor_username }}</router-link>
                       </div>
-                      <div class="text-xs text-slate-500 dark:text-slate-400">{{ formatTime(r.created_at) }}</div>
+                      <div class="text-xs text-muted-foreground">{{ formatTime(r.created_at) }}</div>
                     </div>
                     <div class="mt-2 prose prose-sm prose-slate dark:prose-invert max-w-none" v-html="renderMarkdown(r.body)"></div>
                   </div>

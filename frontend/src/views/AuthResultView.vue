@@ -74,19 +74,19 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-[#F8FAFC] dark:bg-[#0B1120] text-slate-900 dark:text-slate-100 font-sans pb-24">
+  <div class="min-h-screen bg-[#F8FAFC] dark:bg-[#0B1120] text-foreground font-sans pb-24">
     <main class="pt-24 px-6 max-w-5xl mx-auto">
       <div class="mb-8">
-        <h1 class="text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white mb-2">
+        <h1 class="text-3xl sm:text-4xl font-extrabold tracking-tight text-foreground mb-2">
           {{ isConfirmed ? '智教联盟绑定信息' : '创建账号确认' }}
         </h1>
-        <p class="text-slate-600 dark:text-slate-300">
+        <p class="text-muted-foreground">
           {{ isConfirmed ? '你可以在这里随时查看当前绑定信息。' : '请确认以下账号信息，确认后进入系统。' }}
         </p>
       </div>
 
-      <div v-if="loading" class="bg-white dark:bg-[#111827] rounded-3xl p-8 border border-slate-200/80 dark:border-slate-800/80 shadow-xl shadow-slate-200/50 dark:shadow-none">
-        <div class="inline-flex items-center gap-3 text-slate-600 dark:text-slate-300">
+      <div v-if="loading" class="bg-white dark:bg-[#111827] rounded-3xl p-8 border border-border shadow-xl shadow-slate-200/50 dark:shadow-none">
+        <div class="inline-flex items-center gap-3 text-muted-foreground">
           <span class="w-5 h-5 border-2 border-slate-300 border-t-slate-600 dark:border-slate-600 dark:border-t-slate-300 rounded-full animate-spin"></span>
           正在读取账号信息...
         </div>
@@ -100,35 +100,35 @@ onMounted(async () => {
       </div>
 
       <div v-else class="space-y-6">
-        <div class="bg-white dark:bg-[#111827] rounded-3xl p-6 sm:p-8 border border-slate-200/80 dark:border-slate-800/80 shadow-xl shadow-slate-200/50 dark:shadow-none">
+        <div class="bg-white dark:bg-[#111827] rounded-3xl p-6 sm:p-8 border border-border shadow-xl shadow-slate-200/50 dark:shadow-none">
           <div class="flex items-center gap-2 mb-4">
             <ShieldCheck class="w-5 h-5 text-emerald-500" />
-            <h2 class="text-xl font-extrabold text-slate-900 dark:text-white">账号信息预览</h2>
+            <h2 class="text-xl font-extrabold text-foreground">账号信息预览</h2>
           </div>
 
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-            <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800">
-              <div class="text-xs text-slate-500 dark:text-slate-400">姓名</div>
+            <div class="p-4 rounded-2xl bg-card/40 border border-border">
+              <div class="text-xs text-muted-foreground">姓名</div>
               <div class="font-bold mt-1 break-all">{{ user?.name || '-' }}</div>
             </div>
-            <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800">
-              <div class="text-xs text-slate-500 dark:text-slate-400">邮箱</div>
+            <div class="p-4 rounded-2xl bg-card/40 border border-border">
+              <div class="text-xs text-muted-foreground">邮箱</div>
               <div class="font-bold mt-1 break-all">{{ user?.email || '-' }}</div>
             </div>
-            <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800">
-              <div class="text-xs text-slate-500 dark:text-slate-400">STCN 用户 ID</div>
+            <div class="p-4 rounded-2xl bg-card/40 border border-border">
+              <div class="text-xs text-muted-foreground">STCN 用户 ID</div>
               <div class="font-bold mt-1 break-all">{{ user?.stcn_user_id || '-' }}</div>
             </div>
-            <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800">
-              <div class="text-xs text-slate-500 dark:text-slate-400">STCN 账号</div>
+            <div class="p-4 rounded-2xl bg-card/40 border border-border">
+              <div class="text-xs text-muted-foreground">STCN 账号</div>
               <div class="font-bold mt-1 break-all">{{ user?.stcn_username || '-' }}</div>
             </div>
-            <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800">
-              <div class="text-xs text-slate-500 dark:text-slate-400">头像来源</div>
+            <div class="p-4 rounded-2xl bg-card/40 border border-border">
+              <div class="text-xs text-muted-foreground">头像来源</div>
               <div class="font-bold mt-1 break-all">{{ user?.avatar_source || '-' }}</div>
             </div>
-            <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800">
-              <div class="text-xs text-slate-500 dark:text-slate-400">权限信息</div>
+            <div class="p-4 rounded-2xl bg-card/40 border border-border">
+              <div class="text-xs text-muted-foreground">权限信息</div>
               <div class="font-bold mt-1 break-all">is_superadmin={{ isSuperadmin ? 'true' : 'false' }}, capabilities={{ capabilities.length }}</div>
             </div>
           </div>
@@ -139,19 +139,19 @@ onMounted(async () => {
           </div>
         </div>
 
-        <div class="bg-white dark:bg-[#111827] rounded-3xl p-6 sm:p-8 border border-slate-200/80 dark:border-slate-800/80 shadow-xl shadow-slate-200/50 dark:shadow-none">
+        <div class="bg-white dark:bg-[#111827] rounded-3xl p-6 sm:p-8 border border-border shadow-xl shadow-slate-200/50 dark:shadow-none">
           <div class="flex items-center justify-between mb-4">
-            <h2 class="text-xl font-extrabold text-slate-900 dark:text-white">登录返回 JSON（辅助核对）</h2>
+            <h2 class="text-xl font-extrabold text-foreground">登录返回 JSON（辅助核对）</h2>
             <div class="flex items-center gap-2">
               <button
                 @click="showRaw = !showRaw"
-                class="inline-flex items-center gap-2 px-3 py-2 text-xs font-bold rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                class="inline-flex items-center gap-2 px-3 py-2 text-xs font-bold rounded-xl bg-secondary text-foreground hover:bg-accent transition-colors"
               >
                 {{ showRaw ? '收起 JSON' : '展开 JSON' }}
               </button>
               <button
                 @click="copyJson"
-                class="inline-flex items-center gap-2 px-3 py-2 text-xs font-bold rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                class="inline-flex items-center gap-2 px-3 py-2 text-xs font-bold rounded-xl bg-secondary text-foreground hover:bg-accent transition-colors"
               >
                 <Copy class="w-4 h-4" />
                 {{ copied ? '已复制' : '复制 JSON' }}

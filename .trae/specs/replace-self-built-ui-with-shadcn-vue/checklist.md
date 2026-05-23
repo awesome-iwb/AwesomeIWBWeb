@@ -1,0 +1,27 @@
+- [x] shadcn-vue Button 组件创建完成，支持 6 种 variant 和 4 种 size
+- [x] shadcn-vue Input 组件创建完成，使用语义 token
+- [x] shadcn-vue Label 组件创建完成，基于 reka-ui Label
+- [x] shadcn-vue Separator 组件创建完成，基于 reka-ui Separator
+- [x] shadcn-vue Dialog 组件创建完成（含 Content、Header、Title、Description、Footer、Close、ScrollContent）
+- [x] shadcn-vue Sheet 组件创建完成，支持 side 属性（top/bottom/left/right）
+- [x] shadcn-vue ScrollArea 组件创建完成
+- [x] shadcn-vue Card 组件创建完成（含 Header、Title、Description、Content、Footer）
+- [x] shadcn-vue Tabs 组件创建完成（含 List、Trigger、Content）
+- [x] shadcn-vue Avatar 组件创建完成（含 Image、Fallback）
+- [x] shadcn-vue Badge 组件创建完成，含 statusVariant 状态映射
+- [x] shadcn-vue Pagination 组件创建完成（含 List、ListItem、Prev、Next、Ellipsis）
+- [x] 所有 ActionButton 引用已替换为 Button
+- [x] 所有 FormInput 引用已替换为 Input + Label
+- [x] 所有 Modal 引用已替换为 Dialog
+- [x] 所有 BottomSheet/ActionSheet 引用已替换为 Sheet
+- [x] 所有 Card 引用已替换为 shadcn Card
+- [x] 所有 Tabs 引用已替换为 shadcn Tabs
+- [x] 所有 Avatar 引用已替换为 shadcn Avatar
+- [x] 所有 StatusBadge 引用已替换为 Badge + statusVariant
+- [x] 所有 Pagination 引用已替换为 shadcn Pagination
+- [x] 旧自建组件文件已删除（ActionButton、FormInput、Modal、Card、Tabs、Avatar、StatusBadge、Pagination、BottomSheet、ActionSheet）
+- [x] 保留的特色组件样式已统一为语义 token（LoadingSpinner、EmptyState、ErrorState、ListItem、SwipeAction、BackHeader、BottomNav、Sidebar、ListDetailLayout、AdminShell）
+- [x] NavBar、CommentPanel、CommandPalette 等业务组件硬编码色值已替换
+- [x] HomeView 等高频视图文件硬编码色值和内联 style 已替换
+- [x] ui/index.ts 导出已更新，移除已替换组件
+- [x] `npm run build` 构建通过（vue-tsc + vite-ssg build）

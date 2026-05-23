@@ -81,7 +81,7 @@ onBeforeUnmount(() => {
 
 <template>
   <div
-    class="min-h-screen bg-slate-50 dark:bg-[#0B1120] text-slate-900 dark:text-slate-100 font-sans selection:bg-indigo-500/30 selection:text-indigo-900 dark:selection:text-indigo-100 transition-colors duration-300 relative overflow-x-clip flex flex-col"
+    class="min-h-screen bg-slate-50 dark:bg-[#0B1120] text-foreground font-sans selection:bg-indigo-500/30 selection:text-indigo-900 dark:selection:text-indigo-100 transition-colors duration-300 relative overflow-x-clip flex flex-col"
     :class="isBackofficeRoute ? 'h-screen overflow-hidden' : ''"
   >
     <SiteReloadBanner />

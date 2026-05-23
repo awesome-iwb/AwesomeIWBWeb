@@ -1,0 +1,49 @@
+- [x] design-tokens.css 包含 G2 连续圆角变量（--radius-sm-g2、--radius-md-g2、--radius-lg-g2）
+- [x] design-tokens.css 包含间距系统变量
+- [x] design-tokens.css 包含触控规范变量
+- [x] design-tokens.css 包含背景悬停色变量
+- [x] Card 组件使用 G2 连续圆角
+- [x] Card 组件有 compact 变体
+- [x] Card 组件有 hoverable 属性
+- [x] ListItem 组件选中态有明显视觉反馈（品牌色竖线 + 背景 + 阴影）
+- [x] ListItem 组件悬停态有微缩放效果
+- [x] ListItem 组件移动端有点击反馈
+- [x] FormInput 移动端最小高度 48px
+- [x] FormInput 移动端字体 16px
+- [x] FormInput 聚焦时有微妙阴影
+- [x] Modal 移动端显示为底部 Sheet
+- [x] Modal 平板端居中显示
+- [x] Modal 桌面端居中自适应
+- [x] Modal 支持下滑关闭
+- [x] BottomNav 高度 56px + safe-area-inset-bottom
+- [x] BottomNav 选中项有品牌色顶部指示条
+- [x] BottomNav 有毛玻璃背景
+- [x] BackHeader 移动端高度 48px
+- [x] BackHeader 移动端标题居中
+- [x] BackHeader 返回按钮触控区域 44x44px
+- [x] AdminShell 移动端 main 区域 pt-2 pb-20 px-3
+- [x] AdminShell 安全区域适配
+- [x] ListDetailLayout 移动端列表项触控友好
+- [x] ListDetailLayout 详情页有滑入/滑出动画
+- [x] ListDetailLayout 保持滚动位置
+- [x] ActionSheet 组件可用
+- [x] SwipeAction 组件可用
+- [x] DashboardView 卡片适配新设计
+- [x] UsersView 表单和列表适配
+- [x] ProjectsView 表单和列表适配
+- [x] SubmissionsView 审核界面适配
+- [x] ReviewView 标签页适配
+- [x] DevDashboardView 开发者总览适配
+- [x] DevProjectsView 开发者项目适配
+- [x] MediaView 适配
+- [x] AuditView 适配
+- [x] AnalyticsView 适配
+- [x] CapabilityEditor 移动端触控优化
+- [x] SearchSelect 移动端触控优化
+- [x] EmptyState 视觉升级
+- [x] LoadingSpinner 优化
+- [x] ErrorState 组件可用
+- [x] vite build 构建成功
+- [x] TypeScript 类型检查通过
+- [x] 移动端浏览器验证通过
+- [x] 桌面端浏览器验证通过

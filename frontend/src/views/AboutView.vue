@@ -91,18 +91,18 @@ const displayContributors = contributorMembers.filter((c) => !excludedContributo
 </script>
 
 <template>
-  <div class="min-h-screen bg-[#F8FAFC] dark:bg-[#0B1120] text-slate-900 dark:text-slate-100 font-sans pb-20">
+  <div class="min-h-screen bg-[#F8FAFC] dark:bg-[#0B1120] text-foreground font-sans pb-20">
     <main class="pt-24 px-4 sm:px-6 w-full max-w-5xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out-expo">
       <div class="mb-12">
-        <h1 class="text-4xl md:text-5xl font-extrabold tracking-tight text-slate-900 dark:text-white mb-4">关于我们</h1>
-        <p class="text-lg text-slate-600 dark:text-slate-300 leading-relaxed">
+        <h1 class="text-4xl md:text-5xl font-extrabold tracking-tight text-foreground mb-4">关于我们</h1>
+        <p class="text-lg text-muted-foreground leading-relaxed">
           专为广大中小学电教打造的班级希沃/鸿合等一体机/数字白板/班班通一站式软件推荐清单和实用知识手册，助你在新学期快速上手班级一体机新玩法！<br />
           <span class="font-bold">为广大电教倾情撰写，让班级大屏更好用！</span>
         </p>
       </div>
 
       <section class="bg-white/60 dark:bg-slate-900/30 backdrop-blur-md border border-white/70 dark:border-slate-800/70 rounded-3xl p-8 mb-8">
-        <h2 class="text-2xl font-extrabold text-slate-900 dark:text-white mb-6">运营组</h2>
+        <h2 class="text-2xl font-extrabold text-foreground mb-6">运营组</h2>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
           <a
             v-for="m in operations"
@@ -110,12 +110,12 @@ const displayContributors = contributorMembers.filter((c) => !excludedContributo
             :href="m.href || '#'"
             target="_blank"
             rel="noopener noreferrer"
-            class="group flex items-center gap-4 p-5 rounded-2xl border border-slate-200/70 dark:border-slate-800/70 bg-white/70 dark:bg-slate-950/30 hover:bg-white dark:hover:bg-slate-950/40 transition-colors"
+            class="group flex items-center gap-4 p-5 rounded-2xl border border-border bg-card hover:bg-white dark:hover:bg-slate-950/40 transition-colors"
           >
-            <img :src="m.avatar" :alt="m.name" class="h-12 w-12 rounded-full bg-slate-200/70 dark:bg-slate-700/70 shrink-0 object-cover" @error="(e) => { (e.target as HTMLImageElement).src = placeholderAvatar }" />
+            <img :src="m.avatar" :alt="m.name" class="h-12 w-12 rounded-full bg-muted shrink-0 object-cover" @error="(e) => { (e.target as HTMLImageElement).src = placeholderAvatar }" />
             <div class="min-w-0">
-              <div class="text-base font-extrabold text-slate-800 dark:text-slate-100 line-clamp-1">{{ m.name }}</div>
-              <div class="text-sm text-slate-500 dark:text-slate-400 line-clamp-1">{{ m.role }}</div>
+              <div class="text-base font-extrabold text-foreground line-clamp-1">{{ m.name }}</div>
+              <div class="text-sm text-muted-foreground line-clamp-1">{{ m.role }}</div>
               <div class="text-sm text-emerald-600 dark:text-emerald-400 line-clamp-1">{{ m.linkLabel }}</div>
             </div>
           </a>
@@ -123,7 +123,7 @@ const displayContributors = contributorMembers.filter((c) => !excludedContributo
       </section>
 
       <section class="bg-white/60 dark:bg-slate-900/30 backdrop-blur-md border border-white/70 dark:border-slate-800/70 rounded-3xl p-8 mb-8">
-        <h2 class="text-2xl font-extrabold text-slate-900 dark:text-white mb-6">贡献者</h2>
+        <h2 class="text-2xl font-extrabold text-foreground mb-6">贡献者</h2>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
           <a
             v-for="c in displayContributors"
@@ -131,12 +131,12 @@ const displayContributors = contributorMembers.filter((c) => !excludedContributo
             :href="c.href"
             target="_blank"
             rel="noopener noreferrer"
-            class="group flex items-center gap-4 p-5 rounded-2xl border border-slate-200/70 dark:border-slate-800/70 bg-white/70 dark:bg-slate-950/30 hover:bg-white dark:hover:bg-slate-950/40 transition-colors"
+            class="group flex items-center gap-4 p-5 rounded-2xl border border-border bg-card hover:bg-white dark:hover:bg-slate-950/40 transition-colors"
           >
-            <img :src="c.avatar" :alt="c.name" class="h-12 w-12 rounded-full bg-slate-200/70 dark:bg-slate-700/70 shrink-0 object-cover" @error="(e) => { (e.target as HTMLImageElement).src = placeholderAvatar }" />
+            <img :src="c.avatar" :alt="c.name" class="h-12 w-12 rounded-full bg-muted shrink-0 object-cover" @error="(e) => { (e.target as HTMLImageElement).src = placeholderAvatar }" />
             <div class="min-w-0">
-              <div class="text-base font-extrabold text-slate-800 dark:text-slate-100 line-clamp-1">{{ c.name }}</div>
-              <div class="text-sm text-slate-500 dark:text-slate-400 line-clamp-1">{{ c.role }}</div>
+              <div class="text-base font-extrabold text-foreground line-clamp-1">{{ c.name }}</div>
+              <div class="text-sm text-muted-foreground line-clamp-1">{{ c.role }}</div>
               <div class="text-sm text-emerald-600 dark:text-emerald-400 line-clamp-1">{{ c.linkLabel }}</div>
             </div>
           </a>
@@ -144,7 +144,7 @@ const displayContributors = contributorMembers.filter((c) => !excludedContributo
       </section>
 
       <section class="bg-white/60 dark:bg-slate-900/30 backdrop-blur-md border border-white/70 dark:border-slate-800/70 rounded-3xl p-8">
-        <h2 class="text-2xl font-extrabold text-slate-900 dark:text-white mb-6">感谢</h2>
+        <h2 class="text-2xl font-extrabold text-foreground mb-6">感谢</h2>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
           <a
             v-for="m in thanks"
@@ -152,12 +152,12 @@ const displayContributors = contributorMembers.filter((c) => !excludedContributo
             :href="m.href || '#'"
             target="_blank"
             rel="noopener noreferrer"
-            class="group flex items-center gap-4 p-5 rounded-2xl border border-slate-200/70 dark:border-slate-800/70 bg-white/70 dark:bg-slate-950/30 hover:bg-white dark:hover:bg-slate-950/40 transition-colors"
+            class="group flex items-center gap-4 p-5 rounded-2xl border border-border bg-card hover:bg-white dark:hover:bg-slate-950/40 transition-colors"
           >
-            <img :src="m.avatar" :alt="m.name" class="h-12 w-12 rounded-full bg-slate-200/70 dark:bg-slate-700/70 shrink-0 object-cover" @error="(e) => { (e.target as HTMLImageElement).src = placeholderAvatar }" />
+            <img :src="m.avatar" :alt="m.name" class="h-12 w-12 rounded-full bg-muted shrink-0 object-cover" @error="(e) => { (e.target as HTMLImageElement).src = placeholderAvatar }" />
             <div class="min-w-0">
-              <div class="text-base font-extrabold text-slate-800 dark:text-slate-100 line-clamp-1">{{ m.name }}</div>
-              <div class="text-sm text-slate-500 dark:text-slate-400 line-clamp-1">{{ m.role }}</div>
+              <div class="text-base font-extrabold text-foreground line-clamp-1">{{ m.name }}</div>
+              <div class="text-sm text-muted-foreground line-clamp-1">{{ m.role }}</div>
               <div class="text-sm text-emerald-600 dark:text-emerald-400 line-clamp-1">{{ m.linkLabel }}</div>
             </div>
           </a>
@@ -165,7 +165,7 @@ const displayContributors = contributorMembers.filter((c) => !excludedContributo
       </section>
 
       <section class="bg-white/60 dark:bg-slate-900/30 backdrop-blur-md border border-white/70 dark:border-slate-800/70 rounded-3xl p-8 mt-8">
-        <h2 class="text-2xl font-extrabold text-slate-900 dark:text-white mb-6">友情链接</h2>
+        <h2 class="text-2xl font-extrabold text-foreground mb-6">友情链接</h2>
         <div class="flex flex-col gap-4">
           <a
             v-for="l in friendLinks"
@@ -173,11 +173,11 @@ const displayContributors = contributorMembers.filter((c) => !excludedContributo
             :href="l.href"
             target="_blank"
             rel="noopener noreferrer"
-            class="group flex items-start gap-4 p-5 rounded-2xl border border-slate-200/70 dark:border-slate-800/70 bg-white/70 dark:bg-slate-950/30 hover:bg-white dark:hover:bg-slate-950/40 transition-colors"
+            class="group flex items-start gap-4 p-5 rounded-2xl border border-border bg-card hover:bg-white dark:hover:bg-slate-950/40 transition-colors"
           >
             <div class="min-w-0">
-              <div class="text-base font-extrabold text-slate-800 dark:text-slate-100 line-clamp-1">{{ l.name }}</div>
-              <div class="text-sm text-slate-500 dark:text-slate-400 line-clamp-2">{{ l.description }}</div>
+              <div class="text-base font-extrabold text-foreground line-clamp-1">{{ l.name }}</div>
+              <div class="text-sm text-muted-foreground line-clamp-2">{{ l.description }}</div>
               <div class="text-sm text-emerald-600 dark:text-emerald-400 line-clamp-1">{{ linkLabelFor(l.href, l.key) }}</div>
             </div>
           </a>
