@@ -1,13 +1,13 @@
 <template>
   <div class="h-full min-h-0">
-    <ui-ListDetailLayout
+    <ListDetailLayout
       :selected-id="selectedPageId"
       :searchable="true"
       search-placeholder="搜索路由..."
       :search-model="searchQuery"
       list-title="路由管理"
       :selected-item-label="selectedPage?.title"
-      :selected-item-icon="Route"
+      :selected-item-icon="RouteIcon"
       @update:search-model="searchQuery = $event"
     >
       <template #list-toolbar>
@@ -32,7 +32,7 @@
 
       <template #list>
         <div v-if="loading" class="py-10 flex justify-center">
-          <ui-LoadingSpinner brand="admin" />
+          <LoadingSpinner brand="admin" />
         </div>
         <div v-else class="space-y-1.5">
           <div
@@ -54,7 +54,7 @@
               class="text-[10px] px-1.5 py-0.5 rounded-md bg-secondary text-muted-foreground shrink-0"
             >{{ page.required_capability }}</span>
           </div>
-          <ui-EmptyState v-if="filteredPages.length === 0" :icon="Route" title="暂无路由" />
+          <EmptyState v-if="filteredPages.length === 0" :icon="RouteIcon" title="暂无路由" />
         </div>
       </template>
 
@@ -137,19 +137,36 @@
               </div>
             </div>
 
-            <div class="flex items-center gap-3">
-              <label class="text-xs font-bold text-muted-foreground">导航可见</label>
-              <button
-                type="button"
-                class="relative w-10 h-6 rounded-full transition-colors duration-200"
-                :class="draft.is_visible ? 'bg-[var(--color-brand-500)]' : 'bg-muted'"
-                @click="draft.is_visible = !draft.is_visible"
-              >
-                <span
-                  class="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform duration-200"
-                  :class="draft.is_visible ? 'translate-x-4' : 'translate-x-0'"
-                />
-              </button>
+            <div class="flex items-center gap-6 pt-1">
+              <div class="flex items-center gap-3">
+                <label class="text-xs font-bold text-muted-foreground">导航可见</label>
+                <button
+                  type="button"
+                  class="relative w-10 h-6 rounded-full transition-colors duration-200"
+                  :class="draft.is_visible ? 'bg-[var(--color-brand-500)]' : 'bg-muted'"
+                  @click="draft.is_visible = !draft.is_visible"
+                >
+                  <span
+                    class="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform duration-200"
+                    :class="draft.is_visible ? 'translate-x-4' : 'translate-x-0'"
+                  />
+                </button>
+              </div>
+
+              <div class="flex items-center gap-3">
+                <label class="text-xs font-bold text-muted-foreground">启用状态</label>
+                <button
+                  type="button"
+                  class="relative w-10 h-6 rounded-full transition-colors duration-200"
+                  :class="draft.is_enabled ? 'bg-emerald-500' : 'bg-muted'"
+                  @click="draft.is_enabled = !draft.is_enabled"
+                >
+                  <span
+                    class="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform duration-200"
+                    :class="draft.is_enabled ? 'translate-x-4' : 'translate-x-0'"
+                  />
+                </button>
+              </div>
             </div>
           </div>
 
@@ -163,15 +180,16 @@
           </div>
         </div>
       </template>
-    </ui-ListDetailLayout>
+    </ListDetailLayout>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue';
-import { Route } from 'lucide-vue-next';
+import { Route as RouteIcon } from 'lucide-vue-next';
 import * as lucideIcons from 'lucide-vue-next';
 import { adminFetch } from '../../composables/useAdminFetch';
+import { ListDetailLayout, EmptyState, LoadingSpinner } from '../../components/ui';
 
 type PageItem = {
   id: string;
@@ -182,6 +200,7 @@ type PageItem = {
   icon: string;
   required_capability: string;
   is_visible: boolean;
+  is_enabled: boolean;
   sort_index: number;
   created_at: string;
   updated_at: string;
@@ -203,6 +222,7 @@ const draft = ref({
   icon: '',
   required_capability: '',
   is_visible: true,
+  is_enabled: true,
   sort_index: 0,
 });
 
@@ -238,22 +258,23 @@ function selectPage(page: PageItem) {
 watch(selectedPage, (page) => {
   if (page) {
     draft.value = {
-      path: page.path,
-      title: page.title,
-      description: page.description,
-      group: page.group,
-      icon: page.icon,
-      required_capability: page.required_capability,
-      is_visible: page.is_visible,
-      sort_index: page.sort_index,
+      path: page.path ?? '',
+      title: page.title ?? '',
+      description: page.description ?? '',
+      group: page.group ?? '',
+      icon: page.icon ?? '',
+      required_capability: page.required_capability ?? '',
+      is_visible: page.is_visible ?? true,
+      is_enabled: page.is_enabled ?? true,
+      sort_index: page.sort_index ?? 0,
     };
   }
   saveMsg.value = '';
 });
 
 function iconComponent(iconName: string) {
-  if (!iconName) return Route;
-  return (lucideIcons as any)[iconName] ?? Route;
+  if (!iconName) return RouteIcon;
+  return (lucideIcons as any)[iconName] ?? RouteIcon;
 }
 
 async function fetchPages() {
@@ -266,6 +287,8 @@ async function fetchPages() {
       const data = await res.json();
       pages.value = data.items ?? [];
     }
+  } catch (e) {
+    console.error("Failed to fetch pages:", e);
   } finally {
     loading.value = false;
   }

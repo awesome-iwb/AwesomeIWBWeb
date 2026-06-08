@@ -14,3 +14,17 @@ backend/src/comments.json
 *.log
 AwesomeIWBWeb.zip
 /.claude/worktrees
+
+# Temporary scripts and deployment artifacts
+_*.js
+_*.cjs
+_*.mjs
+_*.sh
+_deploy_artifacts/
+scratch/
+
+# Sensitive deployment files
+audit_remote.sh
+audit_remote.cmdtest.sh
+gen.cjs
+replace.js

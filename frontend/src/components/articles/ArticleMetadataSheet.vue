@@ -112,6 +112,7 @@ async function uploadBanner(e: Event) {
           <label class="block text-sm font-bold text-muted-foreground mb-1">内容格式</label>
           <select v-model="draft.content_format" class="w-full px-3 py-2 rounded-xl border border-border bg-card text-sm">
             <option value="markdown">Markdown</option>
+            <option value="flarum">Flarum</option>
             <option value="html">HTML</option>
             <option value="latex">LaTeX</option>
             <option value="plain">纯文本</option>

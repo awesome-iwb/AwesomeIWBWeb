@@ -9,6 +9,7 @@ const router = useRouter();
 const reasonText = computed(() => {
   const reason = route.query.reason;
   if (reason === 'navigation-error') return '页面加载失败或路由跳转中断，请稍后重试。';
+  if (reason === 'route-blocked') return '该页面已被系统管理员封禁，暂时无法访问。';
   return '你访问的页面不存在，可能已被移动或删除。';
 });
 

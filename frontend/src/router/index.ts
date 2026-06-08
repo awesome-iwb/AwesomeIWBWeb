@@ -15,6 +15,7 @@ import AuthPopupCallbackView from '../views/AuthPopupCallbackView.vue'
 import NotFoundView from '../views/NotFoundView.vue'
 import { useAnalytics } from '../composables/useAnalytics'
 import { useAuth } from '../composables/useAuth'
+import { usePages } from '../composables/usePages'
 
 export const routes: RouteRecordRaw[] = [
   {
@@ -216,10 +217,40 @@ export function setupRouterGuard(router: Router) {
     return requiredCapabilities.some((c) => auth.hasCapability(c))
   }
 
+  const ensurePagesLoaded = async (): Promise<void> => {
+    const { loaded, fetchPages } = usePages()
+    if (loaded.value) return
+    await fetchPages()
+  }
+
   router.beforeEach(async (to) => {
     if (typeof window === 'undefined') return true
     await ensureAuthInitialized()
-    const { isAuthenticated } = useAuth();
+    await ensurePagesLoaded()
+
+    const { pages } = usePages()
+    const { isAuthenticated, hasCapability } = useAuth()
+
+    const matchedPaths = to.matched.map((r) => r.path)
+    const activeRules = pages.value.filter((p) => matchedPaths.includes(p.path))
+
+    // 1. Check if page is blocked/disabled in the database
+    const disabledRule = activeRules.find((r) => r.is_enabled === false)
+    if (disabledRule) {
+      return { path: '/not-found', query: { reason: 'route-blocked' } }
+    }
+
+    // 2. Check capability access limits configured in the database
+    for (const rule of activeRules) {
+      if (rule.required_capability) {
+        const allowed = hasCapability(rule.required_capability)
+        if (!allowed) {
+          return { path: '/me', query: { redirect: to.fullPath, error: 'lack-capability' } }
+        }
+      }
+    }
+
+    // 3. Fallback to static route metadata checks
     if ((to.meta as any)?.requiresAuth && !isAuthenticated.value) {
       return { path: '/me', query: { redirect: to.fullPath } };
     }

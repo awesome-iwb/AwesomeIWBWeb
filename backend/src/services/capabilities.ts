@@ -56,7 +56,7 @@ const ALL_CAPABILITIES: Capability[] = [
   { id: "audit:read", name: "查看审计日志", category: "ops.system", description: "查看系统审计日志", sort_index: 2430 },
   { id: "org:manage", name: "管理组织", category: "ops.system", description: "管理组织状态", sort_index: 2440 },
   { id: 'route:manage', name: '路由管理', category: 'ops.system', description: '管理网站路由页面', sort_index: 2450 },
-  { id: 'analytics:read', name: '查看数据分析', category: 'admin.analytics', description: '查看网站访问统计和用户行为分析', sort_index: 2500 },
+  { id: 'analytics:read', name: '查看数据分析', category: 'ops.analytics', description: '查看网站访问统计和用户行为分析', sort_index: 2500 },
 ];
 
 const ALL_CAPABILITY_IDS = new Set(ALL_CAPABILITIES.map(c => c.id));

@@ -9,9 +9,25 @@ import {
   Trash2,
   Loader2,
   Bold,
-  Quote,
+  Italic,
+  Underline,
+  Strikethrough,
+  Code,
+  Terminal,
+  List,
+  ListOrdered,
+  ListTodo,
+  Link as LinkIcon,
   Image as ImageIcon,
+  Table as TableIcon,
+  Undo2,
+  Redo2,
+  Heading1,
+  Heading2,
+  Heading3,
   Users,
+  Sigma,
+  Vote,
 } from 'lucide-vue-next';
 import { adminFetch, formatAdminError, uploadFile } from '../../composables/useAdminFetch';
 import { useArticleAutosave } from '../../composables/useArticleAutosave';
@@ -25,7 +41,6 @@ import ArticleCommentPanel from '../../components/articles/ArticleCommentPanel.v
 import ArticleAnnotationPanel from '../../components/articles/ArticleAnnotationPanel.vue';
 import ArticleMetadataSheet, { type ArticleDraft } from '../../components/articles/ArticleMetadataSheet.vue';
 import type { MarkdownHeading } from '../../lib/parseMarkdownHeadings';
-import { INTERVIEW_BLOCK_SNIPPET } from '../../lib/renderArticleContent';
 import { API } from '../../api/endpoints';
 
 const MarkdownEditor = defineAsyncComponent(() => import('../../components/articles/MarkdownEditor.vue'));
@@ -56,18 +71,51 @@ const draft = ref<ArticleDraft>({
 
 const metadataOpen = ref(false);
 const viewMode = ref<'edit' | 'split' | 'preview'>('split');
-const mobileTab = ref<'edit' | 'preview' | 'outline'>('edit');
+const mobileTab = ref<'edit' | 'preview' | 'outline' | 'backlinks' | 'revisions' | 'comments' | 'annotations'>('edit');
 const sidebarOpen = ref(true);
 const sidebarTab = ref<'outline' | 'backlinks' | 'revisions' | 'comments' | 'annotations'>('outline');
 const imageUploading = ref(false);
 const uploadError = ref('');
 const imageInput = ref<HTMLInputElement | null>(null);
 const editorRef = ref<InstanceType<typeof MarkdownEditor> | null>(null);
-const fallbackEditorRef = ref<HTMLTextAreaElement | null>(null);
 const backlinksRef = ref<InstanceType<typeof ArticleBacklinksPanel> | null>(null);
 const annotationPanelRef = ref<InstanceType<typeof ArticleAnnotationPanel> | null>(null);
 const previewRef = ref<HTMLDivElement | null>(null);
 const annotationPopup = ref<{ x: number; y: number; anchorId: string; selectedText: string } | null>(null);
+
+const activeScrollSource = ref<'editor' | 'preview' | null>(null);
+let scrollTimeout: ReturnType<typeof setTimeout> | null = null;
+
+function onEditorScroll(percent: number) {
+  if (activeScrollSource.value === 'preview') return;
+  activeScrollSource.value = 'editor';
+  
+  if (previewRef.value) {
+    previewRef.value.scrollTop = percent * (previewRef.value.scrollHeight - previewRef.value.clientHeight);
+  }
+  
+  if (scrollTimeout) clearTimeout(scrollTimeout);
+  scrollTimeout = setTimeout(() => {
+    activeScrollSource.value = null;
+  }, 150);
+}
+
+function onPreviewScroll(e: Event) {
+  if (activeScrollSource.value === 'editor') return;
+  activeScrollSource.value = 'preview';
+  
+  const el = e.target as HTMLElement;
+  const denominator = el.scrollHeight - el.clientHeight;
+  if (denominator > 0) {
+    const percent = el.scrollTop / denominator;
+    editorRef.value?.setScrollPercent(percent);
+  }
+  
+  if (scrollTimeout) clearTimeout(scrollTimeout);
+  scrollTimeout = setTimeout(() => {
+    activeScrollSource.value = null;
+  }, 150);
+}
 
 const { saveStatus, saveError, saveNow, syncSnapshot, resolveConflict } = useArticleAutosave(
   articleId,
@@ -78,7 +126,7 @@ const { saveStatus, saveError, saveNow, syncSnapshot, resolveConflict } = useArt
 const { activeEditors } = useArticlePresence(articleId);
 const { user: currentUser } = useAuth();
 
-const isMarkdown = computed(() => draft.value.content_format === 'markdown');
+const isRichEditor = computed(() => ['markdown', 'html', 'latex', 'flarum'].includes(draft.value.content_format));
 const isDesktopSplit = computed(() => !isMobile.value && viewMode.value === 'split');
 const publicPreviewUrl = computed(() =>
   draft.value.slug ? `/articles/${encodeURIComponent(draft.value.slug)}` : '',
@@ -165,29 +213,44 @@ async function searchArticles(q: string) {
 }
 
 function insertSnippet(text: string) {
-  if (isMarkdown.value && editorRef.value) {
+  if (editorRef.value) {
     editorRef.value.insertAtCursor(text);
     return;
   }
-  const el = fallbackEditorRef.value;
-  if (!el) {
-    draft.value.content += text;
-    return;
-  }
-  const start = el.selectionStart;
-  const end = el.selectionEnd;
-  draft.value.content = draft.value.content.slice(0, start) + text + draft.value.content.slice(end);
+  draft.value.content += text;
 }
 
 function onOutlineSelect(heading: MarkdownHeading) {
-  if (isMarkdown.value && editorRef.value) {
+  if (editorRef.value) {
     editorRef.value.scrollToLine(heading.line);
   }
   mobileTab.value = 'edit';
 }
 
+const showImageModal = ref(false);
+const imageTab = ref<'web' | 'local'>('web');
+const webImageUrl = ref('');
+const webImageAlt = ref('');
+
 function triggerImageUpload() {
   imageInput.value?.click();
+}
+
+function handleImageButtonClick() {
+  showImageModal.value = true;
+}
+
+function insertWebImage() {
+  if (!webImageUrl.value) return;
+  const altText = webImageAlt.value.trim() || '图片描述';
+  const url = webImageUrl.value.trim();
+  const snippet = draft.value.content_format === 'html'
+    ? `<img src="${url}" alt="${altText}" />`
+    : `![${altText}](${url})`;
+  insertSnippet(snippet);
+  webImageUrl.value = '';
+  webImageAlt.value = '';
+  showImageModal.value = false;
 }
 
 async function uploadImage(e: Event) {
@@ -197,13 +260,25 @@ async function uploadImage(e: Event) {
   uploadError.value = '';
   try {
     const url = await uploadFile(file);
-    insertSnippet(`\n![图](${url})\n`);
+    const altText = file.name.replace(/\.[^.]+$/, '');
+    const snippet = draft.value.content_format === 'html'
+      ? `<img src="${url}" alt="${altText}" />`
+      : `![${altText}](${url})`;
+    insertSnippet(snippet);
+    showImageModal.value = false;
   } catch (err: unknown) {
     uploadError.value = err instanceof Error ? err.message : '上传失败';
   } finally {
     imageUploading.value = false;
     if (imageInput.value) imageInput.value.value = '';
   }
+}
+
+function insertPollTemplate() {
+  const template = draft.value.content_format === 'html'
+    ? `\n<div class="poll-card-wrapper">\n  <div class="poll-header">\n    <h4>这里写投票标题</h4>\n  </div>\n  <div class="poll-options">\n    <div class="poll-option-item">\n      <div class="poll-option-progress" style="width: 50%"></div>\n      <div class="poll-option-content">\n        <span>选项 1</span>\n        <span>50 票 (50%)</span>\n      </div>\n    </div>\n    <div class="poll-option-item">\n      <div class="poll-option-progress" style="width: 30%"></div>\n      <div class="poll-option-content">\n        <span>选项 2</span>\n        <span>30 票 (30%)</span>\n      </div>\n    </div>\n  </div>\n  <div class="poll-footer">\n    <span>🗳 投票组件</span>\n    <span>共计 80 人参与</span>\n  </div>\n</div>\n`
+    : `\n[poll name="你最喜欢的电子白板"]\n- Ink Canvas\n- ClassIsland\n- Class Widgets\n[/poll]\n`;
+  insertSnippet(template);
 }
 
 function onEditorUploadError(message: string) {
@@ -420,16 +495,16 @@ onBeforeUnmount(() => {
     <div v-else-if="loadError" class="flex-1 flex items-center justify-center text-rose-500 text-sm px-4">{{ loadError }}</div>
 
     <template v-else>
-      <div class="lg:hidden shrink-0 flex border-b border-border">
+      <div class="lg:hidden shrink-0 flex border-b border-border overflow-x-auto">
         <button
-          v-for="tab in ['edit', 'preview', 'outline'] as const"
+          v-for="tab in ['edit', 'preview', 'outline', 'comments', 'annotations', 'revisions', 'backlinks'] as const"
           :key="tab"
           type="button"
-          class="flex-1 py-2 text-xs font-bold"
+          class="shrink-0 px-4 py-2 text-xs font-bold whitespace-nowrap"
           :class="mobileTab === tab ? 'text-[var(--color-brand-500)] border-b-2 border-[var(--color-brand-500)]' : 'text-muted-foreground'"
           @click="mobileTab = tab"
         >
-          {{ tab === 'edit' ? '编辑' : tab === 'preview' ? '预览' : '大纲' }}
+          {{ tab === 'edit' ? '编辑' : tab === 'preview' ? '预览' : tab === 'outline' ? '大纲' : tab === 'comments' ? '评论' : tab === 'annotations' ? '批注' : tab === 'revisions' ? '版本' : '链接' }}
         </button>
       </div>
 
@@ -463,26 +538,96 @@ onBeforeUnmount(() => {
 
         <div class="flex-1 min-h-0 flex flex-col overflow-hidden">
           <div
-            v-if="isMarkdown"
-            class="shrink-0 flex items-center gap-1 px-3 py-2 border-b border-border overflow-x-auto"
+            v-if="isRichEditor"
+            class="editor-toolbar shrink-0 flex items-center gap-1.5 px-4 py-2 border-b border-border overflow-x-auto bg-card/60 backdrop-blur-md select-none"
           >
-            <button type="button" class="p-2 rounded-lg hover:bg-accent" title="加粗" @click="insertSnippet('**加粗**')">
-              <Bold class="w-4 h-4" />
-            </button>
-            <button type="button" class="p-2 rounded-lg hover:bg-accent" title="访谈块" @click="insertSnippet(INTERVIEW_BLOCK_SNIPPET)">
-              <Quote class="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              class="p-2 rounded-lg hover:bg-accent text-emerald-600"
-              title="图片"
-              :disabled="imageUploading"
-              @click="triggerImageUpload"
-            >
-              <ImageIcon class="w-4 h-4" />
-            </button>
-            <input ref="imageInput" type="file" class="hidden" accept="image/*" @change="uploadImage" />
-            <span v-if="imageUploading" class="text-xs text-muted-foreground ml-2">上传中…</span>
+            <!-- Group 1: History -->
+            <div class="flex items-center gap-0.5 border-r border-border/80 pr-1.5 mr-1">
+              <button type="button" class="p-1.5 rounded-lg hover:bg-accent text-muted-foreground hover:text-foreground transition-all active:scale-95 cursor-pointer" title="撤销 (Ctrl+Z)" @click="editorRef?.undo()">
+                <Undo2 class="w-4 h-4" />
+              </button>
+              <button type="button" class="p-1.5 rounded-lg hover:bg-accent text-muted-foreground hover:text-foreground transition-all active:scale-95 cursor-pointer" title="重做 (Ctrl+Y)" @click="editorRef?.redo()">
+                <Redo2 class="w-4 h-4" />
+              </button>
+            </div>
+
+            <!-- Group 2: Headings -->
+            <div class="flex items-center gap-0.5 border-r border-border/80 pr-1.5 mr-1">
+              <button type="button" class="p-1.5 rounded-lg hover:bg-accent text-muted-foreground hover:text-foreground font-bold transition-all active:scale-95 cursor-pointer" title="一级标题" @click="editorRef?.toggleHeading(1)">
+                <Heading1 class="w-4 h-4" />
+              </button>
+              <button type="button" class="p-1.5 rounded-lg hover:bg-accent text-muted-foreground hover:text-foreground font-bold transition-all active:scale-95 cursor-pointer" title="二级标题" @click="editorRef?.toggleHeading(2)">
+                <Heading2 class="w-4 h-4" />
+              </button>
+              <button type="button" class="p-1.5 rounded-lg hover:bg-accent text-muted-foreground hover:text-foreground font-bold transition-all active:scale-95 cursor-pointer" title="三级标题" @click="editorRef?.toggleHeading(3)">
+                <Heading3 class="w-4 h-4" />
+              </button>
+            </div>
+
+            <!-- Group 3: Formatting -->
+            <div class="flex items-center gap-0.5 border-r border-border/80 pr-1.5 mr-1">
+              <button type="button" class="p-1.5 rounded-lg hover:bg-accent text-muted-foreground hover:text-foreground transition-all active:scale-95 cursor-pointer" title="加粗 (Ctrl+B)" @click="editorRef?.toggleBold()">
+                <Bold class="w-4 h-4" />
+              </button>
+              <button type="button" class="p-1.5 rounded-lg hover:bg-accent text-muted-foreground hover:text-foreground transition-all active:scale-95 cursor-pointer" title="斜体 (Ctrl+I)" @click="editorRef?.toggleItalic()">
+                <Italic class="w-4 h-4" />
+              </button>
+              <button type="button" class="p-1.5 rounded-lg hover:bg-accent text-muted-foreground hover:text-foreground transition-all active:scale-95 cursor-pointer" title="下划线" @click="editorRef?.toggleUnderline()">
+                <Underline class="w-4 h-4" />
+              </button>
+              <button type="button" class="p-1.5 rounded-lg hover:bg-accent text-muted-foreground hover:text-foreground transition-all active:scale-95 cursor-pointer" title="删除线" @click="editorRef?.toggleStrikethrough()">
+                <Strikethrough class="w-4 h-4" />
+              </button>
+              <button type="button" class="p-1.5 rounded-lg hover:bg-accent text-muted-foreground hover:text-foreground transition-all active:scale-95 cursor-pointer" title="行内代码" @click="editorRef?.toggleCodeInline()">
+                <Code class="w-4 h-4" />
+              </button>
+              <button type="button" class="p-1.5 rounded-lg hover:bg-accent text-muted-foreground hover:text-foreground transition-all active:scale-95 cursor-pointer" title="代码块" @click="editorRef?.toggleCodeBlock()">
+                <Terminal class="w-4 h-4" />
+              </button>
+            </div>
+
+            <!-- Group 4: Lists -->
+            <div class="flex items-center gap-0.5 border-r border-border/80 pr-1.5 mr-1">
+              <button type="button" class="p-1.5 rounded-lg hover:bg-accent text-muted-foreground hover:text-foreground transition-all active:scale-95 cursor-pointer" title="无序列表" @click="editorRef?.toggleBulletList()">
+                <List class="w-4 h-4" />
+              </button>
+              <button type="button" class="p-1.5 rounded-lg hover:bg-accent text-muted-foreground hover:text-foreground transition-all active:scale-95 cursor-pointer" title="有序列表" @click="editorRef?.toggleOrderedList()">
+                <ListOrdered class="w-4 h-4" />
+              </button>
+              <button type="button" class="p-1.5 rounded-lg hover:bg-accent text-muted-foreground hover:text-foreground transition-all active:scale-95 cursor-pointer" title="任务列表" @click="editorRef?.toggleTaskList()">
+                <ListTodo class="w-4 h-4" />
+              </button>
+            </div>
+
+            <!-- Group 5: Inserts -->
+            <div class="flex items-center gap-0.5 border-r border-border/80 pr-1.5 mr-1">
+              <button type="button" class="p-1.5 rounded-lg hover:bg-accent text-muted-foreground hover:text-foreground transition-all active:scale-95 cursor-pointer" title="插入超链接 (Ctrl+K)" @click="editorRef?.insertLink()">
+                <LinkIcon class="w-4 h-4" />
+              </button>
+              <button type="button" class="p-1.5 rounded-lg hover:bg-accent text-emerald-600 hover:text-emerald-700 transition-all active:scale-95 cursor-pointer" title="上传/插入图片" :disabled="imageUploading" @click="handleImageButtonClick">
+                <ImageIcon class="w-4 h-4" />
+              </button>
+              <button type="button" class="p-1.5 rounded-lg hover:bg-accent text-emerald-600 hover:text-emerald-700 transition-all active:scale-95 cursor-pointer" title="插入投票组件" @click="insertPollTemplate">
+                <Vote class="w-4 h-4" />
+              </button>
+              <button type="button" class="p-1.5 rounded-lg hover:bg-accent text-muted-foreground hover:text-foreground transition-all active:scale-95 cursor-pointer" title="插入表格" @click="editorRef?.insertTable()">
+                <TableIcon class="w-4 h-4" />
+              </button>
+              <button type="button" class="p-1.5 rounded-lg hover:bg-accent text-purple-600 hover:text-purple-700 transition-all active:scale-95 cursor-pointer" title="插入 LaTeX 公式块" @click="editorRef?.toggleWrapSelection('\n$$\n', '\n$$\n', '公式')">
+                <Sigma class="w-4 h-4" />
+              </button>
+              <input ref="imageInput" type="file" class="hidden" accept="image/*" @change="uploadImage" />
+              <span v-if="imageUploading" class="text-xs text-muted-foreground ml-2 animate-pulse">上传中…</span>
+            </div>
+
+            <!-- Group 6: Callouts -->
+            <div class="flex items-center gap-1.5 pl-0.5">
+              <span class="text-xs text-muted-foreground font-semibold">提示盒:</span>
+              <button type="button" class="w-5 h-5 rounded-full bg-blue-500 hover:scale-110 active:scale-95 transition-all border border-white/20 shadow-sm cursor-pointer" title="信息卡片 (Note)" @click="editorRef?.insertCallout('note')" />
+              <button type="button" class="w-5 h-5 rounded-full bg-emerald-500 hover:scale-110 active:scale-95 transition-all border border-white/20 shadow-sm cursor-pointer" title="成功卡片 (Tip)" @click="editorRef?.insertCallout('tip')" />
+              <button type="button" class="w-5 h-5 rounded-full bg-amber-500 hover:scale-110 active:scale-95 transition-all border border-white/20 shadow-sm cursor-pointer" title="警告卡片 (Warning)" @click="editorRef?.insertCallout('warning')" />
+              <button type="button" class="w-5 h-5 rounded-full bg-rose-500 hover:scale-110 active:scale-95 transition-all border border-white/20 shadow-sm cursor-pointer" title="错误卡片 (Error)" @click="editorRef?.insertCallout('error')" />
+            </div>
           </div>
 
           <div class="flex-1 min-h-0 flex overflow-hidden">
@@ -492,20 +637,22 @@ onBeforeUnmount(() => {
               :style="!isMobile && isDesktopSplit ? { flex: '1 1 50%' } : undefined"
             >
               <MarkdownEditor
-                v-if="isMarkdown"
+                v-if="isRichEditor"
                 ref="editorRef"
                 v-model="draft.content"
+                :format="draft.content_format"
                 :article-search="searchArticles"
                 class="h-full w-full"
                 @uploading="imageUploading = $event"
                 @upload-error="onEditorUploadError"
+                @scroll="onEditorScroll"
               />
               <textarea
                 v-else
                 ref="fallbackEditorRef"
                 v-model="draft.content"
                 class="w-full h-full p-4 font-mono text-sm resize-none outline-none"
-                :placeholder="draft.content_format === 'html' ? 'HTML 源码…' : '正文…'"
+                placeholder="正文内容…"
               />
             </div>
 
@@ -515,6 +662,7 @@ onBeforeUnmount(() => {
               class="flex-1 min-h-0 overflow-y-auto p-4 bg-accent/30 border-l border-border relative"
               :style="!isMobile && isDesktopSplit ? { flex: '1 1 50%' } : undefined"
               @mouseup="onPreviewMouseUp"
+              @scroll="onPreviewScroll"
             >
               <ArticleContent :format="draft.content_format" :content="draft.content" :enable-anchors="true" />
               <button
@@ -529,11 +677,16 @@ onBeforeUnmount(() => {
             </div>
 
             <div
-              v-if="isMobile && mobileTab === 'outline'"
+              v-if="isMobile && ['outline', 'backlinks', 'revisions', 'comments', 'annotations'].includes(mobileTab)"
               class="flex-1 min-h-0 overflow-y-auto border-l border-border bg-card/40"
             >
-              <ArticleEditorOutline :content="draft.content" @select="onOutlineSelect" />
-              <ArticleBacklinksPanel ref="backlinksRef" :article-id="draft.id" />
+              <ArticleEditorOutline v-show="mobileTab === 'outline'" :content="draft.content" @select="onOutlineSelect" />
+              <ArticleBacklinksPanel v-show="mobileTab === 'backlinks'" ref="backlinksRef" :article-id="draft.id" />
+              <ArticleRevisionPanel v-show="mobileTab === 'revisions'" :article-id="draft.id" @rollback="onRollback" />
+              <div v-show="mobileTab === 'comments'" class="h-full overflow-y-auto p-2">
+                <ArticleCommentPanel v-if="draft.slug" :article-slug="draft.slug" admin-mode />
+              </div>
+              <ArticleAnnotationPanel v-show="mobileTab === 'annotations'" ref="annotationPanelRef" :article-id="draft.id" />
             </div>
           </div>
         </div>
@@ -567,5 +720,96 @@ onBeforeUnmount(() => {
     </template>
 
     <ArticleMetadataSheet v-model:open="metadataOpen" v-model:draft="draft" />
+
+    <!-- Image insert modal dialog -->
+    <div v-if="showImageModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-all">
+      <div class="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl relative">
+        <h3 class="text-base font-bold text-foreground mb-4">插入图片</h3>
+        
+        <!-- Tab headers -->
+        <div class="flex border-b border-border mb-4">
+          <button 
+            type="button" 
+            class="flex-1 pb-2 text-sm font-bold text-center" 
+            :class="imageTab === 'web' ? 'text-[var(--color-brand-500)] border-b-2 border-[var(--color-brand-500)]' : 'text-muted-foreground'"
+            @click="imageTab = 'web'"
+          >
+            网络图片
+          </button>
+          <button 
+            type="button" 
+            class="flex-1 pb-2 text-sm font-bold text-center" 
+            :class="imageTab === 'local' ? 'text-[var(--color-brand-500)] border-b-2 border-[var(--color-brand-500)]' : 'text-muted-foreground'"
+            @click="imageTab = 'local'"
+          >
+            本地上传
+          </button>
+        </div>
+        
+        <!-- Web Image Tab Content -->
+        <div v-if="imageTab === 'web'" class="space-y-4">
+          <div>
+            <label class="block text-xs font-bold text-muted-foreground mb-1.5">图片链接 (URL)</label>
+            <input 
+              v-model="webImageUrl" 
+              type="text" 
+              class="w-full px-3 py-2 text-sm rounded-xl border border-border bg-card text-foreground"
+              placeholder="https://example.com/image.jpg"
+              required
+            />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-muted-foreground mb-1.5">图片描述 (Alt Text)</label>
+            <input 
+              v-model="webImageAlt" 
+              type="text" 
+              class="w-full px-3 py-2 text-sm rounded-xl border border-border bg-card text-foreground"
+              placeholder="图片描述，将显示为图题（可选）"
+            />
+          </div>
+          <div class="flex gap-2 justify-end pt-2">
+            <button 
+              type="button" 
+              class="px-4 py-2 text-xs font-bold rounded-xl bg-secondary hover:bg-accent" 
+              @click="showImageModal = false"
+            >
+              取消
+            </button>
+            <button 
+              type="button" 
+              class="px-4 py-2 text-xs font-bold rounded-xl bg-[var(--color-brand-500)] text-white hover:opacity-95" 
+              :disabled="!webImageUrl" 
+              @click="insertWebImage"
+            >
+              确认插入
+            </button>
+          </div>
+        </div>
+        
+        <!-- Local Upload Tab Content -->
+        <div v-else class="space-y-4">
+          <div 
+            class="border-2 border-dashed border-border/85 hover:border-[var(--color-brand-500)] transition-colors rounded-2xl p-8 flex flex-col items-center justify-center cursor-pointer select-none"
+            @click="triggerImageUpload"
+          >
+            <Loader2 v-if="imageUploading" class="w-8 h-8 text-[var(--color-brand-500)] animate-spin mb-2" />
+            <ImageIcon v-else class="w-8 h-8 text-muted-foreground mb-2" />
+            <p class="text-sm font-bold text-foreground">
+              {{ imageUploading ? '正在上传...' : '点击选择图片' }}
+            </p>
+            <p class="text-xs text-muted-foreground mt-1">支持 PNG, JPG, GIF 等格式</p>
+          </div>
+          <div class="flex justify-end">
+            <button 
+              type="button" 
+              class="px-4 py-2 text-xs font-bold rounded-xl bg-secondary hover:bg-accent" 
+              @click="showImageModal = false"
+            >
+              关闭
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>

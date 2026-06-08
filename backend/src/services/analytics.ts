@@ -81,8 +81,106 @@ export function clampAnalyticsDays(days: number): number {
   return Math.min(90, Math.max(1, Math.floor(days) || 7));
 }
 
+function getMockAnalyticsOverview(days: number): AnalyticsOverview {
+  const pvToday = 1450;
+  const pvThisWeek = 9800;
+  const pvTotal = 1500 * days;
+  
+  const uvToday = 410;
+  const uvThisWeek = 2800;
+  const uvTotal = 430 * days;
+
+  const clickToday = 310;
+  const clickTotal = 320 * days;
+
+  const searchToday = 150;
+  const searchTotal = 160 * days;
+
+  const dailyPvTrend: Array<{ date: string; pv: number; uv: number }> = [];
+  const now = new Date();
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+    const dateStr = d.toISOString().split("T")[0];
+    const seed = (d.getDate() * 17) % 50;
+    const pv = 1200 + seed * 15 + (d.getDay() === 0 || d.getDay() === 6 ? -300 : 200);
+    const uv = 350 + seed * 4 + (d.getDay() === 0 || d.getDay() === 6 ? -80 : 50);
+    dailyPvTrend.push({ date: dateStr, pv, uv });
+  }
+
+  const hourlyDistribution = Array.from({ length: 24 }, (_, hour) => {
+    let factor = 0.3;
+    if (hour >= 9 && hour <= 11) factor = 1.2;
+    else if (hour >= 14 && hour <= 17) factor = 1.1;
+    else if (hour >= 20 && hour <= 22) factor = 1.3;
+    else if (hour >= 0 && hour <= 6) factor = 0.1;
+    
+    const pv = Math.round(180 * factor + (hour % 3) * 10);
+    const uv = Math.round(60 * factor + (hour % 2) * 5);
+    return { hour, pv, uv };
+  });
+
+  const weeklyDistribution = [1, 2, 3, 4, 5, 6, 7].map((weekday) => {
+    const factor = weekday <= 5 ? 1.2 : 0.7;
+    const pv = Math.round(1500 * factor + (weekday % 2) * 100);
+    return { weekday, pv };
+  });
+
+  const topPages = [
+    { path: "/", displayName: "首页", count: Math.round(pvTotal * 0.45) },
+    { path: "/categories", displayName: "分类浏览", count: Math.round(pvTotal * 0.2) },
+    { path: "/today", displayName: "今日推荐", count: Math.round(pvTotal * 0.15) },
+    { path: "/compare", displayName: "项目对比", count: Math.round(pvTotal * 0.08) },
+    { path: "/me", displayName: "个人中心", count: Math.round(pvTotal * 0.05) },
+    { path: "/submit", displayName: "提交项目", count: Math.round(pvTotal * 0.03) },
+    { path: "/project/ClassroomManager", displayName: "Classroom Manager · 项目详情", count: Math.round(pvTotal * 0.02) },
+    { path: "/project/SeewoToolbox", displayName: "Seewo Toolbox · 项目详情", count: Math.round(pvTotal * 0.02) },
+  ];
+
+  const topProjects = [
+    { slug: "ClassroomManager", name: "课堂助手", clicks: Math.round(clickTotal * 0.4), downloads: Math.round(clickTotal * 0.15) },
+    { slug: "SeewoToolbox", name: "希沃工具箱", clicks: Math.round(clickTotal * 0.25), downloads: Math.round(clickTotal * 0.08) },
+    { slug: "EasyBoard", name: "简易白板", clicks: Math.round(clickTotal * 0.15), downloads: Math.round(clickTotal * 0.05) },
+    { slug: "RandomNamePicker", name: "随机点名器", clicks: Math.round(clickTotal * 0.1), downloads: Math.round(clickTotal * 0.02) },
+    { slug: "TimerWidget", name: "倒计时小部件", clicks: Math.round(clickTotal * 0.08), downloads: Math.round(clickTotal * 0.01) },
+  ];
+
+  const topSearches = [
+    { query: "白板", count: Math.round(searchTotal * 0.35), avgResults: 12 },
+    { query: "点名", count: Math.round(searchTotal * 0.2), avgResults: 4 },
+    { query: "希沃", count: Math.round(searchTotal * 0.15), avgResults: 8 },
+    { query: "课堂管理", count: Math.round(searchTotal * 0.1), avgResults: 6 },
+    { query: "课件", count: Math.round(searchTotal * 0.08), avgResults: 3 },
+    { query: "倒计时", count: Math.round(searchTotal * 0.07), avgResults: 2 },
+  ];
+
+  const categoryDistribution = [
+    { category: "首页", count: Math.round(pvTotal * 0.45) },
+    { category: "分类浏览", count: Math.round(pvTotal * 0.2) },
+    { category: "今日推荐", count: Math.round(pvTotal * 0.15) },
+    { category: "项目详情", count: Math.round(pvTotal * 0.12) },
+    { category: "项目对比", count: Math.round(pvTotal * 0.08) },
+  ];
+
+  return {
+    pv: { total: pvTotal, today: pvToday, thisWeek: pvThisWeek },
+    uv: { total: uvTotal, today: uvToday, thisWeek: uvThisWeek },
+    clicks: { total: clickTotal, today: clickToday },
+    searches: { total: searchTotal, today: searchToday },
+    dailyPvTrend,
+    hourlyDistribution,
+    weeklyDistribution,
+    topPages,
+    topProjects,
+    topSearches,
+    categoryDistribution,
+  };
+}
+
 export async function getAnalyticsOverview(days: number): Promise<AnalyticsOverview> {
   const rangeDays = clampAnalyticsDays(days);
+  if (!dbEnabled) {
+    return getMockAnalyticsOverview(rangeDays);
+  }
 
   const [{ pv_total }] = await sql()<Array<{ pv_total: string }>>`
     select count(*)::text as pv_total from page_views

@@ -12,7 +12,8 @@
     </div>
 
     <template v-else-if="data">
-      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
+      <div class="space-y-4 lg:space-y-6 animate-in fade-in duration-500">
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
         <div class="bg-card rounded-2xl border border-border p-4">
           <div class="text-xs text-muted-foreground mb-1">页面浏览</div>
           <div class="text-2xl font-bold text-foreground">{{ formatNum(data.pv.total) }}</div>
@@ -102,7 +103,8 @@
           </div>
         </div>
       </div>
-    </template>
+    </div>
+  </template>
 
     <div v-else class="text-center py-20 text-slate-400">
       <p class="text-sm">暂无分析数据</p>
@@ -117,9 +119,7 @@ import { LineChart, BarChart, PieChart, TreemapChart, RadarChart } from 'echarts
 import { GridComponent, TooltipComponent, LegendComponent, VisualMapComponent, RadarComponent } from 'echarts/components';
 import { CanvasRenderer } from 'echarts/renderers';
 import VChart from 'vue-echarts';
-if (typeof window !== 'undefined') {
-  await import('echarts-wordcloud/dist/echarts-wordcloud.js');
-}
+
 import { adminFetch } from '../../composables/useAdminFetch';
 
 echarts.use([LineChart, BarChart, PieChart, TreemapChart, RadarChart, GridComponent, TooltipComponent, LegendComponent, VisualMapComponent, RadarComponent, CanvasRenderer]);
@@ -314,5 +314,14 @@ async function fetchData() {
 }
 
 watch(days, () => { void fetchData(); });
-onMounted(() => { void fetchData(); });
+onMounted(async () => {
+  if (typeof window !== 'undefined') {
+    try {
+      await import('echarts-wordcloud/dist/echarts-wordcloud.js');
+    } catch (e) {
+      console.error('Failed to load echarts-wordcloud:', e);
+    }
+  }
+  void fetchData();
+});
 </script>

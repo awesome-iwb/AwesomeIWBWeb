@@ -3,7 +3,7 @@ import { syncArticleLinks } from "./articleLinks";
 import { createArticleRevision } from "./articleRevisions";
 
 export type ArticleLayoutType = "hero" | "interview" | "app_spotlight";
-export type ArticleContentFormat = "markdown" | "html" | "latex" | "plain";
+export type ArticleContentFormat = "markdown" | "html" | "latex" | "plain" | "flarum";
 export type ArticleStatus = "draft" | "published";
 
 export interface ArticleProjectRef {

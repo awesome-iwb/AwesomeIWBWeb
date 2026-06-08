@@ -1415,6 +1415,9 @@ const app = new Elysia()
     if (capErr) return capErr;
     return { templates: getRoleTemplates() };
   })
+  .get("/api/pages", async () => {
+    return await listPages();
+  })
   .get("/api/admin/pages", async ({ set, user, query }) => {
     const capErr = await checkCap(user, set, "route:manage");
     if (capErr) return capErr;
@@ -1441,6 +1444,7 @@ const app = new Elysia()
       icon: t.Optional(t.String()),
       required_capability: t.Optional(t.String()),
       is_visible: t.Optional(t.Boolean()),
+      is_enabled: t.Optional(t.Boolean()),
       sort_index: t.Optional(t.Number()),
     })
   })
@@ -1459,6 +1463,7 @@ const app = new Elysia()
       icon: t.Optional(t.String()),
       required_capability: t.Optional(t.String()),
       is_visible: t.Optional(t.Boolean()),
+      is_enabled: t.Optional(t.Boolean()),
       sort_index: t.Optional(t.Number()),
     })
   })

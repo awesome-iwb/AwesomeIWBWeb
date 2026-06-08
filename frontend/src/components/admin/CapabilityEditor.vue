@@ -108,6 +108,7 @@ const groupLabels: Record<string, string> = {
   'ops.review': '审核',
   'ops.content': '内容',
   'ops.system': '系统',
+  'ops.analytics': '数据分析',
 };
 
 const tierBgClass = (tier: string) => {
