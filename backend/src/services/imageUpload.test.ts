@@ -1,11 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import {
+  assertSafeImageDimensions,
   extFromMime,
   validateImageMime,
   validateImageSignature,
 } from "../services/imageUpload";
 import { parseThumbWidth } from "../services/thumbnails";
-import { buildKey, thumbSidecarKey } from "../services/storage";
+import { buildKey, normalizeStorageKey, resolveStoragePath, thumbSidecarKey } from "../services/storage";
 
 describe("imageUpload helpers", () => {
   test("extFromMime maps supported types", () => {
@@ -27,6 +28,12 @@ describe("imageUpload helpers", () => {
     expect(validateImageSignature(png)).toBe(true);
     expect(validateImageSignature(Buffer.from("not-an-image"))).toBe(false);
   });
+
+  test("assertSafeImageDimensions rejects unreadable or excessive pixel dimensions", () => {
+    expect(() => assertSafeImageDimensions({ width: 1, height: 1 })).not.toThrow();
+    expect(() => assertSafeImageDimensions({ width: null, height: 1 })).toThrow("UPLOAD_INVALID_IMAGE");
+    expect(() => assertSafeImageDimensions({ width: 100000, height: 100000 })).toThrow("UPLOAD_IMAGE_TOO_LARGE");
+  });
 });
 
 describe("storage namespaces", () => {
@@ -37,6 +44,19 @@ describe("storage namespaces", () => {
 
   test("thumbSidecarKey keeps directory", () => {
     expect(thumbSidecarKey("content/abc.jpg", 128)).toBe("content/abc.w128.webp");
+  });
+
+  test("normalizeStorageKey rejects path traversal and unsafe segments", () => {
+    expect(normalizeStorageKey("/content/abc.webp")).toBe("content/abc.webp");
+    expect(() => normalizeStorageKey("../secret.txt")).toThrow("INVALID_STORAGE_KEY");
+    expect(() => normalizeStorageKey("content\\..\\secret.txt")).toThrow("INVALID_STORAGE_KEY");
+    expect(() => normalizeStorageKey("content//abc.webp")).toThrow("INVALID_STORAGE_KEY");
+    expect(() => normalizeStorageKey("content/\u0000.webp")).toThrow("INVALID_STORAGE_KEY");
+  });
+
+  test("resolveStoragePath rejects traversal attempts", () => {
+    expect(resolveStoragePath("content/abc.webp")).toContain("content");
+    expect(() => resolveStoragePath("content/../../data.json")).toThrow("INVALID_STORAGE_KEY");
   });
 });
 

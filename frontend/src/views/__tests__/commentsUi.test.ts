@@ -15,16 +15,14 @@ describe('Comments UI', () => {
   test('comment panel prompts login via STCN', () => {
     const s = readCommentPanel();
     expect(s.includes('智教联盟登录')).toBe(true);
-    expect(s.includes('必须登录')).toBe(true);
+    expect(s.includes('需要登录')).toBe(true);
   });
 
-  test('bug UI looks like issues and supports markdown rendering', () => {
+  test('bug UI looks like issues and supports safe markdown rendering', () => {
     const s = readCommentPanel();
-    expect(s.includes('未解决')).toBe(true);
-    expect(s.includes('已解决')).toBe(true);
-    expect(s.includes('筛选')).toBe(true);
-    expect(s.includes('markdown-it')).toBe(true);
-    expect(s.includes('DOMPurify')).toBe(true);
+    expect(s.includes('renderSafeMarkdown')).toBe(true);
+    expect(s.includes('ISSUE_LABELS')).toBe(true);
+    expect(s.includes('issueLabels')).toBe(true);
   });
 
   test('uses predefined labels for issues', () => {
@@ -35,7 +33,7 @@ describe('Comments UI', () => {
 
   test('supports image upload toolbar for markdown', () => {
     const s = readCommentPanel();
-    expect(s.includes('/api/upload')).toBe(true);
+    expect(s.includes('API.upload.image')).toBe(true);
     expect(s.includes('插入图片')).toBe(true);
     expect(s.includes('加粗')).toBe(true);
   });

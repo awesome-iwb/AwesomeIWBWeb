@@ -13,6 +13,8 @@ export type JwtPayload = {
   tv?: number;
 };
 
+export type JwtInputPayload = Omit<JwtPayload, "iss" | "aud" | "iat" | "nbf" | "exp">;
+
 function base64UrlEncode(input: string): string {
   return Buffer.from(input)
     .toString("base64")
@@ -31,7 +33,7 @@ function hmacSha256(message: string, secret: string): string {
   return createHmac("sha256", secret).update(message).digest("base64url");
 }
 
-export function signJwt(payload: Omit<JwtPayload, "iat" | "exp">, expiresInSeconds = 7 * 24 * 60 * 60): string {
+export function signJwt(payload: JwtInputPayload, expiresInSeconds = appConfig.jwtExpiresInSeconds): string {
   const now = Math.floor(Date.now() / 1000);
   const fullPayload: JwtPayload = {
     iss: appConfig.jwtIssuer,

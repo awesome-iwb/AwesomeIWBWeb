@@ -2,6 +2,7 @@
 import { onMounted, ref } from 'vue';
 import { useRoute } from 'vue-router';
 import { CheckCircle2, XCircle } from 'lucide-vue-next';
+import { publishAuthPopupResult } from '../lib/authPopupChannel';
 
 const route = useRoute();
 
@@ -16,15 +17,7 @@ const handleClose = () => {
 };
 
 const notifyOpener = (success: boolean, message?: string) => {
-  if (!window.opener) return;
-  window.opener.postMessage(
-    {
-      type: 'aiwb-oauth-popup-result',
-      success,
-      message,
-    },
-    window.location.origin,
-  );
+  publishAuthPopupResult(success, message);
 };
 
 onMounted(async () => {

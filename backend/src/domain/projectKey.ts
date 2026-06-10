@@ -1,3 +1,5 @@
+import { parseGithubRepoUrl } from "./urlSafety";
+
 const slugify = (input: string) => {
   const lowered = input.trim().toLowerCase();
   const replaced = lowered.replace(/[^a-z0-9]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
@@ -5,15 +7,8 @@ const slugify = (input: string) => {
 };
 
 const tryGithubOwnerRepo = (url: string) => {
-  try {
-    const u = new URL(url);
-    if (u.hostname !== 'github.com') return null;
-    const parts = u.pathname.replace(/\/+$/, '').split('/').filter(Boolean);
-    if (parts.length < 2) return null;
-    return `${parts[0]}-${parts[1]}`;
-  } catch {
-    return null;
-  }
+  const ref = parseGithubRepoUrl(url);
+  return ref ? `${ref.owner}-${ref.repo}` : null;
 };
 
 export const projectKeyFrom = (p: { slug?: string; name?: string; github_url?: string }) => {
@@ -22,4 +17,3 @@ export const projectKeyFrom = (p: { slug?: string; name?: string; github_url?: s
   if (gh) return slugify(gh);
   return slugify(p.name ?? '');
 };
-

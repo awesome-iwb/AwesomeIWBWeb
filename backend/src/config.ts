@@ -39,6 +39,12 @@ function parseList(raw?: string): string[] {
     .filter(Boolean);
 }
 
+function parsePositiveInt(raw: string | undefined, fallback: number): number {
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0) return fallback;
+  return Math.floor(n);
+}
+
 const nodeEnv = asNodeEnv(process.env.NODE_ENV);
 const allowedOrigins = parseList(process.env.ALLOWED_ORIGINS);
 const dbEnabled = Boolean(process.env.DATABASE_URL);
@@ -46,6 +52,7 @@ const oauthEnabled = process.env.OAUTH_ENABLED !== "false";
 const superadminOnlyLocal = process.env.SUPERADMIN_ONLY_LOCAL !== "false";
 const allowExternalImageUrl = process.env.ALLOW_EXTERNAL_IMAGE_URL === "true";
 const externalImageAllowlist = parseList(process.env.EXTERNAL_IMAGE_ALLOWLIST);
+const trustProxy = process.env.TRUST_PROXY === "true";
 
 requiredInProduction("JWT_SECRET", process.env.JWT_SECRET);
 requiredInProduction("DATABASE_URL", process.env.DATABASE_URL);
@@ -131,15 +138,16 @@ export const appConfig = {
   jwtSecret,
   jwtIssuer: process.env.JWT_ISSUER?.trim() || "awesome-iwb-backend",
   jwtAudience: process.env.JWT_AUDIENCE?.trim() || "awesome-iwb-web",
-  jwtExpiresInSeconds: Number(process.env.JWT_EXPIRES_IN_SECONDS ?? 7 * 24 * 3600),
+  jwtExpiresInSeconds: parsePositiveInt(process.env.JWT_EXPIRES_IN_SECONDS, 7 * 24 * 3600),
   allowedOrigins,
   cookieDomain: process.env.COOKIE_DOMAIN?.trim() || "",
   sessionCookieName: process.env.SESSION_COOKIE_NAME?.trim() || "session",
-  uploadMaxBytes: Number(process.env.UPLOAD_MAX_BYTES ?? 5 * 1024 * 1024),
+  uploadMaxBytes: parsePositiveInt(process.env.UPLOAD_MAX_BYTES, 5 * 1024 * 1024),
   allowExternalImageUrl,
   externalImageAllowlist,
-  rateLimitWindowMs: Number(process.env.RATE_LIMIT_WINDOW_MS ?? 60_000),
-  rateLimitMax: Number(process.env.RATE_LIMIT_MAX ?? 30),
+  rateLimitWindowMs: parsePositiveInt(process.env.RATE_LIMIT_WINDOW_MS, 60_000),
+  rateLimitMax: parsePositiveInt(process.env.RATE_LIMIT_MAX, 30),
+  trustProxy,
   oauthEnabled,
   superadminOnlyLocal,
   casdoor: {

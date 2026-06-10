@@ -225,7 +225,7 @@ onMounted(() => {
           <Moon v-else class="w-5 h-5 text-slate-600" />
         </button>
 
-        <a href="https://github.com/awesome-iwb/awesome-iwb" target="_blank" class="hidden sm:flex p-2 hover:bg-accent rounded-lg transition-colors">
+        <a href="https://github.com/awesome-iwb/awesome-iwb" target="_blank" rel="noopener noreferrer" class="hidden sm:flex p-2 hover:bg-accent rounded-lg transition-colors">
           <Github class="w-5 h-5" />
         </a>
 
@@ -338,7 +338,7 @@ onMounted(() => {
       >
         <Plus class="w-5 h-5" /> 提交新项目
       </button>
-      <a href="https://github.com/awesome-iwb/awesome-iwb" target="_blank" class="flex items-center justify-center gap-2 w-full py-3 bg-secondary text-foreground rounded-xl font-bold">
+      <a href="https://github.com/awesome-iwb/awesome-iwb" target="_blank" rel="noopener noreferrer" class="flex items-center justify-center gap-2 w-full py-3 bg-secondary text-foreground rounded-xl font-bold">
         <Github class="w-5 h-5" /> GitHub 仓库
       </a>
     </div>

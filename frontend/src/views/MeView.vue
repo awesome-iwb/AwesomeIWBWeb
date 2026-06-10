@@ -8,6 +8,7 @@ import { useApi } from '../composables/useApi';
 import { API } from '../api/endpoints';
 import ImageCropper from '../components/ImageCropper.vue';
 import { inferDisplayRole, displayRoleLabel } from '../utils/displayRole';
+import { subscribeAuthPopupResult } from '../lib/authPopupChannel';
 
 useHead({
   title: '个人中心 - Awesome IWB',
@@ -21,10 +22,13 @@ const route = useRoute();
 const { user, isAuthenticated, logout, getCasdoorAuthorizeUrl, uploadAvatar, hasCapability, fetchUser, setAvatarSource, setToken } = useAuth();
 const { apiFetch } = useApi();
 
-const redirectTo = computed(() => {
-  const q = route.query.redirect;
-  return typeof q === 'string' && q ? q : '/';
-});
+const safeInternalPath = (value: unknown) => {
+  const raw = typeof value === 'string' ? value.trim() : '';
+  if (!raw.startsWith('/') || raw.startsWith('//') || raw.includes('\\')) return '/';
+  return raw;
+};
+
+const redirectTo = computed(() => safeInternalPath(route.query.redirect));
 
 const roleLabel = computed(() => {
   if (!user.value) return '';
@@ -87,7 +91,7 @@ onMounted(async () => {
 
   const authSuccess = route.query.auth as string | undefined;
   const returnTo = route.query.returnTo as string | undefined;
-  const nextPath = returnTo && returnTo.startsWith('/') ? returnTo : '/';
+  const nextPath = safeInternalPath(returnTo);
 
   if (authSuccess === 'failed') {
     loginError.value = '登录未完成，请重试';
@@ -125,6 +129,7 @@ const startStcnLogin = async () => {
 
   let popup: Window | null = null;
   let pollTimer: number | null = null;
+  let stopAuthResultListener: (() => void) | null = null;
 
   const stopPoll = () => {
     if (pollTimer !== null) {
@@ -146,6 +151,8 @@ const startStcnLogin = async () => {
 
   const finishError = (message: string) => {
     stopPoll();
+    stopAuthResultListener?.();
+    stopAuthResultListener = null;
     popupStatus.value = '';
     loginError.value = message;
     isLoggingIn.value = false;
@@ -153,6 +160,8 @@ const startStcnLogin = async () => {
 
   const finishSuccess = async () => {
     stopPoll();
+    stopAuthResultListener?.();
+    stopAuthResultListener = null;
     popupStatus.value = '正在接收登录数据...';
     const ok = await fetchUserWithRetry();
     if (!ok) {
@@ -166,16 +175,13 @@ const startStcnLogin = async () => {
     isLoggingIn.value = false;
     popupStatus.value = '';
 
-    const nextPath = redirectTo.value && redirectTo.value.startsWith('/') ? redirectTo.value : '/';
+    const nextPath = safeInternalPath(redirectTo.value);
     await router.push({ path: '/auth/result', query: { returnTo: nextPath } });
   };
 
-  const onMessage = async (event: MessageEvent) => {
-    if (event.origin !== window.location.origin) return;
-    const data = event.data as { type?: string; success?: boolean; message?: string };
-    if (data?.type !== 'aiwb-oauth-popup-result') return;
-
-    window.removeEventListener('message', onMessage);
+  stopAuthResultListener = subscribeAuthPopupResult(async (data) => {
+    stopAuthResultListener?.();
+    stopAuthResultListener = null;
     try {
       popup?.close();
     } catch {}
@@ -184,24 +190,33 @@ const startStcnLogin = async () => {
       await finishSuccess();
       return;
     }
-    finishError(data.message || '登录失败，请重试');
-  };
+    finishError(data.message || 'Login failed, please try again');
+  });
 
   try {
     const authorizeUrl = await getCasdoorAuthorizeUrl(redirectTo.value || undefined);
-    popup = window.open(authorizeUrl, 'aiwb-auth-popup', 'width=560,height=760,menubar=no,toolbar=no,location=yes,status=no,noopener=no');
+    popup = window.open('about:blank', `aiwb-auth-popup-${Date.now()}`, 'width=560,height=760,menubar=no,toolbar=no,location=yes,status=no');
     if (!popup) {
       finishError('浏览器拦截了登录弹窗，请允许弹窗后重试');
       return;
     }
 
-    window.addEventListener('message', onMessage);
+    try {
+      popup.opener = null;
+      popup.location.href = authorizeUrl;
+    } catch {
+      try { popup.close(); } catch {}
+      finishError('Unable to open login page, please try again');
+      return;
+    }
+
     popupStatus.value = '请在弹窗中完成登录...';
 
     pollTimer = window.setInterval(async () => {
       if (!popup || popup.closed) {
         stopPoll();
-        window.removeEventListener('message', onMessage);
+        stopAuthResultListener?.();
+        stopAuthResultListener = null;
         popupStatus.value = '正在检测登录状态...';
         const ok = await fetchUserWithRetry(2, 250);
         if (ok) {
@@ -212,7 +227,8 @@ const startStcnLogin = async () => {
       }
     }, 500);
   } catch (e: any) {
-    window.removeEventListener('message', onMessage);
+    stopAuthResultListener?.();
+    stopAuthResultListener = null;
     finishError(e?.message || '无法启动登录流程，请检查网络连接');
   }
 };
@@ -437,6 +453,7 @@ const handleLogout = async () => {
             <a
               href="https://github.com/awesome-iwb/awesome-iwb"
               target="_blank"
+              rel="noopener noreferrer"
               class="flex-1 inline-flex items-center justify-center gap-2 bg-secondary text-foreground px-6 py-3.5 rounded-2xl font-extrabold hover:bg-accent transition-colors"
             >
               <Github class="w-5 h-5" />

@@ -6,8 +6,7 @@ import { MessageSquare, FolderKanban, Building2, Calendar, Pencil, ChevronLeft, 
 import { useAuth } from '../composables/useAuth';
 import { useApi } from '../composables/useApi';
 import { API } from '../api/endpoints';
-import MarkdownIt from 'markdown-it';
-import DOMPurify from 'dompurify';
+import { renderSafeMarkdown } from '../lib/safeMarkdown';
 
 const route = useRoute();
 const router = useRouter();
@@ -72,10 +71,8 @@ const isLoadingProjects = ref(false);
 const organizations = ref<UserOrganization[]>([]);
 const isLoadingOrganizations = ref(false);
 
-const md = new MarkdownIt({ breaks: true, linkify: true });
 const renderMarkdown = (text: string) => {
-  if (!text) return '';
-  return DOMPurify.sanitize(md.render(text));
+  return renderSafeMarkdown(text);
 };
 
 const isSelf = computed(() => isAuthenticated.value && user.value?.name === userName.value);

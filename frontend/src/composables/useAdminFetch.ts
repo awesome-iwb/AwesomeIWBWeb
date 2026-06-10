@@ -54,22 +54,34 @@ export type NormalizeMediaUrlOptions = {
   allowedExternalHosts?: string[];
 };
 
-export const isInternalUploadUrl = (value: string, prefix = '/api/uploads/'): boolean => value.startsWith(prefix);
+export const isInternalUploadUrl = (value: string, prefix = '/api/uploads/'): boolean => {
+  const text = String(value ?? '').trim();
+  if (!text || !text.startsWith(prefix)) return false;
+  if (text.includes('?') || text.includes('#') || text.includes('\\')) return false;
+  try {
+    const url = new URL(text, 'https://local.invalid');
+    if (url.origin !== 'https://local.invalid' || url.pathname !== text) return false;
+    const suffix = text.slice(prefix.length);
+    return Boolean(suffix) && !suffix.split('/').some((part) => !part || part === '.' || part === '..');
+  } catch {
+    return false;
+  }
+};
 
 export const normalizeMediaUrl = (value: unknown, options?: NormalizeMediaUrlOptions): string => {
   const publicPrefix = options?.publicPrefix ?? '/api/uploads/';
   const allowedExternalHosts = options?.allowedExternalHosts ?? [];
   const text = String(value ?? '').trim();
   if (!text) return '';
-  if (text.startsWith(publicPrefix)) return text;
+  if (isInternalUploadUrl(text, publicPrefix)) return text;
   if (text.startsWith('http')) {
     try {
       const host = new URL(text).hostname;
       if (allowedExternalHosts.includes(host)) return text;
     } catch {}
   }
-  console.warn(`[normalizeMediaUrl] URL 不符合预期前缀 "${publicPrefix}" 且不在外部允许列表中，已保留原值: ${text}`);
-  return text;
+  console.warn(`[normalizeMediaUrl] URL 不符合预期前缀 "${publicPrefix}" 且不在外部允许列表中，已清空: ${text}`);
+  return '';
 };
 
 export const uploadFile = async (file: File): Promise<string> => {

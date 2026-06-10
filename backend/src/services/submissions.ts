@@ -22,17 +22,14 @@ export async function listSubmissions(params: { status?: string; q?: string; pag
   const status = params.status?.trim() || "pending";
   const q = params.q?.trim();
 
-  let where;
-  if (q) {
-    where = sql()`status = ${status} and (payload->>'name' ilike ${"%" + q + "%"} or payload->>'github_url' ilike ${"%" + q + "%"})`;
-  } else {
-    where = sql()`status = ${status}`;
-  }
+  const qFilter = q
+    ? db`and (payload->>'name' ilike ${"%" + q + "%"} or payload->>'github_url' ilike ${"%" + q + "%"})`
+    : db``;
 
   const items = await sql()<Array<any>>`
     select id, status, payload, submitter_meta, review_note, created_at, updated_at
     from project_submissions
-    where ${where}
+    where status = ${status} ${qFilter}
     order by created_at desc
     limit ${pageSize} offset ${offset}
   `;
@@ -40,7 +37,7 @@ export async function listSubmissions(params: { status?: string; q?: string; pag
   const [{ count }] = await sql()<Array<{ count: string }>>`
     select count(*)::text as count
     from project_submissions
-    where ${where}
+    where status = ${status} ${qFilter}
   `;
 
   return { items, page, pageSize, total: Number(count) };
@@ -65,4 +62,3 @@ export async function updateSubmissionStatus(id: string, status: string, reviewN
   `;
   return row ?? null;
 }
-

@@ -30,7 +30,7 @@
               <div v-else class="w-full h-56 rounded-xl bg-muted flex items-center justify-center text-slate-500">无预览</div>
             </div>
             <div class="space-y-3">
-              <div class="text-sm"><span class="font-bold text-muted-foreground">URL：</span><a :href="mediaDraft.url" target="_blank" class="text-emerald-500 break-all hover:underline">{{ mediaDraft.url || '-' }}</a></div>
+              <div class="text-sm"><span class="font-bold text-muted-foreground">URL：</span><a :href="safeExternalUrl(mediaDraft.url)" target="_blank" rel="noopener noreferrer" class="text-emerald-500 break-all hover:underline">{{ mediaDraft.url || '-' }}</a></div>
               <div class="text-sm"><span class="font-bold text-muted-foreground">来源：</span>{{ sourceLabel(mediaDraft.source) }}</div>
               <div class="text-sm"><span class="font-bold text-muted-foreground">MIME：</span>{{ mediaDraft.mime || '-' }}</div>
               <div class="text-sm"><span class="font-bold text-muted-foreground">尺寸：</span>{{ formatDimensions(mediaDraft.width, mediaDraft.height) }}</div>
@@ -213,6 +213,7 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue';
 import { adminFetch, formatAdminError, formatBytes, formatDateTime } from '../../composables/useAdminFetch';
+import { safeExternalUrl } from '../../lib/safeUrl';
 import MediaTagInput from '../../components/admin/MediaTagInput.vue';
 import MediaBatchActions from '../../components/admin/MediaBatchActions.vue';
 import { ListDetailLayout as uiListDetailLayout, EmptyState as uiEmptyState, LoadingSpinner as uiLoadingSpinner } from '../../components/ui';

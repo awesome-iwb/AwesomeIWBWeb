@@ -1,4 +1,5 @@
 import { sql } from "../db/client";
+import { normalizeProjectInput } from "../domain/normalizeProjectInput";
 
 export async function createProjectRevision(projectId: string) {
   const rows = await sql()<Array<any>>`
@@ -46,30 +47,31 @@ export async function rollbackProject(projectId: string, revisionId: string) {
   `;
   const snapshot = rows[0]?.snapshot;
   if (!snapshot) return null;
+  const safeSnapshot = normalizeProjectInput(snapshot);
 
   const [row] = await sql()<Array<any>>`
     update projects
     set
-      name = ${snapshot.name ?? ""},
-      category_id = ${snapshot.category_id ?? null},
-      developer = ${snapshot.developer ?? ""},
-      status = ${snapshot.status ?? ""},
-      version = ${snapshot.version ?? ""},
-      ai_usage_state = ${snapshot.ai_usage_state ?? "unknown"},
-      description = ${snapshot.description ?? ""},
-      keywords = ${snapshot.keywords ?? []},
-      recommendation = ${snapshot.recommendation ?? []},
-      github_url = ${snapshot.github_url ?? ""},
-      avatar = ${snapshot.avatar ?? ""},
-      icon = ${snapshot.icon ?? ""},
-      banner = ${snapshot.banner ?? ""},
-      stars = ${snapshot.stars ?? 0},
-      language = ${snapshot.language ?? ""},
-      last_update = ${snapshot.last_update ?? null},
-      github_is_fork = ${snapshot.github_is_fork ?? false},
-      github_parent_url = ${snapshot.github_parent_url ?? ""},
-      github_source_url = ${snapshot.github_source_url ?? ""},
-      extra = ${snapshot.extra ?? {}},
+      name = ${safeSnapshot.name ?? ""},
+      category_id = ${safeSnapshot.category_id ?? null},
+      developer = ${safeSnapshot.developer ?? ""},
+      status = ${safeSnapshot.status ?? ""},
+      version = ${safeSnapshot.version ?? ""},
+      ai_usage_state = ${safeSnapshot.ai_usage_state ?? "unknown"},
+      description = ${safeSnapshot.description ?? ""},
+      keywords = ${safeSnapshot.keywords ?? []},
+      recommendation = ${safeSnapshot.recommendation ?? []},
+      github_url = ${safeSnapshot.github_url ?? ""},
+      avatar = ${safeSnapshot.avatar ?? ""},
+      icon = ${safeSnapshot.icon ?? ""},
+      banner = ${safeSnapshot.banner ?? ""},
+      stars = ${safeSnapshot.stars ?? 0},
+      language = ${safeSnapshot.language ?? ""},
+      last_update = ${safeSnapshot.last_update ?? null},
+      github_is_fork = ${safeSnapshot.github_is_fork ?? false},
+      github_parent_url = ${safeSnapshot.github_parent_url ?? ""},
+      github_source_url = ${safeSnapshot.github_source_url ?? ""},
+      extra = ${safeSnapshot.extra ?? {}},
       updated_at = now()
     where id = ${projectId}
     returning *

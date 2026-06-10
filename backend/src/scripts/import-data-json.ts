@@ -1,9 +1,12 @@
 ﻿import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
+import { fileURLToPath } from "node:url";
 import { migrate } from "../db/migrate";
 import { sql } from "../db/client";
+import { normalizeProjectInput } from "../domain/normalizeProjectInput";
 import { projectKeyFrom } from "../domain/projectKey";
+import { upsertProjectBySlugOrName } from "../services/projects";
 
 type ProjectLike = {
   slug?: string;
@@ -24,12 +27,13 @@ type ProjectLike = {
   github_is_fork?: boolean;
   github_parent_url?: string;
   github_source_url?: string;
+  extra?: unknown;
 };
 
 type CategoryLike = { name?: string; description?: string; projects?: ProjectLike[] };
 type DataLike = { categories?: CategoryLike[] };
 
-const scriptDir = path.dirname(new URL(import.meta.url).pathname);
+const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const dataCandidates = [
   path.resolve(scriptDir, "../../runtime/data.json"),
   path.resolve(scriptDir, "../data.json")
@@ -112,52 +116,14 @@ for (const c of categories) {
 
     const slug = stableSlug(categoryName, p, name);
 
-    await sql()`
-      insert into projects (slug, name, category_id, developer, status, version, description, keywords, recommendation, github_url, avatar, icon, banner, stars, language, last_update, github_is_fork, github_parent_url, github_source_url, extra)
-      values (
-        ${slug},
-        ${p.name ?? ""},
-        ${categoryId},
-        ${p.developer ?? ""},
-        ${p.status ?? ""},
-        ${p.version ?? ""},
-        ${p.description ?? ""},
-        ${p.keywords ?? []},
-        ${p.recommendation ? [p.recommendation] : []},
-        ${p.github_url ?? ""},
-        ${p.avatar ?? ""},
-        ${p.icon ?? p.avatar ?? ""},
-        ${p.banner ?? ""},
-        ${p.stars ?? 0},
-        ${p.language ?? ""},
-        ${p.last_update ?? null},
-        ${p.github_is_fork ?? false},
-        ${p.github_parent_url ?? ""},
-        ${p.github_source_url ?? ""},
-        ${p}
-      )
-      on conflict (slug) do update set
-        name = excluded.name,
-        category_id = excluded.category_id,
-        developer = excluded.developer,
-        status = excluded.status,
-        version = excluded.version,
-        description = excluded.description,
-        keywords = excluded.keywords,
-        recommendation = excluded.recommendation,
-        github_url = excluded.github_url,
-        avatar = excluded.avatar,
-        icon = excluded.icon,
-        banner = excluded.banner,
-        stars = excluded.stars,
-        language = excluded.language,
-        last_update = excluded.last_update,
-        github_is_fork = excluded.github_is_fork,
-        github_parent_url = excluded.github_parent_url,
-        github_source_url = excluded.github_source_url,
-        extra = excluded.extra,
-        updated_at = now()
-    `;
+    await upsertProjectBySlugOrName(normalizeProjectInput({
+      ...p,
+      slug,
+      name,
+      category_id: categoryId,
+      icon: p.icon ?? p.avatar ?? "",
+      extra: p.extra && typeof p.extra === "object" && !Array.isArray(p.extra) ? p.extra : {},
+    }) as any);
     importedProjects += 1;
   }
 }

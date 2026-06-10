@@ -1,5 +1,6 @@
 import { sql } from "../db/client";
-import { syncAllProjectsFromGithub } from "./githubProjectSync";
+import { syncAllProjectsFromGithub, syncProjectFromGithub, type SyncGithubProjectResult } from "./githubProjectSync";
+import type { ProjectRow } from "./projects";
 
 export const GITHUB_SYNC_JOB_KEY = "github_project_stats";
 
@@ -45,6 +46,7 @@ const SCHEDULER_CHECK_MS = 15 * 60 * 1000;
 let syncRunning = false;
 let syncRunPromise: Promise<SyncRunSummary & { status: SyncRunStatus }> | null = null;
 let schedulerStarted = false;
+const SYNC_LOCK_TTL_MS = 2 * 60 * 60 * 1000;
 
 export function isGithubTokenConfigured(): boolean {
   return Boolean(process.env.GITHUB_TOKEN?.trim());
@@ -184,6 +186,28 @@ async function persistRunResult(summary: SyncRunSummary, status: SyncRunStatus) 
   `;
 }
 
+async function tryAcquireSyncLock(owner: string) {
+  const lockedUntil = new Date(Date.now() + SYNC_LOCK_TTL_MS).toISOString();
+  const rows = await sql()<Array<{ acquired: boolean }>>`
+    insert into sync_job_locks (job_key, locked_until, owner)
+    values (${GITHUB_SYNC_JOB_KEY}, ${lockedUntil}, ${owner})
+    on conflict (job_key) do update
+      set locked_until = excluded.locked_until,
+          owner = excluded.owner,
+          updated_at = now()
+      where sync_job_locks.locked_until < now()
+    returning true as acquired
+  `;
+  return rows[0]?.acquired === true;
+}
+
+async function releaseSyncLock(owner: string) {
+  await sql()`
+    delete from sync_job_locks
+    where job_key = ${GITHUB_SYNC_JOB_KEY} and owner = ${owner}
+  `;
+}
+
 export function isGithubSyncRunning(): boolean {
   return syncRunning;
 }
@@ -194,10 +218,34 @@ export async function runGithubProjectSync(opts?: {
   trigger?: "manual" | "scheduled" | "script";
 }): Promise<SyncRunSummary & { status: SyncRunStatus }> {
   if (syncRunning && syncRunPromise) return syncRunPromise;
+  if (syncRunning) {
+    return {
+      total: 0,
+      updated: 0,
+      failed: 0,
+      skipped: 0,
+      status: "failed",
+      error_snippet: "GitHub sync is already running in this backend process",
+    };
+  }
 
   syncRunning = true;
+  const lockOwner = `${opts?.trigger ?? "manual"}:${crypto.randomUUID()}`;
   syncRunPromise = (async () => {
+    let lockAcquired = false;
     try {
+      lockAcquired = await tryAcquireSyncLock(lockOwner);
+      if (!lockAcquired) {
+        return {
+          total: 0,
+          updated: 0,
+          failed: 0,
+          skipped: 0,
+          status: "failed",
+          error_snippet: "GitHub sync is already running in another backend process",
+        };
+      }
+
       const result = await syncAllProjectsFromGithub({ limit: opts?.limit, dryRun: opts?.dryRun });
       const summary = toSummary(result);
       const status = deriveRunStatus(summary);
@@ -221,12 +269,57 @@ export async function runGithubProjectSync(opts?: {
       }
       return { ...summary, status };
     } finally {
+      if (lockAcquired) {
+        try {
+          await releaseSyncLock(lockOwner);
+        } catch (e) {
+          console.error("[github-sync] failed to release advisory lock:", e);
+        }
+      }
       syncRunning = false;
       syncRunPromise = null;
     }
   })();
 
   return syncRunPromise;
+}
+
+export async function runSingleProjectGithubSync(
+  project: Pick<ProjectRow, "id" | "github_url" | "status" | "extra">,
+  opts?: { dryRun?: boolean; trigger?: "manual" | "script" }
+): Promise<SyncGithubProjectResult> {
+  if (syncRunning) {
+    return {
+      id: project.id,
+      updated: false,
+      error: "GitHub sync is already running in this backend process",
+    };
+  }
+
+  syncRunning = true;
+  const lockOwner = `${opts?.trigger ?? "manual"}:single:${project.id}:${crypto.randomUUID()}`;
+  let lockAcquired = false;
+  try {
+    lockAcquired = await tryAcquireSyncLock(lockOwner);
+    if (!lockAcquired) {
+      return {
+        id: project.id,
+        updated: false,
+        error: "GitHub sync is already running in another backend process",
+      };
+    }
+
+    return await syncProjectFromGithub(project, { dryRun: opts?.dryRun });
+  } finally {
+    if (lockAcquired) {
+      try {
+        await releaseSyncLock(lockOwner);
+      } catch (e) {
+        console.error("[github-sync] failed to release single-project lock:", e);
+      }
+    }
+    syncRunning = false;
+  }
 }
 
 async function schedulerTick() {

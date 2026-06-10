@@ -106,15 +106,21 @@ export async function setUserCapabilities(userId: string, capabilityIds: string[
   if (!dbEnabled) return;
   await sql()`delete from user_capabilities where user_id = ${userId}`;
   if (validIds.length === 0) return;
-  const values = validIds.map(cid => `('${userId}', '${cid}')`).join(", ");
-  await sql().unsafe(`insert into user_capabilities (user_id, capability_id) values ${values} on conflict do nothing`);
+  await sql()`
+    insert into user_capabilities (user_id, capability_id)
+    select ${userId}, unnest(${validIds}::text[])
+    on conflict do nothing
+  `;
 }
 
 export async function grantCapabilities(userId: string, capabilityIds: string[]): Promise<void> {
   const validIds = capabilityIds.filter(id => ALL_CAPABILITY_IDS.has(id));
   if (!dbEnabled || validIds.length === 0) return;
-  const values = validIds.map(cid => `('${userId}', '${cid}')`).join(", ");
-  await sql().unsafe(`insert into user_capabilities (user_id, capability_id) values ${values} on conflict do nothing`);
+  await sql()`
+    insert into user_capabilities (user_id, capability_id)
+    select ${userId}, unnest(${validIds}::text[])
+    on conflict do nothing
+  `;
 }
 
 export async function grantDefaultUserCapabilities(userId: string): Promise<void> {

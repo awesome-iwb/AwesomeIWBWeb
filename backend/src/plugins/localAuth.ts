@@ -14,6 +14,9 @@ import {
 } from "../services/localAccounts";
 import { logAudit } from "../services/audit";
 import { setSessionCookie } from "../utils/cookies";
+import { bumpUserTokenVersion, findUserById, findUserByName } from "../services/users";
+import { isApiTokenIdentity } from "../domain/authIdentity";
+import { getClientIp } from "../security/clientIp";
 
 const dbEnabled = Boolean(process.env.DATABASE_URL);
 const SUPERADMIN_INITIAL_USERNAME = (process.env.SUPERADMIN_INITIAL_USERNAME ?? "lincube").trim();
@@ -36,14 +39,6 @@ const IP_MAX_ATTEMPTS = 5;
 const IP_WINDOW_MS = 15 * 60 * 1000;
 let superadminFailureWindow = { count: 0, resetAt: 0 };
 let superadminLockUntil = 0;
-
-function getClientIp(headers: Record<string, string | undefined>): string {
-  return (
-    headers["x-forwarded-for"] ??
-    headers["x-real-ip"] ??
-    "unknown"
-  ).split(",")[0].trim();
-}
 
 function checkIpRateLimit(ip: string): boolean {
   const now = Date.now();
@@ -184,12 +179,13 @@ export const localAuthPlugin = new Elysia({ prefix: "/api/auth" })
       await recordLoginSuccess(account.id);
       superadminFailureWindow = { count: 0, resetAt: Date.now() + 15 * 60 * 1000 };
       superadminLockUntil = 0;
+      const dbUser = dbEnabled ? await findUserByName(account.username) : null;
 
       const jwt = signJwt({
-        sub: `local:${account.id}`,
-        name: account.username,
-        role: account.role,
-        tv: 0
+        sub: dbUser?.id ?? `local:${account.id}`,
+        name: dbUser?.name ?? account.username,
+        role: dbUser?.role ?? account.role,
+        tv: dbUser?.token_version ?? 0
       });
 
       await logAttempt({ ip: clientIp, ua, username, status: "success", reason: "ok" });
@@ -197,10 +193,10 @@ export const localAuthPlugin = new Elysia({ prefix: "/api/auth" })
 
       return {
         user: {
-          id: `local:${account.id}`,
-          name: account.username,
-          role: account.role,
-          avatar_url: "",
+          id: dbUser?.id ?? `local:${account.id}`,
+          name: dbUser?.name ?? account.username,
+          role: dbUser?.role ?? account.role,
+          avatar_url: dbUser?.avatar_url ?? "",
         },
         mustChangePassword: account.must_change_password,
         token: jwt
@@ -219,11 +215,22 @@ export const localAuthPlugin = new Elysia({ prefix: "/api/auth" })
       set.status = 401;
       return authError(set, 401, "UNAUTHORIZED", "登录失败");
     }
+    if (isApiTokenIdentity(user)) {
+      set.status = 403;
+      return authError(set, 403, "FORBIDDEN", "Login session required");
+    }
+
+    const currentUser = dbEnabled ? await findUserById(user.id) : null;
+    if (dbEnabled && (!currentUser || !currentUser.is_active)) {
+      set.status = 401;
+      return authError(set, 401, "UNAUTHORIZED", "Login expired");
+    }
+
     const jwt = signJwt({
-      sub: String(user.id),
-      name: user.name,
-      role: user.role,
-      tv: 0
+      sub: currentUser?.id ?? String(user.id),
+      name: currentUser?.name ?? user.name,
+      role: currentUser?.role ?? user.role,
+      tv: currentUser?.token_version ?? 0
     });
     setSessionCookie(set, jwt);
     return { success: true };
@@ -250,19 +257,45 @@ export const localAuthPlugin = new Elysia({ prefix: "/api/auth" })
         set.status = 404;
         return authError(set, 404, "NOT_FOUND", "登录失败");
       }
+      let dbUser = dbEnabled ? await findUserById(payload.sub) : null;
+      if (!dbUser && payload.sub.startsWith("local:")) {
+        dbUser = dbEnabled ? await findUserByName(account.username) : null;
+      }
+      if (dbEnabled) {
+        if (!dbUser || !dbUser.is_active || dbUser.name !== account.username) {
+          set.status = 401;
+          return authError(set, 401, "UNAUTHORIZED", "Login expired");
+        }
+        if ((payload.tv ?? 0) !== (dbUser.token_version ?? 0)) {
+          set.status = 401;
+          return authError(set, 401, "UNAUTHORIZED", "Login expired");
+        }
+      }
+
       const ok = await verifyLocalPassword(account, String(body.currentPassword ?? ""));
       if (!ok) {
         set.status = 401;
         return authError(set, 401, "AUTH_FAILED", "登录失败");
       }
       await setLocalAccountPassword(username, String(body.newPassword ?? ""), false);
+      if (dbUser) {
+        await bumpUserTokenVersion(dbUser.id);
+        dbUser = await findUserById(dbUser.id);
+      }
+      const jwt = signJwt({
+        sub: dbUser?.id ?? payload.sub,
+        name: dbUser?.name ?? username,
+        role: dbUser?.role ?? "ops",
+        tv: dbUser?.token_version ?? 0
+      });
+      setSessionCookie(set, jwt);
       await logAudit({
         action: "superadmin_password_changed",
         entity_type: "local_account",
         entity_id: username,
         diff: { ip: getClientIp(headers), ua: headers["user-agent"] ?? "" }
       }).catch(() => {});
-      return { success: true };
+      return { success: true, token: jwt };
     },
     {
       body: t.Object({

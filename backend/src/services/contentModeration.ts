@@ -71,34 +71,24 @@ export async function listCommentModeration(params: {
   const pageSize = Math.min(100, Math.max(1, params.pageSize ?? 20));
   const offset = (page - 1) * pageSize;
 
-  const conditions: string[] = [];
-  const queryParams: any[] = [];
+  const db = sql();
+  const statusFilter = params.status ? db`and status = ${params.status}` : db``;
+  const actorFilter = params.actor_username ? db`and actor_username = ${params.actor_username}` : db``;
+  const projectFilter = params.project_name ? db`and project_name = ${params.project_name}` : db``;
 
-  if (params.status) {
-    queryParams.push(params.status);
-    conditions.push(`status = $${queryParams.length}`);
-  }
-  if (params.actor_username) {
-    queryParams.push(params.actor_username);
-    conditions.push(`actor_username = $${queryParams.length}`);
-  }
-  if (params.project_name) {
-    queryParams.push(params.project_name);
-    conditions.push(`project_name = $${queryParams.length}`);
-  }
-
-  const whereClause = conditions.length ? `where ${conditions.join(" and ")}` : "";
-
-  const countQuery = `select count(*)::text as count from comment_moderation ${whereClause}`;
-  const itemsQuery = `
+  const items = await db<CommentModerationEntry[]>`
     select id, project_name, body, actor_username, actor_role, status, review_note, feedback_entry_id, created_at, updated_at
-    from comment_moderation ${whereClause}
+    from comment_moderation
+    where true ${statusFilter} ${actorFilter} ${projectFilter}
     order by created_at desc
     limit ${pageSize} offset ${offset}
   `;
 
-  const items = await sql().unsafe(itemsQuery, queryParams) as CommentModerationEntry[];
-  const [{ count }] = await sql().unsafe(countQuery, queryParams) as Array<{ count: string }>;
+  const [{ count }] = await db<Array<{ count: string }>>`
+    select count(*)::text as count
+    from comment_moderation
+    where true ${statusFilter} ${actorFilter} ${projectFilter}
+  `;
 
   return { items, page, pageSize, total: Number(count) };
 }
@@ -114,34 +104,24 @@ export async function listBugModeration(params: {
   const pageSize = Math.min(100, Math.max(1, params.pageSize ?? 20));
   const offset = (page - 1) * pageSize;
 
-  const conditions: string[] = [];
-  const queryParams: any[] = [];
+  const db = sql();
+  const statusFilter = params.status ? db`and status = ${params.status}` : db``;
+  const actorFilter = params.actor_username ? db`and actor_username = ${params.actor_username}` : db``;
+  const projectFilter = params.project_name ? db`and project_name = ${params.project_name}` : db``;
 
-  if (params.status) {
-    queryParams.push(params.status);
-    conditions.push(`status = $${queryParams.length}`);
-  }
-  if (params.actor_username) {
-    queryParams.push(params.actor_username);
-    conditions.push(`actor_username = $${queryParams.length}`);
-  }
-  if (params.project_name) {
-    queryParams.push(params.project_name);
-    conditions.push(`project_name = $${queryParams.length}`);
-  }
-
-  const whereClause = conditions.length ? `where ${conditions.join(" and ")}` : "";
-
-  const countQuery = `select count(*)::text as count from bug_moderation ${whereClause}`;
-  const itemsQuery = `
+  const items = await db<BugModerationEntry[]>`
     select id, project_name, title, body, labels, actor_username, actor_role, status, review_note, feedback_entry_id, created_at, updated_at
-    from bug_moderation ${whereClause}
+    from bug_moderation
+    where true ${statusFilter} ${actorFilter} ${projectFilter}
     order by created_at desc
     limit ${pageSize} offset ${offset}
   `;
 
-  const items = await sql().unsafe(itemsQuery, queryParams) as BugModerationEntry[];
-  const [{ count }] = await sql().unsafe(countQuery, queryParams) as Array<{ count: string }>;
+  const [{ count }] = await db<Array<{ count: string }>>`
+    select count(*)::text as count
+    from bug_moderation
+    where true ${statusFilter} ${actorFilter} ${projectFilter}
+  `;
 
   return { items, page, pageSize, total: Number(count) };
 }

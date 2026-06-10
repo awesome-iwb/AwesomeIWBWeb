@@ -2,6 +2,47 @@ import { sql } from "../db/client";
 
 const dbEnabled = Boolean(process.env.DATABASE_URL);
 
+const MAX_MEDIA_TAGS = 50;
+const MAX_BATCH_MEDIA_IDS = 200;
+const MAX_MEDIA_TAG_CHARS = 64;
+const MEDIA_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function normalizeMediaId(value: unknown): string {
+  const id = String(value ?? "").trim();
+  return MEDIA_ID_PATTERN.test(id) ? id : "";
+}
+
+function normalizeMediaIdList(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const item of value) {
+    const id = normalizeMediaId(item);
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    out.push(id);
+    if (out.length >= MAX_BATCH_MEDIA_IDS) break;
+  }
+  return out;
+}
+
+export function normalizeMediaTags(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const item of value) {
+    const tag = String(item ?? "")
+      .replace(/[\u0000-\u001F\u007F]/g, "")
+      .trim()
+      .slice(0, MAX_MEDIA_TAG_CHARS);
+    if (!tag || seen.has(tag)) continue;
+    seen.add(tag);
+    out.push(tag);
+    if (out.length >= MAX_MEDIA_TAGS) break;
+  }
+  return out;
+}
+
 export type MediaAsset = {
   id: string;
   sha256: string;
@@ -116,16 +157,15 @@ export async function listMediaAssets(
   const pageSize = Math.min(100, Math.max(1, pagination.pageSize ?? 50));
   const offset = (page - 1) * pageSize;
 
-  const whereParts = [];
   const q = filters.q?.trim();
-  if (q) whereParts.push(sql()`(m.url ilike ${"%" + q + "%"} or m.sha256 ilike ${"%" + q + "%"} or m.storage_key ilike ${"%" + q + "%"})`);
-  if (filters.status) whereParts.push(sql()`m.status = ${filters.status}`);
-  if (filters.mime) whereParts.push(sql()`m.mime = ${filters.mime}`);
-  if (filters.source) whereParts.push(sql()`m.source = ${filters.source}`);
-  if (filters.tag) {
-    whereParts.push(sql()`m.id in (select media_id from media_tags where tag = ${filters.tag})`);
-  }
-  const where = whereParts.length ? sql().join(whereParts, sql()` and `) : sql()`true`;
+  const db = sql();
+  const qFilter = q
+    ? db`and (m.url ilike ${"%" + q + "%"} or m.sha256 ilike ${"%" + q + "%"} or m.storage_key ilike ${"%" + q + "%"})`
+    : db``;
+  const statusFilter = filters.status ? db`and m.status = ${filters.status}` : db``;
+  const mimeFilter = filters.mime ? db`and m.mime = ${filters.mime}` : db``;
+  const sourceFilter = filters.source ? db`and m.source = ${filters.source}` : db``;
+  const tagFilter = filters.tag ? db`and m.id in (select media_id from media_tags where tag = ${filters.tag})` : db``;
 
   const rows = await sql()<
     Array<
@@ -146,12 +186,12 @@ export async function listMediaAssets(
     left join lateral (
       select array_agg(tag order by tag) as tags from media_tags mt where mt.media_id = m.id
     ) tg on true
-    where ${where}
+    where true ${qFilter} ${statusFilter} ${mimeFilter} ${sourceFilter} ${tagFilter}
     order by m.created_at desc
     limit ${pageSize} offset ${offset}
   `;
   const [{ count }] = await sql()<Array<{ count: string }>>`
-    select count(*)::text as count from media_assets m where ${where}
+    select count(*)::text as count from media_assets m where true ${qFilter} ${statusFilter} ${mimeFilter} ${sourceFilter} ${tagFilter}
   `;
 
   const items: MediaAssetListItem[] = rows.map((row) => ({
@@ -259,21 +299,27 @@ export async function getMediaTags(mediaId: string): Promise<string[]> {
 
 export async function setMediaTags(mediaId: string, tags: string[]): Promise<string[]> {
   if (!dbEnabled) return [];
-  await sql()`delete from media_tags where media_id = ${mediaId}`;
-  if (tags.length === 0) return [];
-  for (const tag of tags) {
-    await sql()`insert into media_tags (media_id, tag) values (${mediaId}, ${tag}) on conflict do nothing`;
+  const safeMediaId = normalizeMediaId(mediaId);
+  if (!safeMediaId) return [];
+  const safeTags = normalizeMediaTags(tags);
+  await sql()`delete from media_tags where media_id = ${safeMediaId}`;
+  if (safeTags.length === 0) return [];
+  for (const tag of safeTags) {
+    await sql()`insert into media_tags (media_id, tag) values (${safeMediaId}, ${tag}) on conflict do nothing`;
   }
-  return tags;
+  return safeTags;
 }
 
 export async function batchTagMedia(mediaIds: string[], tagsToAdd: string[], tagsToRemove: string[]): Promise<void> {
   if (!dbEnabled) return;
-  for (const mid of mediaIds) {
-    for (const tag of tagsToRemove) {
+  const safeMediaIds = normalizeMediaIdList(mediaIds);
+  const safeTagsToAdd = normalizeMediaTags(tagsToAdd);
+  const safeTagsToRemove = normalizeMediaTags(tagsToRemove);
+  for (const mid of safeMediaIds) {
+    for (const tag of safeTagsToRemove) {
       await sql()`delete from media_tags where media_id = ${mid} and tag = ${tag}`;
     }
-    for (const tag of tagsToAdd) {
+    for (const tag of safeTagsToAdd) {
       await sql()`insert into media_tags (media_id, tag) values (${mid}, ${tag}) on conflict do nothing`;
     }
   }
@@ -282,7 +328,7 @@ export async function batchTagMedia(mediaIds: string[], tagsToAdd: string[], tag
 export async function batchSoftDeleteMedia(mediaIds: string[]): Promise<number> {
   if (!dbEnabled) return 0;
   let count = 0;
-  for (const mid of mediaIds) {
+  for (const mid of normalizeMediaIdList(mediaIds)) {
     const result = await sql()`update media_assets set status = 'deleted', deleted_at = coalesce(deleted_at, now()) where id = ${mid} and status = 'active'`;
     count += (result as any).count ?? (result as any).rowCount ?? 0;
   }

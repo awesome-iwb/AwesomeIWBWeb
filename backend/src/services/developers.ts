@@ -24,28 +24,25 @@ export async function listDevelopers(params: {
   const pageSize = Math.min(100, Math.max(1, params.pageSize ?? 20));
   const offset = (page - 1) * pageSize;
 
-  const whereParts: string[] = [
-    "uc.capability_id = 'dev_panel_access'",
-    "u.is_active = true",
-  ];
-  const queryParams: any[] = [];
+  const db = sql();
+  const q = params.q?.trim();
+  const qFilter = q ? db`and u.name ilike ${`%${q}%`}` : db``;
 
-  if (params.q) {
-    queryParams.push(`%${params.q}%`);
-    whereParts.push(`u.name ilike $${queryParams.length}`);
-  }
+  const users = await db<Array<{ id: string; name: string; avatar_url: string; email: string | null; created_at: string }>>`
+    select distinct u.id, u.name, u.avatar_url, u.email, u.created_at
+    from users u
+    join user_capabilities uc on uc.user_id = u.id
+    where uc.capability_id = 'dev_panel_access' and u.is_active = true ${qFilter}
+    order by u.created_at desc
+    limit ${pageSize} offset ${offset}
+  `;
 
-  const whereClause = `where ${whereParts.join(" and ")}`;
-
-  const users = await sql().unsafe(
-    `select distinct u.id, u.name, u.avatar_url, u.email, u.created_at from users u join user_capabilities uc on uc.user_id = u.id ${whereClause} order by u.created_at desc limit ${pageSize} offset ${offset}`,
-    queryParams
-  ) as Array<{ id: string; name: string; avatar_url: string; email: string | null; created_at: string }>;
-
-  const [{ count }] = await sql().unsafe(
-    `select count(distinct u.id)::text as count from users u join user_capabilities uc on uc.user_id = u.id ${whereClause}`,
-    queryParams
-  ) as Array<{ count: string }>;
+  const [{ count }] = await db<Array<{ count: string }>>`
+    select count(distinct u.id)::text as count
+    from users u
+    join user_capabilities uc on uc.user_id = u.id
+    where uc.capability_id = 'dev_panel_access' and u.is_active = true ${qFilter}
+  `;
 
   const items: DeveloperListItem[] = [];
 

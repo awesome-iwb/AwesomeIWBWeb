@@ -28,65 +28,50 @@ export async function listFeedback(input: {
   pageSize?: number;
   ids?: string[];
 }) {
-  const where: string[] = [];
-  const params: any[] = [];
-
-  if (input.project_name) {
-    params.push(input.project_name);
-    where.push(`project_name = $${params.length}`);
-  }
-  if (input.project_names && input.project_names.length > 0) {
-    const list = input.project_names.map(n => `'${n.replace(/'/g, "''")}'`).join(",");
-    where.push(`project_name in (${list})`);
-  }
-  if (input.kind) {
-    params.push(input.kind);
-    where.push(`kind = $${params.length}`);
-  }
-  if (input.status === "open") where.push(`status <> 'done'`);
-  if (input.status === "closed") where.push(`status = 'done'`);
-  if (input.ids && input.ids.length > 0) {
-    const idList = input.ids.map(id => `'${id.replace(/'/g, "''")}'`).join(",");
-    where.push(`id in (${idList})`);
-  }
-
-  const clause = where.length ? `where ${where.join(" and ")}` : "";
+  const db = sql();
+  const projectNameFilter = input.project_name ? db`and fe.project_name = ${input.project_name}` : db``;
+  const projectNamesFilter = input.project_names?.length ? db`and fe.project_name = any(${input.project_names}::text[])` : db``;
+  const kindFilter = input.kind ? db`and fe.kind = ${input.kind}` : db``;
+  const statusFilter = input.status === "open"
+    ? db`and fe.status <> 'done'`
+    : input.status === "closed"
+      ? db`and fe.status = 'done'`
+      : db``;
+  const idsFilter = input.ids?.length ? db`and fe.id = any(${input.ids}::uuid[])` : db``;
 
   if (input.page || input.pageSize) {
     const page = Math.max(1, input.page ?? 1);
     const pageSize = Math.min(100, Math.max(1, input.pageSize ?? 20));
     const offset = (page - 1) * pageSize;
-    const rows = await sql().unsafe(
-      `select fe.id, fe.project_name, fe.kind, fe.title, fe.body, fe.labels, fe.status,
-              fe.actor_username, fe.actor_role, coalesce(u.avatar_url, '') as actor_avatar_url,
-              fe.created_at, fe.updated_at
-       from feedback_entries fe
-       left join users u on u.name = fe.actor_username
-       ${clause}
-       order by fe.created_at desc
-       limit ${pageSize} offset ${offset}`,
-      params
-    );
-    const [{ count }] = await sql().unsafe(
-      `select count(*)::text as count from feedback_entries ${clause}`,
-      params
-    ) as Array<{ count: string }>;
-    return { items: rows as FeedbackEntry[], page, pageSize, total: Number(count) };
+    const rows = await db<FeedbackEntry[]>`
+      select fe.id, fe.project_name, fe.kind, fe.title, fe.body, fe.labels, fe.status,
+             fe.actor_username, fe.actor_role, coalesce(u.avatar_url, '') as actor_avatar_url,
+             fe.created_at, fe.updated_at
+      from feedback_entries fe
+      left join users u on u.name = fe.actor_username
+      where true ${projectNameFilter} ${projectNamesFilter} ${kindFilter} ${statusFilter} ${idsFilter}
+      order by fe.created_at desc
+      limit ${pageSize} offset ${offset}
+    `;
+    const [{ count }] = await db<Array<{ count: string }>>`
+      select count(*)::text as count
+      from feedback_entries fe
+      where true ${projectNameFilter} ${projectNamesFilter} ${kindFilter} ${statusFilter} ${idsFilter}
+    `;
+    return { items: rows, page, pageSize, total: Number(count) };
   }
 
   const limit = Math.min(Math.max(Number(input.limit ?? 50) || 50, 1), 200);
-  const rows = await sql().unsafe(
-    `select fe.id, fe.project_name, fe.kind, fe.title, fe.body, fe.labels, fe.status,
-            fe.actor_username, fe.actor_role, coalesce(u.avatar_url, '') as actor_avatar_url,
-            fe.created_at, fe.updated_at
-     from feedback_entries fe
-     left join users u on u.name = fe.actor_username
-     ${clause}
-     order by fe.created_at desc
-     limit ${limit}`,
-    params
-  );
-  return rows as FeedbackEntry[];
+  return db<FeedbackEntry[]>`
+    select fe.id, fe.project_name, fe.kind, fe.title, fe.body, fe.labels, fe.status,
+           fe.actor_username, fe.actor_role, coalesce(u.avatar_url, '') as actor_avatar_url,
+           fe.created_at, fe.updated_at
+    from feedback_entries fe
+    left join users u on u.name = fe.actor_username
+    where true ${projectNameFilter} ${projectNamesFilter} ${kindFilter} ${statusFilter} ${idsFilter}
+    order by fe.created_at desc
+    limit ${limit}
+  `;
 }
 
 export async function createFeedback(input: {
@@ -112,32 +97,17 @@ export async function createFeedback(input: {
 }
 
 export async function updateFeedback(input: { id: string; status?: FeedbackStatus; labels?: string[] }) {
-  const fields: string[] = [];
-  const params: any[] = [];
-
-  if (input.status) {
-    params.push(input.status);
-    fields.push(`status = $${params.length}`);
-  }
-  if (input.labels) {
-    params.push(input.labels);
-    fields.push(`labels = $${params.length}`);
-  }
-  params.push(input.id);
-  fields.push(`updated_at = now()`);
-  const setClause = fields.join(", ");
-
-  const rows = await sql().unsafe(
-    `update feedback_entries set ${setClause}
-     where id = $${params.length}
-     returning id, project_name, kind, title, body, labels, status, actor_username, actor_role, created_at, updated_at`,
-    params
-  );
-  const row = (rows as FeedbackEntry[])[0] ?? null;
+  const [row] = await sql()<FeedbackEntry[]>`
+    update feedback_entries
+    set status = coalesce(${input.status ?? null}, status),
+        labels = coalesce(${input.labels ?? null}, labels),
+        updated_at = now()
+    where id = ${input.id}
+    returning id, project_name, kind, title, body, labels, status, actor_username, actor_role, created_at, updated_at
+  `;
   if (row) {
     const avatarRow = await sql()<Array<{ avatar_url: string }>>`select coalesce(avatar_url, '') as avatar_url from users where name = ${row.actor_username} limit 1`;
     (row as any).actor_avatar_url = avatarRow[0]?.avatar_url ?? '';
   }
-  return row;
+  return row ?? null;
 }
-

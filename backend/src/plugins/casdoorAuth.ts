@@ -116,7 +116,7 @@ function clearOauthStateCookie(set: any) {
 
 function pickSafeReturnTo(input: string): string {
   if (!input) return "/";
-  if (input.startsWith("/")) return input;
+  if (input.startsWith("/") && !input.startsWith("//") && !input.includes("\\")) return input;
   try {
     const u = new URL(input);
     const allowed = appConfig.allowedOrigins.includes(u.origin) || appConfig.casdoor.allowedRedirectOrigins.includes(u.origin);
@@ -413,6 +413,7 @@ export const casdoorAuthPlugin = new Elysia({ prefix: "/api/auth" })
 
             const u = await findUserByName(account.username);
             if (!u || !u.is_active) return null;
+            if ((payload.tv ?? 0) !== (u.token_version ?? 0)) return null;
             return u;
           })()
         : subject.startsWith(JWT_SUB_TOKEN_PREFIX)
@@ -451,7 +452,7 @@ export const casdoorAuthPlugin = new Elysia({ prefix: "/api/auth" })
     };
   })
   .post("/logout", async ({ user, set, headers }) => {
-    if (user?.id && !String(user.id).startsWith("local:") && !String(user.id).startsWith("token:")) {
+    if (user?.id && !String(user.id).startsWith("token:")) {
       await bumpUserTokenVersion(user.id).catch(() => {});
     }
     clearSessionCookie(set);

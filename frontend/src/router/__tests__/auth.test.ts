@@ -8,16 +8,11 @@ describe('Auth routes', () => {
     expect(me?.name).toBe('me');
   });
 
-  test('registers /dev only in dev env', () => {
+  test('registers /dev behind auth and capability gates', () => {
     const dev = routes.find(r => r.path === '/dev');
-    if (import.meta.env.DEV) {
-      expect(dev).toBeTruthy();
-      expect(dev?.name).toBe('dev');
-      expect((dev as any)?.meta?.requiresAuth).toBe(true);
-      expect((dev as any)?.meta?.requiresCapability).toBe('dev_panel_access');
-    } else {
-      expect(dev).toBeUndefined();
-    }
+    expect(dev).toBeTruthy();
+    expect((dev as any)?.meta?.requiresAuth).toBe(true);
+    expect((dev as any)?.meta?.requiresCapability).toBe('dev_panel_access');
   });
 
   test('/submit requires auth', () => {

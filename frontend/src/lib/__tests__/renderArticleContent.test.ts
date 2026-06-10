@@ -60,6 +60,7 @@ describe('renderArticleContent', () => {
     expect(html).toContain('Favorite whiteboard');
     expect(html).toContain('Ink Canvas');
     expect(html).toContain('ClassIsland');
+    expect(html).toContain('poll-option-progress-45');
   });
 
   test('renders image tags with figure and figcaption caption wrappers', () => {
@@ -90,5 +91,21 @@ describe('renderArticleContent', () => {
     const html = renderArticleContent('markdown', text);
     expect(html).not.toContain('user-mention');
     expect(html).toContain('@&quot;jiangyin14&quot;#1');
+  });
+
+  test('sanitizes raw html content before rendering', () => {
+    const html = renderArticleContent('html', '<h2 onclick="alert(1)">Hi</h2><script>alert(1)</script><a href="javascript:alert(1)" style="color:red">bad</a>');
+    expect(html).toContain('<h2>Hi</h2>');
+    expect(html).toContain('<a>bad</a>');
+    expect(html).not.toContain('<script');
+    expect(html).not.toContain('onclick');
+    expect(html).not.toContain('javascript:');
+    expect(html).not.toContain('style=');
+  });
+
+  test('sanitizes before injecting block anchors', () => {
+    const html = renderArticleContent('html', '<p onclick="alert(1)">Anchored</p>', true);
+    expect(html).toContain('<p id="p-0" data-anchor>Anchored</p>');
+    expect(html).not.toContain('onclick');
   });
 });

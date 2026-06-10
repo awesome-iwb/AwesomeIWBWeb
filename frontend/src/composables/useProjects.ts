@@ -99,6 +99,21 @@ export function useProjects() {
       recommendation = recommendationRaw.trim();
     }
     const isEditorsChoice = Boolean(p?.is_editors_choice ?? p?.extra?.is_editors_choice ?? false);
+    const releases = Array.isArray(p?.releases)
+      ? p.releases
+      : Array.isArray(p?.extra?.releases)
+        ? p.extra.releases
+        : [];
+    const relations = Array.isArray(p?.relations)
+      ? p.relations
+      : Array.isArray(p?.extra?.relations)
+        ? p.extra.relations
+        : undefined;
+    const reviews = Array.isArray(p?.reviews)
+      ? p.reviews
+      : Array.isArray(p?.extra?.reviews)
+        ? p.extra.reviews
+        : undefined;
     return {
       ...p,
       status: String(p?.status ?? ''),
@@ -108,7 +123,10 @@ export function useProjects() {
       description: String(p?.description ?? ''),
       developer: String(p?.developer ?? ''),
       github_url: String(p?.github_url ?? ''),
-      organization: p?.organization || p?.extra?.feishu?.organization || ''
+      organization: p?.organization || p?.extra?.feishu?.organization || '',
+      releases,
+      ...(relations !== undefined ? { relations } : {}),
+      ...(reviews !== undefined ? { reviews } : {})
     } as Project;
   };
 

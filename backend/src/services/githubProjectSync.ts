@@ -1,22 +1,9 @@
 import { Octokit } from "@octokit/rest";
 import { sql } from "../db/client";
-import { updateProject, type ProjectRow } from "./projects";
+import { normalizeGithubRepoUrl, parseGithubRepoUrl, type GithubRepoRef } from "../domain/urlSafety";
+import { markProjectGithubSyncAttempt, updateProjectGithubMetadata, type ProjectRow } from "./projects";
 
-export type GithubRepoRef = { owner: string; repo: string };
-
-export function parseGithubRepoUrl(githubUrl: string): GithubRepoRef | null {
-  const raw = String(githubUrl ?? "").trim();
-  if (!raw) return null;
-  try {
-    const u = new URL(raw);
-    if (u.hostname !== "github.com") return null;
-    const parts = u.pathname.split("/").filter(Boolean);
-    if (parts.length < 2) return null;
-    return { owner: parts[0], repo: parts[1].replace(/\.git$/i, "") };
-  } catch {
-    return null;
-  }
-}
+export { parseGithubRepoUrl, type GithubRepoRef };
 
 export function evaluateStatusFromPush(pushedAt: string | null | undefined): string | null {
   if (!pushedAt) return null;
@@ -40,28 +27,85 @@ type ReleaseRow = {
   html_url: string;
 };
 
-async function fetchRecentReleases(octokitClient: Octokit, owner: string, repo: string): Promise<ReleaseRow[]> {
-  try {
-    const { data } = await octokitClient.repos.listReleases({ owner, repo, per_page: 5 });
-    return (data ?? []).map((r) => ({
-      tag_name: r.tag_name ?? "",
-      published_at: r.published_at ?? null,
-      body: r.body ?? "",
-      html_url: r.html_url ?? "",
-    })).filter((r) => r.tag_name);
-  } catch {
-    return [];
-  }
+type SyncableProject = Pick<ProjectRow, "id" | "github_url" | "status" | "extra">;
+
+const MAX_RELEASE_TAG_CHARS = 160;
+const MAX_RELEASE_BODY_CHARS = 4000;
+const MAX_GITHUB_TEXT_CHARS = 160;
+
+function boundedSingleLineText(value: unknown, maxChars: number): string {
+  const text = typeof value === "string" ? value.trim() : "";
+  if (!text || /[\x00-\x1f\x7f]/.test(text)) return "";
+  return text.slice(0, maxChars);
+}
+
+function boundedMultilineText(value: unknown, maxChars: number): string {
+  const text = typeof value === "string" ? value.trim() : "";
+  if (!text || /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(text)) return "";
+  return text.slice(0, maxChars);
+}
+
+function normalizeTimestamp(value: unknown): string | null {
+  if (typeof value !== "string" || !value.trim()) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+function normalizeCount(value: unknown): number {
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  return Math.min(Number.MAX_SAFE_INTEGER, Math.floor(n));
+}
+
+function releaseHtmlUrl(ref: GithubRepoRef, tagName: string): string {
+  return `https://github.com/${ref.owner}/${ref.repo}/releases/tag/${encodeURIComponent(tagName)}`;
+}
+
+function normalizeReleaseRow(ref: GithubRepoRef, input: {
+  tag_name?: unknown;
+  published_at?: unknown;
+  body?: unknown;
+}): ReleaseRow | null {
+  const tagName = boundedSingleLineText(input.tag_name, MAX_RELEASE_TAG_CHARS);
+  if (!tagName) return null;
+  return {
+    tag_name: tagName,
+    published_at: normalizeTimestamp(input.published_at),
+    body: boundedMultilineText(input.body, MAX_RELEASE_BODY_CHARS),
+    html_url: releaseHtmlUrl(ref, tagName),
+  };
+}
+
+function mapReleaseRows(ref: GithubRepoRef, data: Awaited<ReturnType<Octokit["repos"]["listReleases"]>>["data"]): ReleaseRow[] {
+  return (data ?? [])
+    .map((r) => normalizeReleaseRow(ref, {
+      tag_name: r.tag_name,
+      published_at: r.published_at,
+      body: r.body,
+    }))
+    .filter((r): r is ReleaseRow => Boolean(r));
+}
+
+async function fetchRecentTags(octokitClient: Octokit, owner: string, repo: string): Promise<ReleaseRow[]> {
+  const { data } = await octokitClient.repos.listTags({ owner, repo, per_page: 5 });
+  const ref = { owner, repo };
+  return (data ?? [])
+    .map((tag) => normalizeReleaseRow(ref, {
+      tag_name: tag.name,
+      published_at: null,
+      body: "",
+    }))
+    .filter((r): r is ReleaseRow => Boolean(r));
 }
 
 function sumReleaseDownloads(releases: Awaited<ReturnType<Octokit["repos"]["listReleases"]>>["data"]): number {
   let total = 0;
   for (const rel of releases ?? []) {
     for (const asset of rel.assets ?? []) {
-      total += asset.download_count ?? 0;
+      total += normalizeCount(asset.download_count);
     }
   }
-  return total;
+  return Math.min(Number.MAX_SAFE_INTEGER, total);
 }
 
 export type SyncGithubProjectResult = {
@@ -72,43 +116,64 @@ export type SyncGithubProjectResult = {
 };
 
 export async function syncProjectFromGithub(
-  project: Pick<ProjectRow, "id" | "github_url" | "status" | "extra">,
+  project: SyncableProject,
   opts?: { dryRun?: boolean; octokitClient?: Octokit }
 ): Promise<SyncGithubProjectResult> {
   const ref = parseGithubRepoUrl(project.github_url);
-  if (!ref) return { id: project.id, updated: false, skipped: "invalid_github_url" };
+  if (!ref) {
+    if (!opts?.dryRun) await markProjectGithubSyncAttempt(project.id, "invalid_github_url");
+    return { id: project.id, updated: false, skipped: "invalid_github_url" };
+  }
 
   const client = opts?.octokitClient ?? octokit();
   try {
-    const { data } = await client.repos.get({ owner: ref.owner, repo: ref.repo });
-    const releases = await fetchRecentReleases(client, ref.owner, ref.repo);
-    let latestVersion = "";
-    try {
-      const latest = await client.repos.getLatestRelease({ owner: ref.owner, repo: ref.repo });
-      latestVersion = latest.data.tag_name ?? "";
-    } catch {
-      if (releases[0]?.tag_name) latestVersion = releases[0].tag_name;
+    const [{ data }, releaseResult] = await Promise.all([
+      client.repos.get({ owner: ref.owner, repo: ref.repo }),
+      client.repos.listReleases({ owner: ref.owner, repo: ref.repo, per_page: 5 }).catch((error) => ({ error })),
+    ]);
+
+    let releases: ReleaseRow[] = [];
+    let releaseDownloads = 0;
+    let releaseError = "";
+    if ("data" in releaseResult) {
+      releases = mapReleaseRows(ref, releaseResult.data);
+      releaseDownloads = sumReleaseDownloads(releaseResult.data);
+    } else {
+      releaseError = releaseResult.error?.message ?? String(releaseResult.error);
     }
 
-    const pushedAt = data.pushed_at ?? data.updated_at ?? null;
+    if (releases.length === 0) {
+      try {
+        releases = await fetchRecentTags(client, ref.owner, ref.repo);
+      } catch (error: any) {
+        if (!releaseError) releaseError = error?.message ?? String(error);
+      }
+    }
+
+    let latestVersion = releases[0]?.tag_name ?? "";
+    try {
+      const latest = await client.repos.getLatestRelease({ owner: ref.owner, repo: ref.repo });
+      latestVersion = boundedSingleLineText(latest.data.tag_name, MAX_RELEASE_TAG_CHARS);
+    } catch {
+      // Tags or the first release are an acceptable version fallback.
+    }
+
+    const pushedAt = normalizeTimestamp(data.pushed_at) ?? normalizeTimestamp(data.updated_at);
     const patch: Partial<ProjectRow> = {
-      stars: data.stargazers_count ?? 0,
-      language: data.language ?? "",
+      stars: normalizeCount(data.stargazers_count),
+      language: boundedSingleLineText(data.language, MAX_GITHUB_TEXT_CHARS),
       last_update: pushedAt,
       version: latestVersion || undefined,
       github_is_fork: Boolean(data.fork),
-      github_parent_url: data.parent?.html_url ?? "",
-      github_source_url: data.source?.html_url ?? "",
+      github_parent_url: normalizeGithubRepoUrl(data.parent?.html_url),
+      github_source_url: normalizeGithubRepoUrl(data.source?.html_url),
     };
 
     const extra = typeof project.extra === "object" && project.extra ? { ...project.extra } : {};
     extra.releases = releases;
-    try {
-      const relList = await client.repos.listReleases({ owner: ref.owner, repo: ref.repo, per_page: 3 });
-      extra.github_release_downloads = sumReleaseDownloads(relList.data);
-    } catch {
-      /* optional */
-    }
+    extra.github_release_downloads = releaseDownloads;
+    if (releaseError) extra.github_release_error = releaseError.slice(0, 200);
+    else delete extra.github_release_error;
     patch.extra = extra;
 
     const currentStatus = String(project.status ?? "").trim();
@@ -119,25 +184,27 @@ export async function syncProjectFromGithub(
 
     if (opts?.dryRun) return { id: project.id, updated: true };
 
-    await updateProject(project.id, patch);
+    await updateProjectGithubMetadata(project.id, patch);
     return { id: project.id, updated: true };
   } catch (e: any) {
-    return { id: project.id, updated: false, error: e?.message ?? String(e) };
+    const error = e?.message ?? String(e);
+    if (!opts?.dryRun) await markProjectGithubSyncAttempt(project.id, error);
+    return { id: project.id, updated: false, error };
   }
 }
 
 export async function syncAllProjectsFromGithub(opts?: { limit?: number; dryRun?: boolean }) {
   const rows = opts?.limit
-    ? await sql()<Array<Pick<ProjectRow, "id" | "github_url" | "status" | "extra">>>`
+    ? await sql()<SyncableProject[]>`
         select id, github_url, status, extra from projects
         where github_url is not null and trim(github_url) <> ''
-        order by updated_at asc nulls first
+        order by github_synced_at asc nulls first, updated_at asc nulls first
         limit ${opts.limit}
       `
-    : await sql()<Array<Pick<ProjectRow, "id" | "github_url" | "status" | "extra">>>`
+    : await sql()<SyncableProject[]>`
         select id, github_url, status, extra from projects
         where github_url is not null and trim(github_url) <> ''
-        order by updated_at asc nulls first
+        order by github_synced_at asc nulls first, updated_at asc nulls first
       `;
 
   const client = octokit();

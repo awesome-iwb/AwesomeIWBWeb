@@ -30,6 +30,7 @@ import {
   Vote,
 } from 'lucide-vue-next';
 import { adminFetch, formatAdminError, uploadFile } from '../../composables/useAdminFetch';
+import { openBlankNoopener } from '../../lib/safeUrl';
 import { useArticleAutosave } from '../../composables/useArticleAutosave';
 import { useArticlePresence } from '../../composables/useArticlePresence';
 import { useAuth, getAvatarDisplaySrc } from '../../composables/useAuth';
@@ -197,7 +198,7 @@ function goBack() {
 
 function openPublicPreview() {
   if (!publicPreviewUrl.value) return;
-  window.open(publicPreviewUrl.value, '_blank');
+  openBlankNoopener(publicPreviewUrl.value);
 }
 
 async function searchArticles(q: string) {

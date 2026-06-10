@@ -58,43 +58,6 @@ export function displayRoleMatchesFilter(role: DisplayRole, filter: string): boo
   return role === filter;
 }
 
-function sqlCapExists(capabilityId: string): string {
-  return `exists (
-    select 1 from user_capabilities uc
-    where uc.user_id = users.id and uc.capability_id = '${capabilityId}'
-  )`;
-}
-
-function sqlCapAny(capabilityIds: readonly string[]): string {
-  const list = capabilityIds.map((id) => `'${id}'`).join(", ");
-  return `exists (
-    select 1 from user_capabilities uc
-    where uc.user_id = users.id and uc.capability_id in (${list})
-  )`;
-}
-
-/** SQL predicate for admin user list role filter (capabilities-based). */
-export function buildDisplayRoleFilterSql(filterRole: string): string | null {
-  if (!filterRole) return null;
-  const opsMarkers = sqlCapAny(OPS_MARKER_CAPABILITIES);
-  const editorMarkers = sqlCapAny(EDITOR_MARKER_CAPABILITIES);
-  const adminPanel = sqlCapExists("admin_panel_access");
-  const devPanel = sqlCapExists("dev_panel_access");
-
-  switch (filterRole) {
-    case "ops":
-      return `(${opsMarkers} or (${adminPanel} and not (${editorMarkers})))`;
-    case "editor":
-      return `(${adminPanel} and not (${opsMarkers}) and (${editorMarkers}))`;
-    case "dev":
-      return devPanel;
-    case "user":
-      return `(not ${devPanel} and not ${adminPanel} and not (${opsMarkers}))`;
-    default:
-      return null;
-  }
-}
-
 export function inferDisplayRoleFromCapabilitySet(capabilities: Iterable<string>): DisplayRole {
   return inferDisplayRole([...capabilities]);
 }

@@ -76,14 +76,11 @@ export async function listAdminTags(params?: { q?: string; group?: string }) {
   const group = params?.group?.trim();
   const like = q ? `%${q}%` : null;
 
-  const whereParts = [];
-  if (group && ["feature", "state", "release", "community", "custom"].includes(group)) {
-    whereParts.push(sql()`td."group" = ${group}`);
-  }
-  if (like) {
-    whereParts.push(sql()`(td.label ilike ${like} or td.slug ilike ${like})`);
-  }
-  const where = whereParts.length ? sql().join(whereParts, sql()` and `) : sql()`true`;
+  const db = sql();
+  const groupFilter = group && ["feature", "state", "release", "community", "custom"].includes(group)
+    ? db`and td."group" = ${group}`
+    : db``;
+  const queryFilter = like ? db`and (td.label ilike ${like} or td.slug ilike ${like})` : db``;
 
   const rows = await sql()<Array<TagDefinition & { project_count: number }>>`
     select td.*, coalesce(pc.project_count, 0)::int as project_count
@@ -91,7 +88,7 @@ export async function listAdminTags(params?: { q?: string; group?: string }) {
     left join lateral (
       select count(*)::int as project_count from project_tag_links ptl where ptl.tag_id = td.id
     ) pc on true
-    where ${where}
+    where true ${groupFilter} ${queryFilter}
     order by td.card_priority desc, td.label asc
   `;
 

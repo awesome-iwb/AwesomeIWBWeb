@@ -17,8 +17,6 @@ export type ProjectClaim = {
   reviewed_at: string | null;
 };
 
-const CLAIM_COLUMNS = "id, project_id, user_id, message, status, review_note, created_at, reviewed_at";
-
 export async function createProjectClaim(input: {
   project_id: string;
   user_id: string;
@@ -27,7 +25,7 @@ export async function createProjectClaim(input: {
   const [row] = await sql()<ProjectClaim[]>`
     insert into project_claims (project_id, user_id, message)
     values (${input.project_id}, ${input.user_id}, ${input.message ?? ""})
-    returning ${sql(CLAIM_COLUMNS)}
+    returning id, project_id, user_id, message, status, review_note, created_at, reviewed_at
   `;
   return row;
 }
@@ -44,24 +42,24 @@ export async function listProjectClaims(params: {
   const pageSize = Math.min(100, Math.max(1, params.pageSize ?? 20));
   const offset = (page - 1) * pageSize;
 
-  const whereParts: string[] = [];
-  const queryParams: any[] = [];
+  const db = sql();
+  const statusFilter = params.status ? db`and status = ${params.status}` : db``;
+  const userFilter = params.user_id ? db`and user_id = ${params.user_id}` : db``;
+  const projectFilter = params.project_id ? db`and project_id = ${params.project_id}` : db``;
 
-  if (params.status) { queryParams.push(params.status); whereParts.push(`status = $${queryParams.length}`); }
-  if (params.user_id) { queryParams.push(params.user_id); whereParts.push(`user_id = $${queryParams.length}`); }
-  if (params.project_id) { queryParams.push(params.project_id); whereParts.push(`project_id = $${queryParams.length}`); }
+  const items = await db<ProjectClaim[]>`
+    select id, project_id, user_id, message, status, review_note, created_at, reviewed_at
+    from project_claims
+    where true ${statusFilter} ${userFilter} ${projectFilter}
+    order by created_at desc
+    limit ${pageSize} offset ${offset}
+  `;
 
-  const whereClause = whereParts.length ? `where ${whereParts.join(" and ")}` : "";
-
-  const items = await sql().unsafe(
-    `select ${CLAIM_COLUMNS} from project_claims ${whereClause} order by created_at desc limit ${pageSize} offset ${offset}`,
-    queryParams
-  ) as ProjectClaim[];
-
-  const [{ count }] = await sql().unsafe(
-    `select count(*)::text as count from project_claims ${whereClause}`,
-    queryParams
-  ) as Array<{ count: string }>;
+  const [{ count }] = await db<Array<{ count: string }>>`
+    select count(*)::text as count
+    from project_claims
+    where true ${statusFilter} ${userFilter} ${projectFilter}
+  `;
 
   return { items, page, pageSize, total: Number(count) };
 }
@@ -71,7 +69,7 @@ export async function approveProjectClaim(claimId: string, reviewNote?: string):
   const [claim] = await sql()<ProjectClaim[]>`
     update project_claims set status = 'approved', review_note = ${reviewNote ?? ""}, reviewed_at = now()
     where id = ${claimId} and status = 'pending'
-    returning ${sql(CLAIM_COLUMNS)}
+    returning id, project_id, user_id, message, status, review_note, created_at, reviewed_at
   `;
   if (!claim) return null;
   await addProjectMember({ project_id: claim.project_id, user_id: claim.user_id, role: "owner" });
@@ -84,7 +82,7 @@ export async function rejectProjectClaim(claimId: string, reviewNote?: string): 
   const rows = await sql()<ProjectClaim[]>`
     update project_claims set status = 'rejected', review_note = ${reviewNote ?? ""}, reviewed_at = now()
     where id = ${claimId} and status = 'pending'
-    returning ${sql(CLAIM_COLUMNS)}
+    returning id, project_id, user_id, message, status, review_note, created_at, reviewed_at
   `;
   return rows[0] ?? null;
 }

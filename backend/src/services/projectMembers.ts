@@ -38,14 +38,22 @@ export async function addProjectMember(input: {
 
 export async function removeProjectMember(projectId: string, userId: string): Promise<boolean> {
   if (!dbEnabled) return false;
-  const result = await sql()`delete from project_members where project_id = ${projectId} and user_id = ${userId} and role != 'owner'`;
-  return (result as any).rowCount > 0;
+  const rows = await sql()<Array<{ project_id: string }>>`
+    delete from project_members
+    where project_id = ${projectId} and user_id = ${userId} and role != 'owner'
+    returning project_id
+  `;
+  return rows.length > 0;
 }
 
 export async function removeProjectOrgMember(projectId: string, orgId: string): Promise<boolean> {
   if (!dbEnabled) return false;
-  const result = await sql()`delete from project_members where project_id = ${projectId} and org_id = ${orgId}`;
-  return (result as any).rowCount > 0;
+  const rows = await sql()<Array<{ project_id: string }>>`
+    delete from project_members
+    where project_id = ${projectId} and org_id = ${orgId}
+    returning project_id
+  `;
+  return rows.length > 0;
 }
 
 export async function getProjectMembers(projectId: string): Promise<ProjectMemberWithUser[]> {
@@ -73,10 +81,9 @@ export async function getUserProjects(userId: string): Promise<Array<{ project_i
   const orgIds = orgMemberships.map(m => m.org_id);
   let orgProjects: Array<{ project_id: string; role: ProjectMemberRole }> = [];
   if (orgIds.length > 0) {
-    const values = orgIds.map(id => `'${id}'`).join(",");
-    orgProjects = await sql().unsafe(
-      `select project_id, role from project_members where org_id in (${values})`
-    ) as Array<{ project_id: string; role: ProjectMemberRole }>;
+    orgProjects = await sql()<Array<{ project_id: string; role: ProjectMemberRole }>>`
+      select project_id, role from project_members where org_id = any(${orgIds}::uuid[])
+    `;
   }
   const map = new Map<string, ProjectMemberRole>();
   for (const p of [...directProjects, ...orgProjects]) {

@@ -2,14 +2,15 @@
 import { ref, onMounted, computed, watch, onBeforeUnmount } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useHead } from '@unhead/vue';
-import MarkdownIt from 'markdown-it';
-import DOMPurify from 'dompurify';
 import ProjectLineageGraph from '../components/ProjectLineageGraph.vue';
 import CommentPanel from '../components/CommentPanel.vue';
 import { resolveProjectDisplayTags } from '../lib/resolveProjectDisplayTags';
 import ProjectTagRow from '../components/projects/ProjectTagRow.vue';
 import ProjectTagGallery from '../components/projects/ProjectTagGallery.vue';
 import { computeCursorFrames } from '../utils/captchaCursor';
+import { renderSafeMarkdown } from '../lib/safeMarkdown';
+import { stringifyJsonLd } from '../lib/jsonLd';
+import { safeExternalUrl } from '../lib/safeUrl';
 import { useProjects } from '../composables/useProjects';
 import { useAnalytics } from '../composables/useAnalytics';
 import type { Project } from '../composables/useProjects';
@@ -34,8 +35,6 @@ const { trackClick } = useAnalytics();
 const loading = ref(true);
 
 const project = ref<Project | null>(null);
-
-const md = new MarkdownIt({ breaks: true, linkify: true });
 
 /**
  * reCAPTCHA-style AI usage badge state.
@@ -314,8 +313,7 @@ watch(() => aiUsageState.value, () => {
 });
 
 const renderMarkdown = (text: string) => {
-  if (!text) return '';
-  return DOMPurify.sanitize(md.render(text));
+  return renderSafeMarkdown(text);
 };
 
 const latestRelease = computed(() => {
@@ -329,6 +327,8 @@ const historyReleases = computed(() => {
     ? project.value.releases.slice(1) 
     : [];
 });
+
+const projectGithubUrl = computed(() => safeExternalUrl(project.value?.github_url));
 
 const formatDate = (isoString: string) => {
   const date = new Date(isoString);
@@ -371,7 +371,7 @@ useHead(() => {
     script: [
       {
         type: 'application/ld+json',
-        innerHTML: JSON.stringify({
+        innerHTML: stringifyJsonLd({
           '@context': 'https://schema.org',
           '@type': 'SoftwareApplication',
           name: project.value.name,
@@ -504,8 +504,9 @@ if (allProjects.value.length === 0) {
           <!-- Actions -->
           <div class="flex flex-wrap items-center gap-4 mt-auto">
             <a 
-              :href="project?.github_url" 
-              target="_blank" 
+              :href="projectGithubUrl"
+              target="_blank"
+              rel="noopener noreferrer"
               class="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-3.5 rounded-2xl font-bold shadow-lg shadow-emerald-600/20 hover:shadow-emerald-600/40 transition-all hover:-translate-y-0.5 active:translate-y-0"
               @click="trackClick(project?.slug || '', 'download')"
             >
@@ -513,8 +514,9 @@ if (allProjects.value.length === 0) {
               Get App
             </a>
             <a 
-              :href="project?.github_url" 
-              target="_blank" 
+              :href="projectGithubUrl"
+              target="_blank"
+              rel="noopener noreferrer"
               class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-secondary hover:bg-accent text-muted-foreground transition-colors"
               title="View Source Code"
               @click="trackClick(project?.slug || '', 'github')"
@@ -680,7 +682,7 @@ if (allProjects.value.length === 0) {
                     发布于 {{ formatDate(latestRelease.published_at) }}
                   </span>
                 </div>
-                <a :href="latestRelease.html_url" target="_blank" class="text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 text-sm font-medium flex items-center gap-1">
+                <a :href="safeExternalUrl(latestRelease.html_url)" target="_blank" rel="noopener noreferrer" class="text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 text-sm font-medium flex items-center gap-1">
                   查看完整日志 <ArrowRight class="w-4 h-4" />
                 </a>
               </div>
@@ -698,7 +700,7 @@ if (allProjects.value.length === 0) {
               <div v-for="release in historyReleases" :key="release.tag_name" class="relative">
                 <div class="absolute -left-[21px] top-1.5 w-3 h-3 bg-muted border-2 border-white dark:border-[#0B1120] rounded-full"></div>
                 <div class="flex items-center gap-3 mb-1">
-                  <a :href="release.html_url" target="_blank" class="font-bold text-foreground hover:text-emerald-600 transition-colors">
+                  <a :href="safeExternalUrl(release.html_url)" target="_blank" rel="noopener noreferrer" class="font-bold text-foreground hover:text-emerald-600 transition-colors">
                     {{ release.tag_name }}
                   </a>
                   <span class="text-muted-foreground text-xs" v-if="release.published_at">{{ formatDate(release.published_at) }}</span>

@@ -1,19 +1,15 @@
 import { randomUUID } from "crypto";
 import { Elysia } from "elysia";
 import { verifyJwt, hashToken } from "../utils/jwt";
-import { findUserById } from "../services/users";
+import { findUserById, findUserByName } from "../services/users";
 import { findActiveTokenByHash, recordTokenUsage } from "../services/apiTokens";
 import { findLocalAccountByUsername } from "../services/localAccounts";
 import { userHasCapability, isSuperadmin } from "../services/capabilities";
 import { appConfig } from "../config";
 import { parseCookieHeader } from "../utils/cookies";
+import { apiTokenCanUseCapability, isApiTokenIdentity, type AuthIdentity } from "../domain/authIdentity";
 
-export type AuthUser = {
-  id: string;
-  name: string;
-  role: "user" | "dev" | "ops";
-  avatar_url?: string;
-};
+export type AuthUser = AuthIdentity;
 
 export type AuthContext = {
   user: AuthUser | null;
@@ -46,12 +42,16 @@ export const authPlugin = new Elysia({ name: "auth" }).derive(
         const localId = jwtPayload.sub.slice(6);
         const account = await findLocalAccountByUsername(jwtPayload.name);
         if (account && account.id === localId && account.is_active) {
+          const dbUser = await findUserByName(account.username);
+          if (!dbUser || !dbUser.is_active) return { user: null };
+          if ((jwtPayload.tv ?? 0) !== (dbUser.token_version ?? 0)) return { user: null };
           return {
             user: {
-              id: jwtPayload.sub,
-              name: account.username,
-              role: account.role,
-              avatar_url: "",
+              id: dbUser.id,
+              name: dbUser.name,
+              role: dbUser.role,
+              auth_type: "local",
+              avatar_url: dbUser.avatar_url,
             },
           };
         }
@@ -65,6 +65,7 @@ export const authPlugin = new Elysia({ name: "auth" }).derive(
             id: dbUser.id,
             name: dbUser.name,
             role: dbUser.role,
+            auth_type: "user",
             avatar_url: dbUser.avatar_url,
           },
         };
@@ -80,8 +81,9 @@ export const authPlugin = new Elysia({ name: "auth" }).derive(
         return {
           user: {
             id: `token:${apiToken.id}`,
-            name: apiToken.name,
+            name: `api-token:${apiToken.name}`,
             role: apiToken.role,
+            auth_type: "api_token",
           },
         };
       }
@@ -106,6 +108,10 @@ export function requireCapability(capabilityId: string) {
     if (!user) {
       return authError(set, 401, "UNAUTHORIZED", "Unauthorized");
     }
+    if (isApiTokenIdentity(user)) {
+      if (apiTokenCanUseCapability(capabilityId)) return;
+      return authError(set, 403, "FORBIDDEN", "Forbidden: API token cannot use this capability");
+    }
     if (isSuperadmin(user.name)) return;
     const has = await userHasCapability(user.id, user.name, capabilityId);
     if (!has) {
@@ -119,6 +125,9 @@ export function requireProjectMember(getProjectId: (context: { params: Record<st
     if (!dbEnabled) return;
     if (!user) {
       return authError(set, 401, "UNAUTHORIZED", "Unauthorized");
+    }
+    if (isApiTokenIdentity(user)) {
+      return authError(set, 403, "FORBIDDEN", "Forbidden: API token cannot use project membership routes");
     }
     if (isSuperadmin(user.name)) return;
     const hasCap = await userHasCapability(user.id, user.name, "dev:project_edit");

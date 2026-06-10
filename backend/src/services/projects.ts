@@ -3,6 +3,7 @@ import { newSlug } from "../utils/slug";
 import { normalizeProjectTags } from "../domain/projectTags";
 import { attachRegistryTagsToCatalog } from "./tags";
 import { normalizeProjectInput } from "../domain/normalizeProjectInput";
+import { normalizeInternalUploadUrl } from "../domain/urlSafety";
 
 export type CategoryRow = {
   id: string;
@@ -10,6 +11,24 @@ export type CategoryRow = {
   description: string;
   sort_index: number;
 };
+
+export const UNCATEGORIZED_CATEGORY_ID = "00000000-0000-0000-0000-000000000001";
+export const UNCATEGORIZED_CATEGORY_NAME = "未分类";
+export const UNCATEGORIZED_CATEGORY_DESCRIPTION = "未选择分类，或原分类已删除的项目。";
+export const UNCATEGORIZED_CATEGORY_SORT_INDEX = 2147483647;
+
+export function isUncategorizedCategoryId(id: unknown): boolean {
+  return String(id ?? "") === UNCATEGORIZED_CATEGORY_ID;
+}
+
+function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+}
+
+function isUncategorizedCategoryName(name: unknown): boolean {
+  const normalized = String(name ?? "").trim().toLowerCase();
+  return normalized === UNCATEGORIZED_CATEGORY_NAME || normalized === "uncategorized";
+}
 
 /**
  * Database row shape for the `projects` table.
@@ -40,6 +59,8 @@ export type ProjectRow = {
   github_is_fork: boolean;
   github_parent_url: string;
   github_source_url: string;
+  github_synced_at?: string | null;
+  github_sync_error?: string;
   extra: any;
   organization_id: string | null;
   developer_user_id: string | null;
@@ -59,6 +80,95 @@ export async function listCategories() {
 }
 
 /**
+ * Ensure the system fallback category exists.
+ *
+ * Category assignment is not optional from the product perspective: projects without a
+ * valid category must remain visible under the stable "未分类" bucket.
+ */
+export async function ensureUncategorizedCategory() {
+  const [row] = await sql()<CategoryRow[]>`
+    insert into categories (id, name, description, sort_index)
+    values (
+      ${UNCATEGORIZED_CATEGORY_ID},
+      ${UNCATEGORIZED_CATEGORY_NAME},
+      ${UNCATEGORIZED_CATEGORY_DESCRIPTION},
+      ${UNCATEGORIZED_CATEGORY_SORT_INDEX}
+    )
+    on conflict (id) do update
+      set name = ${UNCATEGORIZED_CATEGORY_NAME},
+          description = case
+            when trim(categories.description) = '' then ${UNCATEGORIZED_CATEGORY_DESCRIPTION}
+            else categories.description
+          end,
+          sort_index = ${UNCATEGORIZED_CATEGORY_SORT_INDEX},
+          updated_at = now()
+    returning id, name, description, sort_index
+  `;
+  return row;
+}
+
+export async function backfillUncategorizedProjects() {
+  await ensureUncategorizedCategory();
+  const rows = await sql()<Array<{ id: string }>>`
+    update projects
+    set category_id = ${UNCATEGORIZED_CATEGORY_ID},
+        updated_at = now()
+    where category_id is null
+       or not exists (select 1 from categories c where c.id = projects.category_id)
+    returning id
+  `;
+  return rows.length;
+}
+
+async function categoryExists(id: string) {
+  const rows = await sql()<Array<{ id: string }>>`
+    select id from categories where id = ${id} limit 1
+  `;
+  return rows.length > 0;
+}
+
+export async function resolveCategoryIdOrUncategorized(id: unknown) {
+  const value = typeof id === "string" ? id.trim() : "";
+  if (value && isUuid(value) && await categoryExists(value)) return value;
+  const fallback = await ensureUncategorizedCategory();
+  return fallback.id;
+}
+
+function attachOrphansToUncategorized(categories: CategoryRow[], projects: ProjectRow[]) {
+  const categoryIds = new Set(categories.map((c) => c.id));
+  const hasFallback = categoryIds.has(UNCATEGORIZED_CATEGORY_ID);
+  const fallbackCategory =
+    categories.find((c) => c.id === UNCATEGORIZED_CATEGORY_ID) ?? {
+      id: UNCATEGORIZED_CATEGORY_ID,
+      name: UNCATEGORIZED_CATEGORY_NAME,
+      description: UNCATEGORIZED_CATEGORY_DESCRIPTION,
+      sort_index: UNCATEGORIZED_CATEGORY_SORT_INDEX,
+    };
+  const orphanProjects = projects.filter((p) => !p.category_id || !categoryIds.has(p.category_id));
+  const visibleCategories = hasFallback || orphanProjects.length === 0
+    ? categories
+    : [...categories, fallbackCategory];
+
+  return visibleCategories
+    .slice()
+    .sort((a, b) => a.sort_index - b.sort_index || a.name.localeCompare(b.name))
+    .map((c) => {
+      const categoryProjects = c.id === UNCATEGORIZED_CATEGORY_ID && !hasFallback
+        ? []
+        : projects.filter((p) => p.category_id === c.id);
+      const fallbackProjects = c.id === UNCATEGORIZED_CATEGORY_ID
+        ? orphanProjects.map((p) => ({ ...p, category_id: UNCATEGORIZED_CATEGORY_ID }))
+        : [];
+      return {
+        id: c.id,
+        name: c.name,
+        description: c.description,
+        projects: [...categoryProjects, ...fallbackProjects],
+      };
+    });
+}
+
+/**
  * Fetch the full catalog used by the public homepage: categories + projects grouped by category.
  *
  * This keeps the frontend API simple (`GET /api/projects`) at the cost of returning more data.
@@ -74,12 +184,7 @@ export async function getCatalog() {
     order by p.name asc
   `;
   const normalizedProjects = projects.map(normalizeProjectTags);
-  const grouped = categories.map((c) => ({
-    id: c.id,
-    name: c.name,
-    description: c.description,
-    projects: normalizedProjects.filter((p) => p.category_id === c.id),
-  }));
+  const grouped = attachOrphansToUncategorized(categories, normalizedProjects);
   const enriched = await attachRegistryTagsToCatalog(grouped);
   return { categories: enriched };
 }
@@ -88,6 +193,7 @@ export async function getCatalog() {
  * Create a category.
  */
 export async function createCategory(input: { name: string; description?: string; sort_index?: number }) {
+  if (isUncategorizedCategoryName(input.name)) return ensureUncategorizedCategory();
   const [row] = await sql()<CategoryRow[]>`
     insert into categories (name, description, sort_index)
     values (${input.name}, ${input.description ?? ""}, ${input.sort_index ?? 0})
@@ -100,6 +206,10 @@ export async function createCategory(input: { name: string; description?: string
  * Resolve a category id by case-insensitive name matching.
  */
 export async function findCategoryIdByName(name: string) {
+  if (isUncategorizedCategoryName(name)) {
+    const fallback = await ensureUncategorizedCategory();
+    return fallback.id;
+  }
   const rows = await sql()<Array<{ id: string }>>`
     select id from categories where lower(name) = lower(${name}) limit 1
   `;
@@ -122,6 +232,10 @@ export async function upsertCategoryByName(input: { name: string; description?: 
  * Update a category by id.
  */
 export async function updateCategory(id: string, input: Partial<Omit<CategoryRow, "id">>) {
+  if (isUncategorizedCategoryId(id)) {
+    const fallback = await ensureUncategorizedCategory();
+    return fallback;
+  }
   const [row] = await sql()<CategoryRow[]>`
     update categories
     set
@@ -136,11 +250,31 @@ export async function updateCategory(id: string, input: Partial<Omit<CategoryRow
 }
 
 /**
- * Delete a category. Projects should be re-assigned by the caller if needed.
+ * Delete a category after moving its projects into the system fallback category.
  */
 export async function deleteCategory(id: string) {
+  if (isUncategorizedCategoryId(id)) {
+    throw new Error("CANNOT_DELETE_UNCATEGORIZED_CATEGORY");
+  }
+
+  const existing = await sql()<CategoryRow[]>`
+    select id, name, description, sort_index
+    from categories
+    where id = ${id}
+    limit 1
+  `;
+  if (!existing[0]) return null;
+
+  const fallback = await ensureUncategorizedCategory();
+  const moved = await sql()<Array<{ id: string }>>`
+    update projects
+    set category_id = ${fallback.id},
+        updated_at = now()
+    where category_id = ${id}
+    returning id
+  `;
   await sql()`delete from categories where id = ${id}`;
-  return { success: true };
+  return { success: true, moved_projects: moved.length };
 }
 
 /**
@@ -161,7 +295,9 @@ export async function listProjects(params: {
 
   const q = params.q?.trim();
   const category = params.category?.trim();
+  const tagId = params.tag_id?.trim();
   const sort = params.sort ?? "name";
+  const hasInvalidCategoryFilter = Boolean(category && !isUuid(category));
 
   const orderBy =
     sort === "stars"
@@ -170,26 +306,36 @@ export async function listProjects(params: {
         ? db`p.last_update desc nulls last, p.name asc`
         : db`p.name asc`;
 
-  const whereParts = [];
-  if (q) whereParts.push(sql()`(p.name ilike ${"%" + q + "%"} or p.developer ilike ${"%" + q + "%"} or ${q} = any(p.keywords))`);
-  if (category) whereParts.push(sql()`p.category_id = ${category}`);
-  if (tagId) {
-    whereParts.push(sql()`p.id in (select project_id from project_tag_links where tag_id = ${tagId})`);
-  }
-  const where = whereParts.length ? sql().join(whereParts, sql()` and `) : sql()`true`;
+  const qFilter = q
+    ? db`and (p.name ilike ${"%" + q + "%"} or p.developer ilike ${"%" + q + "%"} or ${q} = any(p.keywords))`
+    : db``;
+  const categoryFilter = category
+    ? hasInvalidCategoryFilter
+      ? db`and false`
+      : isUncategorizedCategoryId(category)
+      ? db`and (
+          p.category_id = ${UNCATEGORIZED_CATEGORY_ID}
+          or p.category_id is null
+          or not exists (select 1 from categories c where c.id = p.category_id)
+        )`
+      : db`and p.category_id = ${category}`
+    : db``;
+  const tagFilter = tagId
+    ? db`and p.id in (select project_id from project_tag_links where tag_id = ${tagId})`
+    : db``;
 
   const items = await sql()<ProjectRow[]>`
     select p.*, o.name as organization_name, u.name as developer_user_name
     from projects p
     left join organizations o on o.id = p.organization_id
     left join users u on u.id = p.developer_user_id
-    where ${where}
+    where true ${qFilter} ${categoryFilter} ${tagFilter}
     order by ${orderBy}
     limit ${pageSize} offset ${offset}
   `;
 
   const [{ count }] = await sql()<Array<{ count: string }>>`
-    select count(*)::text as count from projects p where ${where}
+    select count(*)::text as count from projects p where true ${qFilter} ${categoryFilter} ${tagFilter}
   `;
 
   const normalized = items.map(normalizeProjectTags);
@@ -262,33 +408,35 @@ export async function getProjectByKey(key: string) {
  * to keep JSON serialization stable for the frontend.
  */
 export async function createProject(input: Partial<ProjectRow> & { name: string }) {
-  const slug = input.slug?.trim() || newSlug();
+  const safeInput = normalizeProjectForStorage(input) as Partial<ProjectRow> & { name: string };
+  const slug = safeInput.slug?.trim() || newSlug();
+  const categoryId = await resolveCategoryIdOrUncategorized(safeInput.category_id);
   const [row] = await sql()<ProjectRow[]>`
     insert into projects (slug, name, category_id, developer, status, version, ai_usage_state, description, keywords, recommendation, github_url, avatar, icon, banner, stars, language, last_update, github_is_fork, github_parent_url, github_source_url, extra, organization_id, developer_user_id)
     values (
       ${slug},
-      ${input.name},
-      ${input.category_id ?? null},
-      ${input.developer ?? ""},
-      ${input.status ?? ""},
-      ${input.version ?? ""},
-      ${input.ai_usage_state ?? "unknown"},
-      ${input.description ?? ""},
-      ${input.keywords ?? []},
-      ${input.recommendation ?? []},
-      ${input.github_url ?? ""},
-      ${input.avatar ?? ""},
-      ${input.icon ?? ""},
-      ${input.banner ?? ""},
-      ${input.stars ?? 0},
-      ${input.language ?? ""},
-      ${input.last_update ?? null}
-      ,${input.github_is_fork ?? false}
-      ,${input.github_parent_url ?? ""}
-      ,${input.github_source_url ?? ""}
-      ,${input.extra ?? {}}
-      ,${input.organization_id ?? null}
-      ,${input.developer_user_id ?? null}
+      ${safeInput.name},
+      ${categoryId},
+      ${safeInput.developer ?? ""},
+      ${safeInput.status ?? ""},
+      ${safeInput.version ?? ""},
+      ${safeInput.ai_usage_state ?? "unknown"},
+      ${safeInput.description ?? ""},
+      ${safeInput.keywords ?? []},
+      ${safeInput.recommendation ?? []},
+      ${safeInput.github_url ?? ""},
+      ${safeInput.avatar ?? ""},
+      ${safeInput.icon ?? ""},
+      ${safeInput.banner ?? ""},
+      ${safeInput.stars ?? 0},
+      ${safeInput.language ?? ""},
+      ${safeInput.last_update ?? null}
+      ,${safeInput.github_is_fork ?? false}
+      ,${safeInput.github_parent_url ?? ""}
+      ,${safeInput.github_source_url ?? ""}
+      ,${safeInput.extra ?? {}}
+      ,${safeInput.organization_id ?? null}
+      ,${safeInput.developer_user_id ?? null}
     )
     returning id, slug, name, category_id, developer, status, version, ai_usage_state, description, keywords, recommendation, github_url, avatar, icon, banner, stars, language, last_update, github_is_fork, github_parent_url, github_source_url, extra, organization_id, developer_user_id
   `;
@@ -320,6 +468,43 @@ function recommendationToArray(v: unknown): string[] {
   return [];
 }
 
+const DEV_EXTRA_MEDIA_KEYS = [
+  "filing_image",
+  "filing_image_url",
+  "registration_image",
+  "registration_image_url",
+  "license_image",
+  "license_image_url",
+] as const;
+
+function normalizeDevEditableExtra(value: unknown): Record<string, string> {
+  const raw = value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+  const out: Record<string, string> = {};
+  for (const key of DEV_EXTRA_MEDIA_KEYS) {
+    if (!Object.prototype.hasOwnProperty.call(raw, key)) continue;
+    out[key] = normalizeInternalUploadUrl(raw[key]);
+  }
+  return out;
+}
+
+function mergeDefined<T extends Record<string, any>>(input: T, normalized: Record<string, any>): T {
+  const out = { ...input } as Record<string, any>;
+  for (const [key, value] of Object.entries(normalized)) {
+    if (value !== undefined) out[key] = value;
+  }
+  return out as T;
+}
+
+function normalizeProjectForStorage<T extends Partial<ProjectRow>>(input: T): T {
+  const merged = mergeDefined(input as Record<string, any>, normalizeProjectInput(input)) as Record<string, any>;
+  if (Object.prototype.hasOwnProperty.call(input, "recommendation")) {
+    merged.recommendation = recommendationToArray(merged.recommendation);
+  }
+  return merged as T;
+}
+
 /**
  * Media + metadata fields only allowed for project owner with `dev:project_admin`
  * (see `PATCH /api/dev/projects/:id` handler).
@@ -333,7 +518,7 @@ export function extractDevProjectOwnerAdminPatch(payload: unknown): Partial<Proj
   if (Object.prototype.hasOwnProperty.call(p, "banner") && typeof n.banner === "string") out.banner = n.banner;
   if (Object.prototype.hasOwnProperty.call(p, "avatar") && typeof n.avatar === "string") out.avatar = n.avatar;
   if (Object.prototype.hasOwnProperty.call(p, "extra")) {
-    out.extra = typeof p.extra === "object" && p.extra ? (p.extra as object) : (n.extra ?? {});
+    out.extra = normalizeDevEditableExtra(p.extra ?? n.extra);
   }
   if (Object.prototype.hasOwnProperty.call(p, "stars") && n.stars !== undefined) out.stars = n.stars;
   if (Object.prototype.hasOwnProperty.call(p, "ai_usage_state") && typeof n.ai_usage_state === "string") out.ai_usage_state = n.ai_usage_state;
@@ -357,38 +542,72 @@ export function extractDevProjectOwnerAdminPatch(payload: unknown): Partial<Proj
  * `organization_id` and `developer_user_id` honor explicit `null` to clear when the key is present.
  */
 export async function updateProject(id: string, input: Partial<ProjectRow>) {
-  const hasOrg = Object.prototype.hasOwnProperty.call(input, "organization_id");
-  const hasDev = Object.prototype.hasOwnProperty.call(input, "developer_user_id");
+  const safeInput = normalizeProjectForStorage(input);
+  const hasOrg = input.organization_id !== undefined;
+  const hasDev = input.developer_user_id !== undefined;
+  const hasCategory = input.category_id !== undefined;
+  const categoryId = hasCategory ? await resolveCategoryIdOrUncategorized(safeInput.category_id) : null;
   const [row] = await sql()<ProjectRow[]>`
     update projects
     set
-      name = coalesce(${input.name ?? null}, name),
-      category_id = coalesce(${input.category_id ?? null}, category_id),
-      developer = coalesce(${input.developer ?? null}, developer),
-      status = coalesce(${input.status ?? null}, status),
-      version = coalesce(${input.version ?? null}, version),
-      ai_usage_state = coalesce(${input.ai_usage_state ?? null}, ai_usage_state),
-      description = coalesce(${input.description ?? null}, description),
-      keywords = coalesce(${input.keywords ?? null}, keywords),
-      recommendation = coalesce(${input.recommendation ?? null}, recommendation),
-      github_url = coalesce(${input.github_url ?? null}, github_url),
-      avatar = coalesce(${input.avatar ?? null}, avatar),
-      icon = coalesce(${input.icon ?? null}, icon),
-      banner = coalesce(${input.banner ?? null}, banner),
-      stars = coalesce(${input.stars ?? null}, stars),
-      language = coalesce(${input.language ?? null}, language),
-      last_update = coalesce(${input.last_update ?? null}, last_update),
-      github_is_fork = coalesce(${input.github_is_fork ?? null}, github_is_fork),
-      github_parent_url = coalesce(${input.github_parent_url ?? null}, github_parent_url),
-      github_source_url = coalesce(${input.github_source_url ?? null}, github_source_url),
-      extra = coalesce(${input.extra ?? null}, extra),
-      organization_id = case when ${hasOrg} then ${input.organization_id ?? null} else projects.organization_id end,
-      developer_user_id = case when ${hasDev} then ${input.developer_user_id ?? null} else projects.developer_user_id end,
+      name = coalesce(${safeInput.name ?? null}, name),
+      category_id = case when ${hasCategory} then ${categoryId} else projects.category_id end,
+      developer = coalesce(${safeInput.developer ?? null}, developer),
+      status = coalesce(${safeInput.status ?? null}, status),
+      version = coalesce(${safeInput.version ?? null}, version),
+      ai_usage_state = coalesce(${safeInput.ai_usage_state ?? null}, ai_usage_state),
+      description = coalesce(${safeInput.description ?? null}, description),
+      keywords = coalesce(${safeInput.keywords ?? null}, keywords),
+      recommendation = coalesce(${safeInput.recommendation ?? null}, recommendation),
+      github_url = coalesce(${safeInput.github_url ?? null}, github_url),
+      avatar = coalesce(${safeInput.avatar ?? null}, avatar),
+      icon = coalesce(${safeInput.icon ?? null}, icon),
+      banner = coalesce(${safeInput.banner ?? null}, banner),
+      stars = coalesce(${safeInput.stars ?? null}, stars),
+      language = coalesce(${safeInput.language ?? null}, language),
+      last_update = coalesce(${safeInput.last_update ?? null}, last_update),
+      github_is_fork = coalesce(${safeInput.github_is_fork ?? null}, github_is_fork),
+      github_parent_url = coalesce(${safeInput.github_parent_url ?? null}, github_parent_url),
+      github_source_url = coalesce(${safeInput.github_source_url ?? null}, github_source_url),
+      extra = coalesce(${safeInput.extra ?? null}, extra),
+      organization_id = case when ${hasOrg} then ${safeInput.organization_id ?? null} else projects.organization_id end,
+      developer_user_id = case when ${hasDev} then ${safeInput.developer_user_id ?? null} else projects.developer_user_id end,
       updated_at = now()
     where id = ${id}
     returning id, slug, name, category_id, developer, status, version, ai_usage_state, description, keywords, recommendation, github_url, avatar, icon, banner, stars, language, last_update, github_is_fork, github_parent_url, github_source_url, extra, organization_id, developer_user_id
   `;
   return row ?? null;
+}
+
+export async function updateProjectGithubMetadata(id: string, input: Partial<ProjectRow>) {
+  const safeInput = normalizeProjectForStorage(input);
+  const [row] = await sql()<ProjectRow[]>`
+    update projects
+    set
+      status = coalesce(${safeInput.status ?? null}, status),
+      version = coalesce(${safeInput.version ?? null}, version),
+      stars = coalesce(${safeInput.stars ?? null}, stars),
+      language = coalesce(${safeInput.language ?? null}, language),
+      last_update = coalesce(${safeInput.last_update ?? null}, last_update),
+      github_is_fork = coalesce(${safeInput.github_is_fork ?? null}, github_is_fork),
+      github_parent_url = coalesce(${safeInput.github_parent_url ?? null}, github_parent_url),
+      github_source_url = coalesce(${safeInput.github_source_url ?? null}, github_source_url),
+      extra = coalesce(${safeInput.extra ?? null}, extra),
+      github_synced_at = now(),
+      github_sync_error = ''
+    where id = ${id}
+    returning id, slug, name, category_id, developer, status, version, ai_usage_state, description, keywords, recommendation, github_url, avatar, icon, banner, stars, language, last_update, github_is_fork, github_parent_url, github_source_url, extra, organization_id, developer_user_id, github_synced_at, github_sync_error
+  `;
+  return row ?? null;
+}
+
+export async function markProjectGithubSyncAttempt(id: string, error: string) {
+  await sql()`
+    update projects
+    set github_synced_at = now(),
+        github_sync_error = ${error.slice(0, 500)}
+    where id = ${id}
+  `;
 }
 
 export async function deleteProject(id: string) {

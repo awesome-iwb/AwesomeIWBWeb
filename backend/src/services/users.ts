@@ -1,10 +1,11 @@
 import { sql } from "../db/client";
 import {
-  buildDisplayRoleFilterSql,
+  displayRoleMatchesFilter,
   displayRoleLabel,
   inferDisplayRole,
   type DisplayRole,
 } from "../domain/displayRole";
+import { normalizeInternalUploadUrl, normalizePublicWebsiteUrl } from "../domain/urlSafety";
 import { getUserCapabilities, isSuperadmin } from "./capabilities";
 
 const dbEnabled = Boolean(process.env.DATABASE_URL);
@@ -40,6 +41,31 @@ export type User = {
   updated_at: string;
 };
 
+export function normalizeUserAvatarUrl(value: unknown): string {
+  const internal = normalizeInternalUploadUrl(value);
+  if (internal) return internal;
+  return normalizePublicWebsiteUrl(value);
+}
+
+function normalizeAvatarUrlForSource(value: unknown, source: User["avatar_source"] | undefined): string {
+  if (source === "upload") return normalizeInternalUploadUrl(value);
+  return normalizeUserAvatarUrl(value);
+}
+
+function normalizeUserAvatarInput<T extends {
+  avatar_url?: string;
+  avatar_source?: User["avatar_source"];
+  external_avatar_url?: string;
+  upload_avatar_url?: string;
+}>(input: T): T {
+  const out = { ...input };
+  const source = input.avatar_source;
+  if (input.avatar_url !== undefined) out.avatar_url = normalizeAvatarUrlForSource(input.avatar_url, source);
+  if (input.external_avatar_url !== undefined) out.external_avatar_url = normalizeUserAvatarUrl(input.external_avatar_url);
+  if (input.upload_avatar_url !== undefined) out.upload_avatar_url = normalizeInternalUploadUrl(input.upload_avatar_url);
+  return out;
+}
+
 function createMemoryUser(input: {
   casdoor_id?: string;
   name: string;
@@ -53,20 +79,21 @@ function createMemoryUser(input: {
   stcn_username?: string;
   hzzc_user_id?: string;
 }): User {
+  const safeInput = normalizeUserAvatarInput(input);
   const now = new Date().toISOString();
   const user: User = {
     id: `mem-${memoryUserIdCounter++}`,
-    casdoor_id: input.casdoor_id ?? null,
-    name: input.name,
-    avatar_url: input.avatar_url ?? "",
-    avatar_source: input.avatar_source ?? "default",
-    external_avatar_url: input.external_avatar_url ?? "",
-    upload_avatar_url: input.upload_avatar_url ?? "",
-    email: input.email ?? null,
-    role: input.role ?? "user",
-    stcn_user_id: input.stcn_user_id ?? null,
-    stcn_username: input.stcn_username ?? null,
-    hzzc_user_id: input.hzzc_user_id ?? null,
+    casdoor_id: safeInput.casdoor_id ?? null,
+    name: safeInput.name,
+    avatar_url: safeInput.avatar_url ?? "",
+    avatar_source: safeInput.avatar_source ?? "default",
+    external_avatar_url: safeInput.external_avatar_url ?? "",
+    upload_avatar_url: safeInput.upload_avatar_url ?? "",
+    email: safeInput.email ?? null,
+    role: safeInput.role ?? "user",
+    stcn_user_id: safeInput.stcn_user_id ?? null,
+    stcn_username: safeInput.stcn_username ?? null,
+    hzzc_user_id: safeInput.hzzc_user_id ?? null,
     is_active: true,
     token_version: 0,
     last_login_at: now,
@@ -129,18 +156,20 @@ export async function createUser(input: {
   stcn_username?: string;
   hzzc_user_id?: string;
 }): Promise<User> {
+  const safeInput = normalizeUserAvatarInput(input);
   if (!dbEnabled) {
-    return createMemoryUser(input);
+    return createMemoryUser(safeInput);
   }
   const [row] = await sql()<User[]>`
     insert into users (casdoor_id, name, avatar_url, avatar_source, external_avatar_url, upload_avatar_url, email, role, stcn_user_id, stcn_username, hzzc_user_id)
-    values (${input.casdoor_id ?? null}, ${input.name}, ${input.avatar_url ?? ""}, ${input.avatar_source ?? "default"}, ${input.external_avatar_url ?? ""}, ${input.upload_avatar_url ?? ""}, ${input.email ?? null}, ${input.role ?? "user"}, ${input.stcn_user_id ?? null}, ${input.stcn_username ?? null}, ${input.hzzc_user_id ?? null})
+    values (${safeInput.casdoor_id ?? null}, ${safeInput.name}, ${safeInput.avatar_url ?? ""}, ${safeInput.avatar_source ?? "default"}, ${safeInput.external_avatar_url ?? ""}, ${safeInput.upload_avatar_url ?? ""}, ${safeInput.email ?? null}, ${safeInput.role ?? "user"}, ${safeInput.stcn_user_id ?? null}, ${safeInput.stcn_username ?? null}, ${safeInput.hzzc_user_id ?? null})
     returning id, casdoor_id, name, avatar_url, avatar_source, external_avatar_url, upload_avatar_url, email, role, stcn_user_id, stcn_username, hzzc_user_id, is_active, token_version, last_login_at, created_at, updated_at
   `;
   return row;
 }
 
 export async function updateUserLogin(id: string, updates?: Partial<Pick<User, "name" | "avatar_url" | "avatar_source" | "external_avatar_url" | "upload_avatar_url" | "email" | "stcn_user_id" | "stcn_username" | "hzzc_user_id">>): Promise<User | null> {
+  const safeUpdates = updates ? normalizeUserAvatarInput(updates) : undefined;
   if (!dbEnabled) {
     const user = memoryUsers.get(id);
     if (!user) return null;
@@ -149,68 +178,36 @@ export async function updateUserLogin(id: string, updates?: Partial<Pick<User, "
       ...user,
       last_login_at: now,
       updated_at: now,
-      ...(updates?.name !== undefined && { name: updates.name }),
-      ...(updates?.avatar_url !== undefined && { avatar_url: updates.avatar_url }),
-      ...(updates?.avatar_source !== undefined && { avatar_source: updates.avatar_source }),
-      ...(updates?.external_avatar_url !== undefined && { external_avatar_url: updates.external_avatar_url }),
-      ...(updates?.upload_avatar_url !== undefined && { upload_avatar_url: updates.upload_avatar_url }),
-      ...(updates?.email !== undefined && { email: updates.email }),
-      ...(updates?.stcn_user_id !== undefined && { stcn_user_id: updates.stcn_user_id }),
-      ...(updates?.stcn_username !== undefined && { stcn_username: updates.stcn_username }),
-      ...(updates?.hzzc_user_id !== undefined && { hzzc_user_id: updates.hzzc_user_id }),
+      ...(safeUpdates?.name !== undefined && { name: safeUpdates.name }),
+      ...(safeUpdates?.avatar_url !== undefined && { avatar_url: safeUpdates.avatar_url }),
+      ...(safeUpdates?.avatar_source !== undefined && { avatar_source: safeUpdates.avatar_source }),
+      ...(safeUpdates?.external_avatar_url !== undefined && { external_avatar_url: safeUpdates.external_avatar_url }),
+      ...(safeUpdates?.upload_avatar_url !== undefined && { upload_avatar_url: safeUpdates.upload_avatar_url }),
+      ...(safeUpdates?.email !== undefined && { email: safeUpdates.email }),
+      ...(safeUpdates?.stcn_user_id !== undefined && { stcn_user_id: safeUpdates.stcn_user_id }),
+      ...(safeUpdates?.stcn_username !== undefined && { stcn_username: safeUpdates.stcn_username }),
+      ...(safeUpdates?.hzzc_user_id !== undefined && { hzzc_user_id: safeUpdates.hzzc_user_id }),
     };
     memoryUsers.set(id, updated);
     return updated;
   }
 
-  const sets: string[] = ["last_login_at = now()"];
-  const params: any[] = [];
-
-  if (updates?.name !== undefined) {
-    params.push(updates.name);
-    sets.push(`name = $${params.length}`);
-  }
-  if (updates?.avatar_url !== undefined) {
-    params.push(updates.avatar_url);
-    sets.push(`avatar_url = $${params.length}`);
-  }
-  if (updates?.avatar_source !== undefined) {
-    params.push(updates.avatar_source);
-    sets.push(`avatar_source = $${params.length}`);
-  }
-  if (updates?.external_avatar_url !== undefined) {
-    params.push(updates.external_avatar_url);
-    sets.push(`external_avatar_url = $${params.length}`);
-  }
-  if (updates?.upload_avatar_url !== undefined) {
-    params.push(updates.upload_avatar_url);
-    sets.push(`upload_avatar_url = $${params.length}`);
-  }
-  if (updates?.email !== undefined) {
-    params.push(updates.email);
-    sets.push(`email = $${params.length}`);
-  }
-  if (updates?.stcn_user_id !== undefined) {
-    params.push(updates.stcn_user_id);
-    sets.push(`stcn_user_id = $${params.length}`);
-  }
-  if (updates?.stcn_username !== undefined) {
-    params.push(updates.stcn_username);
-    sets.push(`stcn_username = $${params.length}`);
-  }
-  if (updates?.hzzc_user_id !== undefined) {
-    params.push(updates.hzzc_user_id);
-    sets.push(`hzzc_user_id = $${params.length}`);
-  }
-
-  params.push(id);
-  const query = `
-    update users set ${sets.join(", ")}
-    where id = $${params.length}
+  const [row] = await sql()<User[]>`
+    update users
+    set last_login_at = now(),
+        name = case when ${safeUpdates?.name !== undefined} then ${safeUpdates?.name ?? null} else name end,
+        avatar_url = case when ${safeUpdates?.avatar_url !== undefined} then ${safeUpdates?.avatar_url ?? null} else avatar_url end,
+        avatar_source = case when ${safeUpdates?.avatar_source !== undefined} then ${safeUpdates?.avatar_source ?? null} else avatar_source end,
+        external_avatar_url = case when ${safeUpdates?.external_avatar_url !== undefined} then ${safeUpdates?.external_avatar_url ?? null} else external_avatar_url end,
+        upload_avatar_url = case when ${safeUpdates?.upload_avatar_url !== undefined} then ${safeUpdates?.upload_avatar_url ?? null} else upload_avatar_url end,
+        email = case when ${safeUpdates?.email !== undefined} then ${safeUpdates?.email ?? null} else email end,
+        stcn_user_id = case when ${safeUpdates?.stcn_user_id !== undefined} then ${safeUpdates?.stcn_user_id ?? null} else stcn_user_id end,
+        stcn_username = case when ${safeUpdates?.stcn_username !== undefined} then ${safeUpdates?.stcn_username ?? null} else stcn_username end,
+        hzzc_user_id = case when ${safeUpdates?.hzzc_user_id !== undefined} then ${safeUpdates?.hzzc_user_id ?? null} else hzzc_user_id end
+    where id = ${id}
     returning id, casdoor_id, name, avatar_url, avatar_source, external_avatar_url, upload_avatar_url, email, role, stcn_user_id, stcn_username, hzzc_user_id, is_active, token_version, last_login_at, created_at, updated_at
   `;
-  const rows = await sql().unsafe(query, params);
-  return (rows as User[])[0] ?? null;
+  return row ?? null;
 }
 
 // The seed superadmin username is preserved as ops permanently to avoid lock-out
@@ -232,11 +229,12 @@ export async function setUserRole(id: string, role: "user" | "dev" | "ops"): Pro
   if (existing?.name === SEED_SUPERADMIN_USERNAME && role !== "ops") {
     throw new Error("SUPERADMIN_ROLE_IMMUTABLE");
   }
-  const rows = await sql().unsafe(
-    `update users set role = $1 where id = $2 returning id, casdoor_id, name, avatar_url, avatar_source, external_avatar_url, upload_avatar_url, email, role, stcn_user_id, stcn_username, hzzc_user_id, is_active, token_version, last_login_at, created_at, updated_at`,
-    [role, id]
-  );
-  return (rows as User[])[0] ?? null;
+  const [row] = await sql()<User[]>`
+    update users set role = ${role}
+    where id = ${id}
+    returning id, casdoor_id, name, avatar_url, avatar_source, external_avatar_url, upload_avatar_url, email, role, stcn_user_id, stcn_username, hzzc_user_id, is_active, token_version, last_login_at, created_at, updated_at
+  `;
+  return row ?? null;
 }
 
 export async function setUserActive(id: string, isActive: boolean): Promise<User | null> {
@@ -247,11 +245,12 @@ export async function setUserActive(id: string, isActive: boolean): Promise<User
     memoryUsers.set(id, updated);
     return updated;
   }
-  const rows = await sql().unsafe(
-    `update users set is_active = $1 where id = $2 returning id, casdoor_id, name, avatar_url, avatar_source, external_avatar_url, upload_avatar_url, email, role, stcn_user_id, stcn_username, hzzc_user_id, is_active, token_version, last_login_at, created_at, updated_at`,
-    [isActive, id]
-  );
-  return (rows as User[])[0] ?? null;
+  const [row] = await sql()<User[]>`
+    update users set is_active = ${isActive}
+    where id = ${id}
+    returning id, casdoor_id, name, avatar_url, avatar_source, external_avatar_url, upload_avatar_url, email, role, stcn_user_id, stcn_username, hzzc_user_id, is_active, token_version, last_login_at, created_at, updated_at
+  `;
+  return row ?? null;
 }
 
 async function enrichUsersWithDisplayRole(items: User[]): Promise<UserListItem[]> {
@@ -264,10 +263,9 @@ async function enrichUsersWithDisplayRole(items: User[]): Promise<UserListItem[]
   }
 
   const ids = items.map((u) => u.id);
-  const capRows = await sql().unsafe(
-    `select user_id, capability_id from user_capabilities where user_id = any($1::uuid[])`,
-    [ids],
-  ) as Array<{ user_id: string; capability_id: string }>;
+  const capRows = await sql()<Array<{ user_id: string; capability_id: string }>>`
+    select user_id, capability_id from user_capabilities where user_id = any(${ids}::uuid[])
+  `;
 
   const capsByUser = new Map<string, string[]>();
   for (const row of capRows) {
@@ -300,39 +298,40 @@ export async function listUsers(params: { q?: string; role?: string; page?: numb
     }
     const enriched = await enrichUsersWithDisplayRole(items);
     const filtered = params.role
-      ? enriched.filter((u) => u.display_role === params.role || (params.role === "ops" && u.display_role === "superadmin"))
+      ? enriched.filter((u) => displayRoleMatchesFilter(u.display_role, params.role ?? ""))
       : enriched;
     const total = filtered.length;
     const pageItems = filtered.slice(offset, offset + pageSize);
     return { items: pageItems, page, pageSize, total };
   }
 
-  const whereParts: string[] = [];
-  const queryParams: any[] = [];
+  const db = sql();
+  const q = params.q?.trim();
+  const qFilter = q ? db`and (name ilike ${`%${q}%`} or email ilike ${`%${q}%`} or stcn_user_id ilike ${`%${q}%`})` : db``;
 
-  const roleFilterSql = params.role ? buildDisplayRoleFilterSql(params.role) : null;
-  if (roleFilterSql) {
-    whereParts.push(`(${roleFilterSql})`);
-  }
-  if (params.q) {
-    queryParams.push(`%${params.q}%`);
-    whereParts.push(`(name ilike $${queryParams.length} or email ilike $${queryParams.length} or stcn_user_id ilike $${queryParams.length})`);
-  }
-
-  const whereClause = whereParts.length ? `where ${whereParts.join(" and ")}` : "";
-
-  const countQuery = `select count(*)::text as count from users ${whereClause}`;
-  const itemsQuery = `
-    select id, casdoor_id, name, avatar_url, avatar_source, external_avatar_url, upload_avatar_url, email, role, stcn_user_id, stcn_username, hzzc_user_id, is_active, token_version, last_login_at, created_at, updated_at
-    from users
-    ${whereClause}
-    order by created_at desc
-    limit ${pageSize} offset ${offset}
-  `;
-
-  const items = await sql().unsafe(itemsQuery, queryParams) as User[];
-  const [{ count }] = await sql().unsafe(countQuery, queryParams) as Array<{ count: string }>;
+  const items = params.role
+    ? await db<User[]>`
+        select id, casdoor_id, name, avatar_url, avatar_source, external_avatar_url, upload_avatar_url, email, role, stcn_user_id, stcn_username, hzzc_user_id, is_active, token_version, last_login_at, created_at, updated_at
+        from users
+        where true ${qFilter}
+        order by created_at desc
+      `
+    : await db<User[]>`
+        select id, casdoor_id, name, avatar_url, avatar_source, external_avatar_url, upload_avatar_url, email, role, stcn_user_id, stcn_username, hzzc_user_id, is_active, token_version, last_login_at, created_at, updated_at
+        from users
+        where true ${qFilter}
+        order by created_at desc
+        limit ${pageSize} offset ${offset}
+      `;
   const enrichedItems = await enrichUsersWithDisplayRole(items);
+  if (params.role) {
+    const filtered = enrichedItems.filter((u) => displayRoleMatchesFilter(u.display_role, params.role ?? ""));
+    return { items: filtered.slice(offset, offset + pageSize), page, pageSize, total: filtered.length };
+  }
+
+  const [{ count }] = await db<Array<{ count: string }>>`
+    select count(*)::text as count from users where true ${qFilter}
+  `;
 
   return { items: enrichedItems, page, pageSize, total: Number(count) };
 }
@@ -352,8 +351,11 @@ export async function deleteUser(id: string): Promise<boolean> {
   if (!dbEnabled) {
     return memoryUsers.delete(id);
   }
-  const result = await sql()`delete from users where id = ${id}`;
-  return (result as any).rowCount > 0;
+  const rows = await sql()<Array<{ id: string }>>`
+    delete from users where id = ${id}
+    returning id
+  `;
+  return rows.length > 0;
 }
 
 /** Apply persisted avatar preference (alliance/IdP URL vs last uploaded URL). */
@@ -433,24 +435,22 @@ export async function getUserPublicComments(name: string, page: number, pageSize
     return { items: [], page, pageSize, total: 0 };
   }
   const offset = (page - 1) * pageSize;
-  const rows = await sql().unsafe(
-    `select fe.id, fe.project_name, fe.body, fe.created_at
-     from feedback_entries fe
-     left join content_moderation_comments cm on cm.feedback_entry_id = fe.id
-     where fe.actor_username = $1 and fe.kind = 'comment'
-       and (cm.id is null or cm.status = 'approved')
-     order by fe.created_at desc
-     limit $2 offset $3`,
-    [name, pageSize, offset]
-  ) as PublicUserComment[];
-  const [{ count }] = await sql().unsafe(
-    `select count(*)::text as count
-     from feedback_entries fe
-     left join content_moderation_comments cm on cm.feedback_entry_id = fe.id
-     where fe.actor_username = $1 and fe.kind = 'comment'
-       and (cm.id is null or cm.status = 'approved')`,
-    [name]
-  ) as Array<{ count: string }>;
+  const rows = await sql()<PublicUserComment[]>`
+    select fe.id, fe.project_name, fe.body, fe.created_at
+    from feedback_entries fe
+    left join comment_moderation cm on cm.feedback_entry_id = fe.id
+    where fe.actor_username = ${name} and fe.kind = 'comment'
+      and (cm.id is null or cm.status = 'approved')
+    order by fe.created_at desc
+    limit ${pageSize} offset ${offset}
+  `;
+  const [{ count }] = await sql()<Array<{ count: string }>>`
+    select count(*)::text as count
+    from feedback_entries fe
+    left join comment_moderation cm on cm.feedback_entry_id = fe.id
+    where fe.actor_username = ${name} and fe.kind = 'comment'
+      and (cm.id is null or cm.status = 'approved')
+  `;
   return { items: rows, page, pageSize, total: Number(count) };
 }
 
@@ -469,10 +469,12 @@ export async function getUserPublicProjects(name: string): Promise<PublicUserPro
   const { getUserProjects } = await import("./projectMembers");
   const memberships = await getUserProjects(userRow.id);
   if (memberships.length === 0) return [];
-  const projectIds = memberships.map(m => `'${m.project_id}'`).join(",");
-  const projects = await sql().unsafe(
-    `select id, name as project_name, name as display_name, coalesce(nullif(icon, ''), '') as icon_url, description from projects where id in (${projectIds})`
-  ) as Array<{ id: string; project_name: string; display_name: string; icon_url: string; description: string }>;
+  const projectIds = memberships.map(m => m.project_id);
+  const projects = await sql()<Array<{ id: string; project_name: string; display_name: string; icon_url: string; description: string }>>`
+    select id, name as project_name, name as display_name, coalesce(nullif(icon, ''), '') as icon_url, description
+    from projects
+    where id = any(${projectIds}::uuid[])
+  `;
   const projectMap = new Map(projects.map(p => [p.id, p]));
   return memberships
     .map(m => {
@@ -569,24 +571,15 @@ export async function renameUser(input: {
   if (!oldUser) throw new Error("USER_NOT_FOUND");
   const oldName = oldUser.name;
 
-  await sql().unsafe(
-    `update feedback_entries set actor_username = $1 where actor_username = $2`,
-    [newName, oldName]
-  );
-  await sql().unsafe(
-    `update feedback_replies set actor_username = $1 where actor_username = $2`,
-    [newName, oldName]
-  );
+  await sql()`update feedback_entries set actor_username = ${newName} where actor_username = ${oldName}`;
+  await sql()`update feedback_replies set actor_username = ${newName} where actor_username = ${oldName}`;
 
-  await sql().unsafe(
-    `insert into user_name_changes (user_id, old_name, new_name, changed_by, source) values ($1, $2, $3, $4, $5)`,
-    [userId, oldName, newName, changedBy ?? null, source]
-  );
+  await sql()`
+    insert into user_name_changes (user_id, old_name, new_name, changed_by, source)
+    values (${userId}, ${oldName}, ${newName}, ${changedBy ?? null}, ${source})
+  `;
 
-  await sql().unsafe(
-    `update users set name = $1, updated_at = now() where id = $2`,
-    [newName, userId]
-  );
+  await sql()`update users set name = ${newName}, updated_at = now() where id = ${userId}`;
 
   await sql()`update users set token_version = token_version + 1 where id = ${userId}`;
 

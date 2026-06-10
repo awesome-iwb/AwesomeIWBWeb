@@ -382,6 +382,18 @@ onUpdated(setupCopyButtons);
   background: linear-gradient(90deg, rgba(16, 185, 129, 0.06), rgba(16, 185, 129, 0.12)) !important;
   transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
+:deep(.poll-option-progress-10) {
+  width: 10% !important;
+}
+:deep(.poll-option-progress-15) {
+  width: 15% !important;
+}
+:deep(.poll-option-progress-30) {
+  width: 30% !important;
+}
+:deep(.poll-option-progress-45) {
+  width: 45% !important;
+}
 .dark :deep(.poll-option-progress) {
   background: linear-gradient(90deg, rgba(16, 185, 129, 0.08), rgba(16, 185, 129, 0.18)) !important;
 }

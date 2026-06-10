@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { useHead } from '@unhead/vue';
 import { useProjects } from '../composables/useProjects';
 import type { Project } from '../composables/useProjects';
+import { safeExternalUrl } from '../lib/safeUrl';
 import { Scale, Star, ShieldCheck, Code2, MessageCircle, Github, Tag } from 'lucide-vue-next';
 
 useHead({
@@ -107,7 +108,7 @@ const getOrg = (project: any) => project?.organization || project?.extra?.feishu
                       {{ getOrg(project) }}
                     </span>
                   </div>
-                  <a :href="project.github_url" target="_blank" class="px-4 py-1.5 bg-slate-900 dark:bg-emerald-600 text-white text-xs font-bold rounded-lg hover:bg-slate-800 dark:hover:bg-emerald-500 transition-colors inline-flex items-center gap-1.5">
+                  <a :href="safeExternalUrl(project.github_url)" target="_blank" rel="noopener noreferrer" class="px-4 py-1.5 bg-slate-900 dark:bg-emerald-600 text-white text-xs font-bold rounded-lg hover:bg-slate-800 dark:hover:bg-emerald-500 transition-colors inline-flex items-center gap-1.5">
                     <Github class="w-3.5 h-3.5" /> 获取
                   </a>
                 </div>

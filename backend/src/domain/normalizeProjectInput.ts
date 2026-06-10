@@ -1,6 +1,19 @@
 import { readAiUsageStateField } from "./aiUsage";
+import { normalizeGithubRepoUrl, normalizeInternalUploadUrl } from "./urlSafety";
 
 export function normalizeProjectInput(p: any) {
+  const input = p && typeof p === "object" ? p : {};
+
+  const normalizeGithubUrl = (value: any) => {
+    if (typeof value !== "string") return undefined;
+    return normalizeGithubRepoUrl(value);
+  };
+
+  const normalizeMediaUrl = (value: any) => {
+    if (typeof value !== "string") return undefined;
+    return normalizeInternalUploadUrl(value);
+  };
+
   const normalizeList = (v: any) => {
     if (Array.isArray(v)) return v.map((x) => String(x).trim()).filter(Boolean);
     if (typeof v !== "string") return [];
@@ -12,7 +25,7 @@ export function normalizeProjectInput(p: any) {
         if (Array.isArray(arr)) return arr.map((x) => String(x).trim()).filter(Boolean);
       } catch {}
     }
-    return s.split(/[;,，]/).map((x) => x.trim()).filter(Boolean);
+    return s.split(/[;,\uFF1B,\uFF0C\u3001]/).map((x) => x.trim()).filter(Boolean);
   };
 
   const normalizeDevelopers = (v: any) => {
@@ -24,7 +37,7 @@ export function normalizeProjectInput(p: any) {
         return {
           username: typeof x?.username === "string" ? x.username : "",
           stcn_user_id: stcn,
-          hzzc_user_id: typeof x?.hzzc_user_id === "string" ? x.hzzc_user_id : ""
+          hzzc_user_id: typeof x?.hzzc_user_id === "string" ? x.hzzc_user_id : "",
         };
       })
       .filter((x) => x.username.trim() || x.stcn_user_id.trim() || x.hzzc_user_id.trim());
@@ -36,36 +49,49 @@ export function normalizeProjectInput(p: any) {
   };
 
   const readMediaField = (obj: any, canonicalKey: string, legacyKey: string) => {
-    if (typeof obj?.[canonicalKey] === "string") return obj[canonicalKey];
-    if (typeof obj?.[legacyKey] === "string") return obj[legacyKey];
+    if (typeof obj?.[canonicalKey] === "string") return normalizeMediaUrl(obj[canonicalKey]);
+    if (typeof obj?.[legacyKey] === "string") return normalizeMediaUrl(obj[legacyKey]);
     return undefined;
   };
 
   return {
-    slug: typeof p.slug === "string" ? p.slug.trim() : undefined,
-    name: typeof p.name === "string" ? p.name.trim() : undefined,
-    category_id: Object.prototype.hasOwnProperty.call(p, "category_id") ? (typeof p.category_id === "string" ? p.category_id : null) : undefined,
-    developer: typeof p.developer === "string" ? p.developer : undefined,
-    status: typeof p.status === "string" ? p.status : undefined,
-    version: typeof p.version === "string" ? p.version : undefined,
-    ai_usage_state: readAiUsageStateField(p),
-    description: typeof p.description === "string" ? p.description : undefined,
-    keywords: Object.prototype.hasOwnProperty.call(p, "keywords") ? normalizeList(p.keywords) : undefined,
-    recommendation: Object.prototype.hasOwnProperty.call(p, "recommendation") ? (typeof p.recommendation === 'string' ? p.recommendation.trim() : normalizeList(p.recommendation)) : undefined,
-    github_url: typeof p.github_url === "string" ? p.github_url : undefined,
-    platform_developers: readDevelopersField(p),
-    avatar: readMediaField(p, "avatar", "avatar_url"),
-    icon: readMediaField(p, "icon", "icon_url"),
-    banner: readMediaField(p, "banner", "banner_url"),
-    stars: Object.prototype.hasOwnProperty.call(p, "stars") ? (typeof p.stars === "number" && !Number.isNaN(p.stars) ? p.stars : 0) : undefined,
-    language: typeof p.language === "string" ? p.language : undefined,
-    last_update: typeof p.last_update === "string" ? p.last_update : undefined,
-    github_is_fork: Object.prototype.hasOwnProperty.call(p, "github_is_fork") ? (typeof p.github_is_fork === "boolean" ? p.github_is_fork : false) : undefined,
-    github_parent_url: typeof p.github_parent_url === "string" ? p.github_parent_url : undefined,
-    github_source_url: typeof p.github_source_url === "string" ? p.github_source_url : undefined,
-    extra: Object.prototype.hasOwnProperty.call(p, "extra") ? (typeof p.extra === "object" && p.extra ? p.extra : {}) : undefined,
-    organization_id: Object.prototype.hasOwnProperty.call(p, "organization_id") ? (typeof p.organization_id === "string" ? p.organization_id : null) : undefined,
-    developer_user_id: Object.prototype.hasOwnProperty.call(p, "developer_user_id") ? (typeof p.developer_user_id === "string" ? p.developer_user_id : null) : undefined
+    slug: typeof input.slug === "string" ? input.slug.trim() : undefined,
+    name: typeof input.name === "string" ? input.name.trim() : undefined,
+    category_id: Object.prototype.hasOwnProperty.call(input, "category_id")
+      ? (typeof input.category_id === "string" ? input.category_id : null)
+      : undefined,
+    developer: typeof input.developer === "string" ? input.developer : undefined,
+    status: typeof input.status === "string" ? input.status : undefined,
+    version: typeof input.version === "string" ? input.version : undefined,
+    ai_usage_state: readAiUsageStateField(input),
+    description: typeof input.description === "string" ? input.description : undefined,
+    keywords: Object.prototype.hasOwnProperty.call(input, "keywords") ? normalizeList(input.keywords) : undefined,
+    recommendation: Object.prototype.hasOwnProperty.call(input, "recommendation")
+      ? normalizeList(input.recommendation)
+      : undefined,
+    github_url: normalizeGithubUrl(input.github_url),
+    platform_developers: readDevelopersField(input),
+    avatar: readMediaField(input, "avatar", "avatar_url"),
+    icon: readMediaField(input, "icon", "icon_url"),
+    banner: readMediaField(input, "banner", "banner_url"),
+    stars: Object.prototype.hasOwnProperty.call(input, "stars")
+      ? (typeof input.stars === "number" && !Number.isNaN(input.stars) ? input.stars : 0)
+      : undefined,
+    language: typeof input.language === "string" ? input.language : undefined,
+    last_update: typeof input.last_update === "string" ? input.last_update : undefined,
+    github_is_fork: Object.prototype.hasOwnProperty.call(input, "github_is_fork")
+      ? (typeof input.github_is_fork === "boolean" ? input.github_is_fork : false)
+      : undefined,
+    github_parent_url: normalizeGithubUrl(input.github_parent_url),
+    github_source_url: normalizeGithubUrl(input.github_source_url),
+    extra: Object.prototype.hasOwnProperty.call(input, "extra")
+      ? (typeof input.extra === "object" && input.extra ? input.extra : {})
+      : undefined,
+    organization_id: Object.prototype.hasOwnProperty.call(input, "organization_id")
+      ? (typeof input.organization_id === "string" ? input.organization_id : null)
+      : undefined,
+    developer_user_id: Object.prototype.hasOwnProperty.call(input, "developer_user_id")
+      ? (typeof input.developer_user_id === "string" ? input.developer_user_id : null)
+      : undefined,
   };
 }
-

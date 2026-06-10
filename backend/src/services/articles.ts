@@ -1,4 +1,5 @@
 import { sql } from "../db/client";
+import { normalizeInternalUploadUrl } from "../domain/urlSafety";
 import { syncArticleLinks } from "./articleLinks";
 import { createArticleRevision } from "./articleRevisions";
 
@@ -35,6 +36,72 @@ export interface ArticleRow {
 }
 
 const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const MAX_ARTICLE_TEXT = {
+  title: 180,
+  subtitle: 500,
+  category: 80,
+  content: 200000,
+  projectName: 160,
+  projectSlug: 120,
+};
+const ARTICLE_LAYOUT_TYPES = new Set<ArticleLayoutType>(["hero", "interview", "app_spotlight"]);
+const ARTICLE_CONTENT_FORMATS = new Set<ArticleContentFormat>(["markdown", "html", "latex", "plain", "flarum"]);
+const ARTICLE_THEMES = new Set(["dark", "light"]);
+
+function boundedText(value: unknown, max: number, options?: { multiline?: boolean }): string {
+  const text = String(value ?? "").replace(/\u0000/g, "");
+  const cleaned = options?.multiline
+    ? text.replace(/[\u0001-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "")
+    : text.replace(/[\u0001-\u001F\u007F]/g, "");
+  return cleaned.trim().slice(0, max);
+}
+
+function normalizeArticleLayoutType(value: unknown): ArticleLayoutType {
+  return ARTICLE_LAYOUT_TYPES.has(value as ArticleLayoutType) ? value as ArticleLayoutType : "hero";
+}
+
+function normalizeArticleContentFormat(value: unknown): ArticleContentFormat {
+  return ARTICLE_CONTENT_FORMATS.has(value as ArticleContentFormat) ? value as ArticleContentFormat : "markdown";
+}
+
+function normalizeArticleTheme(value: unknown): "dark" | "light" {
+  return ARTICLE_THEMES.has(String(value)) ? value as "dark" | "light" : "dark";
+}
+
+function normalizeArticleStatus(value: unknown, fallback: ArticleStatus = "draft"): ArticleStatus {
+  if (value === "published") return "published";
+  if (value === "draft") return "draft";
+  return fallback;
+}
+
+function normalizePublishedAt(value: unknown): string | null {
+  if (value == null || value === "") return null;
+  const date = new Date(String(value));
+  return Number.isFinite(date.getTime()) ? date.toISOString() : null;
+}
+
+function normalizeSortIndex(value: unknown): number {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(-100000, Math.min(100000, Math.trunc(n)));
+}
+
+export function normalizeArticleInputForStorage(input: ArticleInput) {
+  return {
+    title: boundedText(input.title, MAX_ARTICLE_TEXT.title),
+    subtitle: boundedText(input.subtitle, MAX_ARTICLE_TEXT.subtitle),
+    category: boundedText(input.category, MAX_ARTICLE_TEXT.category),
+    layout_type: normalizeArticleLayoutType(input.layout_type),
+    content_format: normalizeArticleContentFormat(input.content_format),
+    content: boundedText(input.content, MAX_ARTICLE_TEXT.content, { multiline: true }),
+    theme: normalizeArticleTheme(input.theme),
+    status: normalizeArticleStatus(input.status),
+    sort_index: normalizeSortIndex(input.sort_index),
+    published_at: normalizePublishedAt(input.published_at),
+    projects: normalizeArticleProjects(input.projects),
+    cover_image: normalizeArticleCoverImage(input.cover_image),
+  };
+}
 
 export function normalizeArticleSlug(raw: string): string {
   return String(raw ?? "")
@@ -49,11 +116,45 @@ export function isValidArticleSlug(slug: string): boolean {
   return slug.length >= 1 && slug.length <= 120 && SLUG_PATTERN.test(slug);
 }
 
+export function normalizeArticleCoverImage(value: unknown): string {
+  return normalizeInternalUploadUrl(value);
+}
+
+function normalizeArticleProjects(value: unknown): ArticleProjectRef[] {
+  if (!Array.isArray(value)) return [];
+  return value.map((project) => {
+    const raw = project && typeof project === "object" ? project as Record<string, unknown> : {};
+    const out: ArticleProjectRef = {
+      name: boundedText(raw.name, MAX_ARTICLE_TEXT.projectName),
+    };
+    if (typeof raw.project_id === "string") out.project_id = boundedText(raw.project_id, 80);
+    if (typeof raw.slug === "string") out.slug = normalizeArticleSlug(raw.slug).slice(0, MAX_ARTICLE_TEXT.projectSlug);
+    const icon = normalizeInternalUploadUrl(raw.icon);
+    if (icon) out.icon = icon;
+    return out;
+  }).filter((project) => project.name || project.project_id || project.slug).slice(0, 20);
+}
+
 function mapRow(row: any): ArticleRow {
   const projects = row.projects;
-  return {
+  const safe = normalizeArticleInputForStorage({
     ...row,
     projects: Array.isArray(projects) ? projects : typeof projects === "object" ? projects : [],
+  });
+  return {
+    ...row,
+    title: safe.title,
+    subtitle: safe.subtitle,
+    category: safe.category,
+    layout_type: safe.layout_type,
+    content_format: safe.content_format,
+    content: safe.content,
+    cover_image: safe.cover_image,
+    theme: safe.theme,
+    projects: safe.projects,
+    status: safe.status,
+    sort_index: safe.sort_index,
+    published_at: safe.published_at,
   };
 }
 
@@ -225,8 +326,9 @@ export async function createArticle(input: ArticleInput) {
   const slug = normalizeArticleSlug(input.slug ?? input.title ?? "article");
   if (!isValidArticleSlug(slug)) throw new Error("invalid slug");
 
-  const status = input.status === "published" ? "published" : "draft";
-  const publishedAt = status === "published" ? input.published_at ?? new Date().toISOString() : null;
+  const status = normalizeArticleStatus(input.status);
+  const publishedAt = status === "published" ? normalizePublishedAt(input.published_at) ?? new Date().toISOString() : null;
+  const safeInput = normalizeArticleInputForStorage(input);
 
   const [row] = await sql()<Array<any>>`
     insert into articles (
@@ -234,17 +336,17 @@ export async function createArticle(input: ArticleInput) {
       cover_image, theme, projects, status, sort_index, published_at, author_user_id
     ) values (
       ${slug},
-      ${input.title ?? ""},
-      ${input.subtitle ?? ""},
-      ${input.category ?? ""},
-      ${input.layout_type ?? "hero"},
-      ${input.content_format ?? "markdown"},
-      ${input.content ?? ""},
-      ${input.cover_image ?? ""},
-      ${input.theme ?? "dark"},
-      ${sql().json(input.projects ?? [])},
+      ${safeInput.title},
+      ${safeInput.subtitle},
+      ${safeInput.category},
+      ${safeInput.layout_type},
+      ${safeInput.content_format},
+      ${safeInput.content},
+      ${safeInput.cover_image},
+      ${safeInput.theme},
+      ${sql().json(safeInput.projects)},
       ${status},
-      ${input.sort_index ?? 0},
+      ${safeInput.sort_index},
       ${publishedAt},
       ${input.author_user_id ?? null}
     )
@@ -267,29 +369,34 @@ export async function updateArticle(id: string, input: ArticleInput) {
   const slug = input.slug !== undefined ? normalizeArticleSlug(input.slug) : existing.slug;
   if (!isValidArticleSlug(slug)) throw new Error("invalid slug");
 
-  let status = input.status ?? existing.status;
-  let publishedAt = input.published_at !== undefined ? input.published_at : existing.published_at;
+  let status = input.status !== undefined ? normalizeArticleStatus(input.status, existing.status) : normalizeArticleStatus(existing.status);
+  let publishedAt = input.published_at !== undefined ? normalizePublishedAt(input.published_at) : existing.published_at;
   if (status === "published" && !publishedAt) {
     publishedAt = new Date().toISOString();
   }
   if (status === "draft") {
     publishedAt = null;
   }
+  const coverImage = input.cover_image !== undefined
+    ? normalizeArticleCoverImage(input.cover_image)
+    : existing.cover_image;
+  const projects = input.projects !== undefined ? normalizeArticleProjects(input.projects) : existing.projects;
+  const safeInput = normalizeArticleInputForStorage(input);
 
   const [row] = await sql()<Array<any>>`
     update articles set
       slug = ${slug},
-      title = ${input.title ?? existing.title},
-      subtitle = ${input.subtitle ?? existing.subtitle},
-      category = ${input.category ?? existing.category},
-      layout_type = ${input.layout_type ?? existing.layout_type},
-      content_format = ${input.content_format ?? existing.content_format},
-      content = ${input.content ?? existing.content},
-      cover_image = ${input.cover_image ?? existing.cover_image},
-      theme = ${input.theme ?? existing.theme},
-      projects = ${sql().json(input.projects ?? existing.projects)},
+      title = ${input.title !== undefined ? safeInput.title : existing.title},
+      subtitle = ${input.subtitle !== undefined ? safeInput.subtitle : existing.subtitle},
+      category = ${input.category !== undefined ? safeInput.category : existing.category},
+      layout_type = ${input.layout_type !== undefined ? safeInput.layout_type : existing.layout_type},
+      content_format = ${input.content_format !== undefined ? safeInput.content_format : existing.content_format},
+      content = ${input.content !== undefined ? safeInput.content : existing.content},
+      cover_image = ${coverImage},
+      theme = ${input.theme !== undefined ? safeInput.theme : existing.theme},
+      projects = ${sql().json(projects)},
       status = ${status},
-      sort_index = ${input.sort_index ?? existing.sort_index},
+      sort_index = ${input.sort_index !== undefined ? safeInput.sort_index : existing.sort_index},
       published_at = ${publishedAt},
       author_user_id = ${input.author_user_id !== undefined ? input.author_user_id : existing.author_user_id},
       version = version + 1,

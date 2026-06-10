@@ -1,6 +1,8 @@
 import { describe, expect, test } from 'bun:test';
 import {
   generateOrgSlug,
+  normalizeOrganizationAvatarUrl,
+  normalizeOrganizationWebsiteUrl,
   validateOrgName,
 } from './organizations';
 
@@ -38,6 +40,20 @@ describe('organizations domain', () => {
 
     test('rejects too long name', () => {
       expect(validateOrgName('a'.repeat(101))).toBe(false);
+    });
+  });
+
+  describe('organization URL normalization', () => {
+    test('accepts only safe website URLs', () => {
+      expect(normalizeOrganizationWebsiteUrl('https://example.com/team')).toBe('https://example.com/team');
+      expect(normalizeOrganizationWebsiteUrl('javascript:alert(1)')).toBe('');
+      expect(normalizeOrganizationWebsiteUrl('/relative')).toBe('');
+    });
+
+    test('accepts only site upload avatar URLs', () => {
+      expect(normalizeOrganizationAvatarUrl('/api/uploads/orgs/a.webp')).toBe('/api/uploads/orgs/a.webp');
+      expect(normalizeOrganizationAvatarUrl('https://example.com/a.webp')).toBe('');
+      expect(normalizeOrganizationAvatarUrl('/api/uploads/orgs/a.webp?x=1')).toBe('');
     });
   });
 });

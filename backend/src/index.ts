@@ -7,6 +7,7 @@ import fs from "fs/promises";
 import seedData from "./data.json";
 import { migrate } from "./db/migrate";
 import {
+  backfillUncategorizedProjects,
   createCategory,
   createProject,
   deleteCategory,
@@ -20,6 +21,8 @@ import {
   getStats,
   listCategories,
   listProjects,
+  UNCATEGORIZED_CATEGORY_DESCRIPTION,
+  UNCATEGORIZED_CATEGORY_NAME,
   upsertCategoryByName,
   updateCategory,
   updateProject,
@@ -36,6 +39,7 @@ import { createFeedback, listFeedback, updateFeedback } from "./services/feedbac
 import { createReply, listReplies } from "./services/feedbackReplies";
 import { sanitizeIssueLabels } from "./domain/feedbackLabels";
 import { normalizeProjectTags } from "./domain/projectTags";
+import { normalizeInternalUploadUrl } from "./domain/urlSafety";
 import {
   createCommentModeration,
   createBugModeration,
@@ -64,7 +68,7 @@ import { listCapabilities, getUserCapabilitiesWithInfo, setUserCapabilities, isS
 import { getRoleTemplates } from "./services/capabilities";
 import { getDashboardData } from "./services/dashboard";
 import { getMediaAssetByStorageKey, getMediaReferences, listMediaAssets, restoreMedia, softDeleteMedia, getMediaTags, setMediaTags, batchTagMedia, batchSoftDeleteMedia, upsertMediaReference, upsertMediaReferencesForEntity } from "./services/media";
-import { readFile as storageReadFile, ensureRoot } from "./services/storage";
+import { normalizeStorageKey, readFile as storageReadFile, ensureRoot } from "./services/storage";
 import { bufferFromUploadFile, processImageUpload, validateImageMime } from "./services/imageUpload";
 import { getOrCreateThumbnail, parseThumbWidth } from "./services/thumbnails";
 import { appConfig } from "./config";
@@ -139,14 +143,19 @@ import {
   getProjectTagIds,
   seedTagsFromProjectsIfEmpty,
 } from "./services/tags";
-import { syncAllProjectsFromGithub, syncProjectFromGithub } from "./services/githubProjectSync";
 import {
   getGithubSyncStatus,
   runGithubProjectSync,
+  runSingleProjectGithubSync,
   startGithubSyncScheduler,
   updateGithubSyncSettings,
 } from "./services/githubSyncJob";
 import { sql } from "./db/client";
+import { evaluateMutationOriginGuard } from "./security/requestGuards";
+import { getClientIp } from "./security/clientIp";
+import { resolveFeedbackActor } from "./domain/feedbackActor";
+import { apiTokenCanUseCapability, isApiTokenIdentity, realUserId, userIdForForeignKey } from "./domain/authIdentity";
+import { normalizeProjectSubmissionPayload, validateProjectSubmissionPayload } from "./domain/submissionPayload";
 
 /**
  * Awesome-IWB backend API.
@@ -184,6 +193,7 @@ if (appConfig.isProduction && !dbEnabled) {
 }
 if (dbEnabled) {
   await migrate();
+  await backfillUncategorizedProjects();
   await importStoriesFromFilesIfEmpty();
   await seedTagsFromProjectsIfEmpty();
   startGithubSyncScheduler();
@@ -232,6 +242,37 @@ const feedbackRepliesFile = await loadJsonFile<any[]>(FEEDBACK_REPLIES_PATH, [])
 function withAiUsageState(p: any) {
   const next = { ...p, ai_usage_state: normalizeAiUsageState(p) };
   return normalizeProjectTags(next);
+}
+
+function ensureJsonUncategorizedCategory() {
+  const categories = (data as any).categories ?? ((data as any).categories = []);
+  let category = categories.find((c: any) => String(c.id ?? "") === "uncat");
+  if (!category) {
+    category = { id: "uncat", name: UNCATEGORIZED_CATEGORY_NAME, description: UNCATEGORIZED_CATEGORY_DESCRIPTION, projects: [] };
+    categories.push(category);
+  } else {
+    category.name = UNCATEGORIZED_CATEGORY_NAME;
+    category.description = category.description ?? UNCATEGORIZED_CATEGORY_DESCRIPTION;
+    category.projects = Array.isArray(category.projects) ? category.projects : [];
+  }
+  return category;
+}
+
+function resolveJsonCategoryById(id: unknown) {
+  const categories = (data as any).categories ?? ((data as any).categories = []);
+  if (typeof id === "string" && id.trim()) {
+    const category = categories.find((c: any) => String(c.id) === id.trim());
+    if (category) return category;
+  }
+  return ensureJsonUncategorizedCategory();
+}
+
+function findJsonCategoryByName(name: string) {
+  const normalized = name.trim().toLowerCase();
+  if (normalized === UNCATEGORIZED_CATEGORY_NAME || normalized === "uncategorized") {
+    return ensureJsonUncategorizedCategory();
+  }
+  return ((data as any).categories ?? []).find((c: any) => String(c.name).trim().toLowerCase() === normalized);
 }
 
 /**
@@ -289,9 +330,20 @@ function checkAuth(user: any, set: any) {
   return false;
 }
 
+function checkRealUser(user: any, set: any) {
+  const authErr = checkAuth(user, set);
+  if (authErr) return authErr;
+  if (dbEnabled && !realUserId(user)) return apiForbidden(set, "Real user session required");
+  return false;
+}
+
 async function checkCap(user: any, set: any, capabilityId: string): Promise<any> {
   if (!dbEnabled) return false;
   if (!user) return apiUnauthorized(set);
+  if (isApiTokenIdentity(user)) {
+    if (apiTokenCanUseCapability(capabilityId)) return false;
+    return apiForbidden(set, "API token cannot use this capability");
+  }
   if (isSuperadminUser(user.name)) return false;
   const { userHasCapability } = await import("./services/capabilities");
   const has = await userHasCapability(user.id, user.name, capabilityId);
@@ -302,6 +354,10 @@ async function checkCap(user: any, set: any, capabilityId: string): Promise<any>
 async function checkCapAny(user: any, set: any, capabilityIds: string[]): Promise<any> {
   if (!dbEnabled) return false;
   if (!user) return apiUnauthorized(set);
+  if (isApiTokenIdentity(user)) {
+    if (capabilityIds.some(apiTokenCanUseCapability)) return false;
+    return apiForbidden(set, "API token cannot use this capability");
+  }
   if (isSuperadminUser(user.name)) return false;
   const { userHasCapability } = await import("./services/capabilities");
   for (const capabilityId of capabilityIds) {
@@ -311,6 +367,16 @@ async function checkCapAny(user: any, set: any, capabilityIds: string[]): Promis
   return apiForbidden(set);
 }
 
+async function canManagePublicFeedback(user: any, actorUsername: string): Promise<boolean> {
+  if (!user) return false;
+  if (isApiTokenIdentity(user)) return apiTokenCanUseCapability("feedback:manage");
+  if (user.name === actorUsername) return true;
+  if (isSuperadminUser(user.name)) return true;
+  return (
+    await userHasCapability(user.id, user.name, "feedback:manage") ||
+    await userHasCapability(user.id, user.name, "comment:manage")
+  );
+}
 
 const storyIdPattern = /^[a-zA-Z0-9_-]{1,64}$/;
 const storyFilePattern = /^[a-zA-Z0-9._-]{1,128}$/;
@@ -374,10 +440,35 @@ function mapImageUploadError(set: any, err: unknown) {
   if (code === "UPLOAD_INVALID_SIGNATURE") {
     return uploadError(set, 400, code, "文件内容与图片格式不匹配");
   }
+  if (code === "UPLOAD_INVALID_IMAGE") {
+    return uploadError(set, 400, code, "无法识别图片内容");
+  }
+  if (code === "UPLOAD_IMAGE_TOO_LARGE") {
+    return uploadError(set, 400, code, "图片像素尺寸过大");
+  }
   return uploadError(set, 500, "UPLOAD_FAILED", "上传失败，请稍后重试");
 }
 
+function setDefaultHeader(set: any, name: string, value: string) {
+  if (!set.headers[name]) set.headers[name] = value;
+}
+
+function applySecurityHeaders(set: any) {
+  setDefaultHeader(set, "x-content-type-options", "nosniff");
+  setDefaultHeader(set, "x-frame-options", "DENY");
+  setDefaultHeader(set, "referrer-policy", "no-referrer");
+  setDefaultHeader(set, "permissions-policy", "camera=(), microphone=(), geolocation=(), payment=()");
+  setDefaultHeader(set, "content-security-policy", "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'");
+  if (appConfig.isProduction && appConfig.cookieSecure) {
+    setDefaultHeader(set, "strict-transport-security", "max-age=31536000; includeSubDomains");
+  }
+}
+
 const allowedOrigins = appConfig.allowedOrigins;
+const mutationAllowedOrigins = Array.from(new Set([
+  ...appConfig.allowedOrigins,
+  ...appConfig.casdoor.allowedRedirectOrigins,
+]));
 const app = new Elysia()
   .use(cors({
     origin: ({ headers }) => {
@@ -389,12 +480,29 @@ const app = new Elysia()
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"]
   }))
+  .onBeforeHandle({ as: "global" }, ({ request, headers, set }) => {
+    const guard = evaluateMutationOriginGuard({
+      method: request.method,
+      headers,
+      requestUrl: request.url,
+      allowedOrigins: mutationAllowedOrigins,
+      sessionCookieName: appConfig.sessionCookieName,
+      isProduction: appConfig.isProduction,
+    });
+    if (!guard.allowed) {
+      return apiError(set, 403, "CSRF_ORIGIN_BLOCKED", "Cross-site request blocked", { reason: guard.reason });
+    }
+  })
   .use(authPlugin)
   .use(casdoorAuthPlugin)
   .use(localAuthPlugin)
+  .onAfterHandle(({ set }) => {
+    applySecurityHeaders(set);
+  })
   .onError(({ error, set, request }) => {
     const traceId = crypto.randomUUID();
     console.error(error);
+    applySecurityHeaders(set);
     set.status = 500;
     if (appConfig.isProduction) {
       return { error: { code: "INTERNAL", message: "Internal Server Error", traceId } };
@@ -413,7 +521,7 @@ const app = new Elysia()
     const payload: any = body as any;
     const path = String(payload?.path ?? "").trim();
     if (!path) { set.status = 400; return apiBadRequest(set, "path is required"); }
-    const ip = (headers["x-forwarded-for"] ?? headers["x-real-ip"] ?? "unknown").toString().split(",")[0].trim();
+    const ip = getClientIp(headers);
     const ua = String(headers["user-agent"] ?? "");
     setTimeout(() => { void recordPageView({ path, referrer: String(payload?.referrer ?? ""), userAgent: ua, ip }); }, 0);
     return { ok: true };
@@ -423,7 +531,7 @@ const app = new Elysia()
     const payload: any = body as any;
     const projectSlug = String(payload?.projectSlug ?? "").trim();
     if (!projectSlug) { set.status = 400; return apiBadRequest(set, "projectSlug is required"); }
-    const ip = (headers["x-forwarded-for"] ?? headers["x-real-ip"] ?? "unknown").toString().split(",")[0].trim();
+    const ip = getClientIp(headers);
     const ua = String(headers["user-agent"] ?? "");
     setTimeout(() => { void recordClickEvent({ projectSlug, eventType: String(payload?.eventType ?? "click"), referrer: String(payload?.referrer ?? ""), userAgent: ua, ip }); }, 0);
     return { ok: true };
@@ -433,13 +541,14 @@ const app = new Elysia()
     const payload: any = body as any;
     const query = String(payload?.query ?? "").trim();
     if (!query) { set.status = 400; return apiBadRequest(set, "query is required"); }
-    const ip = (headers["x-forwarded-for"] ?? headers["x-real-ip"] ?? "unknown").toString().split(",")[0].trim();
+    const ip = getClientIp(headers);
     const ua = String(headers["user-agent"] ?? "");
     setTimeout(() => { void recordSearchQuery({ query, resultsCount: Number(payload?.resultsCount ?? 0), userAgent: ua, ip }); }, 0);
     return { ok: true };
   })
   .get("/api/categories", async () => {
     if (!dbEnabled) {
+      ensureJsonUncategorizedCategory();
       return data.categories.map((c: any) => ({ id: c.id ?? c.name, name: c.name, description: c.description ?? "" }));
     }
     const catalog = await getCatalog();
@@ -448,6 +557,7 @@ const app = new Elysia()
   .get("/api/projects", async ({ set, headers }) => {
     applyPublicShortCache(set, 60);
     if (!dbEnabled) {
+      ensureJsonUncategorizedCategory();
       const payload = {
         ...data,
         categories: (data.categories ?? []).map((c: any) => ({
@@ -519,12 +629,13 @@ const app = new Elysia()
     const limit = typeof (query as any)?.limit === "string" ? Number((query as any).limit) : undefined;
 
     if (dbEnabled) {
-      const approvedItems = await listFeedback({
+      const approvedResult = await listFeedback({
         project_name: project_name || undefined,
         kind: kind === "comment" || kind === "bug" ? (kind as any) : undefined,
         status: status === "open" || status === "closed" ? (status as any) : undefined,
         limit
       });
+      const approvedItems = Array.isArray(approvedResult) ? approvedResult : approvedResult.items;
       if (user?.name) {
         const [pendingComments, pendingBugs] = await Promise.all([
           listCommentModeration({ status: "pending", actor_username: user.name, project_name: project_name || undefined, pageSize: 100 }),
@@ -576,13 +687,12 @@ const app = new Elysia()
     return items.slice(0, Math.min(Math.max(limit ?? 100, 1), 200));
   })
   .post("/api/feedback", async ({ body, set, user }) => {
-    const authErr = checkAuth(user, set);
+    const authErr = checkRealUser(user, set);
     if (authErr) return authErr;
     const payload: any = body as any;
     const kind = payload?.kind === "bug" ? "bug" : "comment";
     const project_name = String(payload?.project_name ?? "").trim();
-    const actor_username = String(payload?.actor?.username ?? "").trim();
-    const actor_role = String(payload?.actor?.role ?? "").trim();
+    const { actor_username, actor_role } = resolveFeedbackActor(payload?.actor, user, dbEnabled);
     const title = String(payload?.title ?? "").trim();
     const bodyText = String(payload?.body ?? "").trim();
     const labels = sanitizeIssueLabels(payload?.labels ?? []);
@@ -653,7 +763,8 @@ const app = new Elysia()
     if (dbEnabled) {
       const target = await sql()`select actor_username from feedback_entries where id = ${id}`;
       const actorUsername = target?.[0]?.actor_username ?? '';
-      const canManage = user?.role === 'dev' || user?.role === 'ops' || user?.name === actorUsername;
+      if (!actorUsername) return apiNotFound(set);
+      const canManage = await canManagePublicFeedback(user, actorUsername);
       if (!canManage) {
         set.status = 403;
         return apiForbidden(set);
@@ -697,12 +808,11 @@ const app = new Elysia()
       .sort((a: any, b: any) => String(b.created_at ?? '').localeCompare(String(a.created_at ?? '')));
   })
   .post("/api/feedback/:id/replies", async ({ params: { id }, body, set, user }) => {
-    const authErr = checkAuth(user, set);
+    const authErr = checkRealUser(user, set);
     if (authErr) return authErr;
     const payload: any = body as any;
     const bodyText = String(payload?.body ?? '').trim();
-    const actor_username = String(payload?.actor?.username ?? user?.name ?? '').trim();
-    const actor_role = String(payload?.actor?.role ?? user?.role ?? '').trim();
+    const { actor_username, actor_role } = resolveFeedbackActor(payload?.actor, user, dbEnabled);
 
     if (!bodyText) {
       set.status = 400;
@@ -783,27 +893,39 @@ const app = new Elysia()
     const capErr = await checkCap(user, set, "category:manage");
     if (capErr) return capErr;
     if (!dbEnabled) {
+      if (String(id) === "uncat") {
+        set.status = 400;
+        return apiBadRequest(set, "Cannot delete the uncategorized category");
+      }
       const idx = (data as any).categories.findIndex((c: any) => String(c.id) === String(id));
       if (idx === -1) {
         set.status = 404;
         return apiNotFound(set, "Category not found");
       }
       const removed = (data as any).categories.splice(idx, 1)[0];
-      let uncat = (data as any).categories.find((c: any) => String(c.id) === "uncat");
-      if (!uncat) {
-        uncat = { id: "uncat", name: "Uncategorized", description: "", projects: [] };
-        (data as any).categories.unshift(uncat);
-      }
+      const uncat = ensureJsonUncategorizedCategory();
       if (Array.isArray(removed?.projects) && removed.projects.length) {
         uncat.projects.push(...removed.projects);
       }
       await saveJsonFile(DATA_PATH, data);
-      await logAuditCompat({ action: "delete", entity_type: "category", entity_id: id, diff: { before: removed } }, user?.name);
-      return { success: true };
+      await logAuditCompat({ action: "delete", entity_type: "category", entity_id: id, diff: { before: removed, moved_projects: removed?.projects?.length ?? 0 } }, user?.name);
+      return { success: true, moved_projects: removed?.projects?.length ?? 0 };
     }
-    const res = await deleteCategory(id);
-    await logAuditCompat({ action: "delete", entity_type: "category", entity_id: id }, user?.name);
-    return res;
+    try {
+      const res = await deleteCategory(id);
+      if (!res) {
+        set.status = 404;
+        return apiNotFound(set, "Category not found");
+      }
+      await logAuditCompat({ action: "delete", entity_type: "category", entity_id: id, diff: { moved_projects: res.moved_projects } }, user?.name);
+      return res;
+    } catch (e: any) {
+      if (e?.message === "CANNOT_DELETE_UNCATEGORIZED_CATEGORY") {
+        set.status = 400;
+        return apiBadRequest(set, "Cannot delete the uncategorized category");
+      }
+      throw e;
+    }
   })
   .post("/api/admin/projects", async ({ body, set, user }) => {
     const capErr = await checkCap(user, set, "project:create");
@@ -815,9 +937,7 @@ const app = new Elysia()
     }
     if (!dbEnabled) {
       const normalized: any = normalizeProjectInput(input);
-      const categoryId = typeof normalized.category_id === "string" ? normalized.category_id : (data as any).categories[0]?.id;
-      let cat = (data as any).categories.find((c: any) => String(c.id) === String(categoryId));
-      if (!cat) cat = (data as any).categories[0];
+      const cat = resolveJsonCategoryById(normalized.category_id);
       const project = {
         name: normalized.name,
         developer: normalized.developer,
@@ -905,7 +1025,7 @@ const app = new Elysia()
 
       const targetCategoryId = typeof normalized.category_id === "string" ? normalized.category_id : foundCat.id;
       if (String(targetCategoryId) !== String(foundCat.id)) {
-        const targetCat = (data as any).categories.find((c: any) => String(c.id) === String(targetCategoryId));
+        const targetCat = resolveJsonCategoryById(targetCategoryId);
         if (targetCat) {
           foundCat.projects.splice(foundIdx, 1);
           targetCat.projects.unshift(next);
@@ -959,6 +1079,7 @@ const app = new Elysia()
     const capErr = await checkCap(user, set, "category:manage");
     if (capErr) return capErr;
     if (!dbEnabled) {
+      ensureJsonUncategorizedCategory();
       return (data as any).categories.map((c: any) => ({ id: c.id ?? c.name, name: c.name, description: c.description ?? "", sort_index: 0 }));
     }
     return await listCategories();
@@ -1040,11 +1161,11 @@ const app = new Elysia()
     if (projectId) {
       const project = await getProjectById(projectId);
       if (!project) return apiNotFound(set, "Project not found");
-      const result = await syncProjectFromGithub(project, { dryRun });
+      const result = await runSingleProjectGithubSync(project, { dryRun, trigger: "manual" });
       return result;
     }
     const limit = (body as any)?.limit ? Number((body as any).limit) : undefined;
-    return await syncAllProjectsFromGithub({ limit, dryRun });
+    return await runGithubProjectSync({ limit, dryRun, trigger: "manual" });
   })
   .get("/api/admin/sync/github", async ({ set, user }) => {
     const capErr = await checkCap(user, set, "project:update");
@@ -1240,9 +1361,9 @@ const app = new Elysia()
         if (dbEnabled) {
           const { id } = await upsertCategoryByName({ name: c.name, description: c.description });
           const projects = Array.isArray(c.projects) ? c.projects : [];
-          for (const p of projects) incomingProjects.push({ ...p, category_id: p.category_id ?? id });
+          for (const p of projects) incomingProjects.push({ ...p, category_id: id });
         } else {
-          const cat = (data as any).categories.find((x: any) => String(x.name).toLowerCase() === String(c.name).toLowerCase());
+          const cat = findJsonCategoryByName(String(c.name));
           const categoryId = cat?.id ?? randomUUID().replaceAll("-", "").slice(0, 8);
           if (!cat) (data as any).categories.push({ id: categoryId, name: c.name, description: c.description ?? "", projects: [] });
           const projects = Array.isArray(c.projects) ? c.projects : [];
@@ -1275,7 +1396,9 @@ const app = new Elysia()
               break;
             }
           }
-          const targetCat = (data as any).categories.find((c: any) => String(c.id) === String(normalized.category_id)) ?? foundCat ?? (data as any).categories[0];
+          const targetCat = foundCat && normalized.category_id === undefined
+            ? foundCat
+            : resolveJsonCategoryById(normalized.category_id);
           const next = {
             name: normalized.name,
             developer: normalized.developer,
@@ -1336,7 +1459,7 @@ const app = new Elysia()
             const { id } = await upsertCategoryByName({ name: normalizedRow.category_name });
             normalizedRow.category_id = id;
           } else {
-            const cat = (data as any).categories.find((c: any) => String(c.name).toLowerCase() === String(normalizedRow.category_name).toLowerCase());
+            const cat = findJsonCategoryByName(String(normalizedRow.category_name));
             const categoryId = cat?.id ?? randomUUID().replaceAll("-", "").slice(0, 8);
             if (!cat) (data as any).categories.push({ id: categoryId, name: normalizedRow.category_name, description: "", projects: [] });
             normalizedRow.category_id = categoryId;
@@ -1356,7 +1479,9 @@ const app = new Elysia()
               break;
             }
           }
-          const targetCat = (data as any).categories.find((c: any) => String(c.id) === String(normalized.category_id)) ?? foundCat ?? (data as any).categories[0];
+          const targetCat = foundCat && normalized.category_id === undefined
+            ? foundCat
+            : resolveJsonCategoryById(normalized.category_id);
           const next = {
             name: normalized.name,
             developer: normalized.developer,
@@ -1538,10 +1663,11 @@ const app = new Elysia()
   })
   .post("/api/submissions", async ({ body, set, headers, user }) => {
     if (checkRateLimit({ headers, path: "/api/submissions", set })) return apiError(set, 429, "RATE_LIMITED", "Too Many Requests");
-    const payload: any = body as any;
-    if (!payload?.name || !payload?.developer || !payload?.github_url) {
+    const payload = normalizeProjectSubmissionPayload(body);
+    const validationError = validateProjectSubmissionPayload(payload);
+    if (validationError) {
       set.status = 400;
-      return apiBadRequest(set, "name, developer, github_url are required");
+      return apiBadRequest(set, validationError);
     }
     if (!dbEnabled) {
       const created = { id: randomUUID(), status: "pending", payload, review_note: "", created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
@@ -1550,7 +1676,7 @@ const app = new Elysia()
       await logAuditCompat({ action: "submit", entity_type: "submission", entity_id: created.id });
       return { success: true, submissionId: created.id };
     }
-    const created = await createSubmission(payload, { submitter_user_id: user?.id ?? null });
+    const created = await createSubmission(payload, { submitter_user_id: userIdForForeignKey(user) });
     await logAuditCompat({ action: "submit", entity_type: "submission", entity_id: created.id });
     return { success: true, submissionId: created.id };
   })
@@ -1577,7 +1703,7 @@ const app = new Elysia()
       return { success: true, submissionId: created.id };
     }
 
-    const created = await createSubmission(payload, { submitter_user_id: user.id });
+    const created = await createSubmission(payload, { submitter_user_id: userIdForForeignKey(user) });
     await logAuditCompat({ action: "submit", entity_type: "submission", entity_id: created.id, diff: { kind: "project_update" } });
     return { success: true, submissionId: created.id };
   })
@@ -1591,10 +1717,13 @@ const app = new Elysia()
     const page = Math.max(1, Number((query as any)?.page) || 1);
     const pageSize = Math.min(100, Math.max(1, Number((query as any)?.pageSize) || 20));
     const offset = (page - 1) * pageSize;
-    const idList = projectIds.map(id => `'${id}'`).join(",");
-    const items = await sql().unsafe(
-      `select id, slug, name, developer, description, icon, banner, stars, language, status, updated_at from projects where id in (${idList}) order by updated_at desc limit ${pageSize} offset ${offset}`
-    );
+    const items = await sql()`
+      select id, slug, name, developer, description, icon, banner, stars, language, status, updated_at
+      from projects
+      where id = any(${projectIds}::uuid[])
+      order by updated_at desc
+      limit ${pageSize} offset ${offset}
+    `;
     return { items, page, pageSize, total: projects.length };
   })
   .get("/api/dev/projects/:id", async ({ params: { id }, user, set }) => {
@@ -1817,13 +1946,25 @@ const app = new Elysia()
     const userProjects = await getUserProjects(user.id);
     const projectIds = userProjects.map(p => p.project_id);
     if (projectIds.length === 0) return { projects: 0, totalBugs: 0, openBugs: 0, totalComments: 0 };
-    const idList = projectIds.map(id => `'${id}'`).join(",");
-    const projects = await sql().unsafe(`select id, slug, name, stars from projects where id in (${idList})`);
-    const projectNames = projects.map((p: any) => p.slug);
-    const nameList = projectNames.map((n: string) => `'${n}'`).join(",");
-    const [{ total_bugs }] = await sql().unsafe(`select count(*)::text as total_bugs from feedback_entries where project_name in (${nameList}) and kind = 'bug'`) as Array<{ total_bugs: string }>;
-    const [{ open_bugs }] = await sql().unsafe(`select count(*)::text as open_bugs from feedback_entries where project_name in (${nameList}) and kind = 'bug' and status = 'open'`) as Array<{ open_bugs: string }>;
-    const [{ total_comments }] = await sql().unsafe(`select count(*)::text as total_comments from feedback_entries where project_name in (${nameList}) and kind = 'comment'`) as Array<{ total_comments: string }>;
+    const projects = await sql()<Array<{ id: string; slug: string; name: string; stars: number }>>`
+      select id, slug, name, stars from projects where id = any(${projectIds}::uuid[])
+    `;
+    const projectNames = projects.map((p) => p.slug);
+    const [{ total_bugs }] = await sql()<Array<{ total_bugs: string }>>`
+      select count(*)::text as total_bugs
+      from feedback_entries
+      where project_name = any(${projectNames}::text[]) and kind = 'bug'
+    `;
+    const [{ open_bugs }] = await sql()<Array<{ open_bugs: string }>>`
+      select count(*)::text as open_bugs
+      from feedback_entries
+      where project_name = any(${projectNames}::text[]) and kind = 'bug' and status = 'open'
+    `;
+    const [{ total_comments }] = await sql()<Array<{ total_comments: string }>>`
+      select count(*)::text as total_comments
+      from feedback_entries
+      where project_name = any(${projectNames}::text[]) and kind = 'comment'
+    `;
     return { projects: projectIds.length, totalBugs: Number(total_bugs), openBugs: Number(open_bugs), totalComments: Number(total_comments) };
   })
   .get("/api/dev/organizations", async ({ user, set, query }) => {
@@ -1950,10 +2091,11 @@ const app = new Elysia()
   })
   .post("/api/submit", async ({ body, set, headers, user }) => {
     if (checkRateLimit({ headers, path: "/api/submit", set })) return apiError(set, 429, "RATE_LIMITED", "Too Many Requests");
-    const payload: any = body as any;
-    if (!payload?.name || !payload?.developer || !payload?.github_url) {
+    const payload = normalizeProjectSubmissionPayload(body);
+    const validationError = validateProjectSubmissionPayload(payload);
+    if (validationError) {
       set.status = 400;
-      return apiBadRequest(set, "name, developer, github_url are required");
+      return apiBadRequest(set, validationError);
     }
     if (!dbEnabled) {
       const created = { id: randomUUID(), status: "pending", payload, review_note: "", created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
@@ -1962,7 +2104,7 @@ const app = new Elysia()
       await logAuditCompat({ action: "submit", entity_type: "submission", entity_id: created.id });
       return { success: true, submissionId: created.id };
     }
-    const created = await createSubmission(payload, { submitter_user_id: user?.id ?? null });
+    const created = await createSubmission(payload, { submitter_user_id: userIdForForeignKey(user) });
     await logAuditCompat({ action: "submit", entity_type: "submission", entity_id: created.id });
     return { success: true, submissionId: created.id };
   })
@@ -2070,11 +2212,11 @@ const app = new Elysia()
           submission.review_note = "";
           submission.updated_at = new Date().toISOString();
 
-          setTimeout(() => {
-            void saveJsonFile(REVISIONS_PATH, revisionsFile);
-            void saveJsonFile(DATA_PATH, data);
-            void saveJsonFile(SUBMISSIONS_PATH, submissionsFile);
-          }, 0);
+          await Promise.all([
+            saveJsonFile(REVISIONS_PATH, revisionsFile),
+            saveJsonFile(DATA_PATH, data),
+            saveJsonFile(SUBMISSIONS_PATH, submissionsFile),
+          ]);
 
           const projectId = encodeURIComponent(next.name);
           void logAuditCompat({ action: "approve", entity_type: "submission", entity_id: id, diff: { project_id: projectId, kind: "project_update" } });
@@ -2110,43 +2252,19 @@ const app = new Elysia()
         return apiBadRequest(set, "project.name is required");
       }
 
-    let categoryId: string | null = null;
-    if (typeof input?.category_id === "string" && input.category_id.trim()) {
-      categoryId = input.category_id.trim();
-    } else if (typeof input?.category_name === "string" && input.category_name.trim()) {
-      const name = input.category_name.trim();
-      if (!dbEnabled) {
-        const cat = (data as any).categories.find((c: any) => String(c.name).toLowerCase() === name.toLowerCase());
-        categoryId = cat?.id ?? null;
-        if (!categoryId) {
-          categoryId = randomUUID().replaceAll("-", "").slice(0, 8);
-          (data as any).categories.push({ id: categoryId, name, description: "", projects: [] });
-          setTimeout(() => {
-            void saveJsonFile(DATA_PATH, data);
-          }, 0);
-          void logAuditCompat({ action: "create", entity_type: "category", entity_id: categoryId, diff: { name } });
-        }
-      } else {
-        categoryId = (await findCategoryIdByName(name)) ?? null;
-        if (!categoryId) {
-          const created = await createCategory({ name });
-          categoryId = created.id;
-          await logAuditCompat({ action: "create", entity_type: "category", entity_id: categoryId, diff: { name } });
-        }
-      }
-    } else if (typeof (submission.payload as any)?.category === "string") {
-      const name = String((submission.payload as any).category).trim();
-      if (name) {
+      let categoryId: string | null = null;
+      if (typeof input?.category_id === "string" && input.category_id.trim()) {
+        categoryId = input.category_id.trim();
+      } else if (typeof input?.category_name === "string" && input.category_name.trim()) {
+        const name = input.category_name.trim();
         if (!dbEnabled) {
-          const cat = (data as any).categories.find((c: any) => String(c.name).toLowerCase() === name.toLowerCase());
+          const cat = findJsonCategoryByName(name);
           categoryId = cat?.id ?? null;
           if (!categoryId) {
             categoryId = randomUUID().replaceAll("-", "").slice(0, 8);
             (data as any).categories.push({ id: categoryId, name, description: "", projects: [] });
-            setTimeout(() => {
-              void saveJsonFile(DATA_PATH, data);
-            }, 0);
-            void logAuditCompat({ action: "create", entity_type: "category", entity_id: categoryId, diff: { name } });
+            await saveJsonFile(DATA_PATH, data);
+            await logAuditCompat({ action: "create", entity_type: "category", entity_id: categoryId, diff: { name } });
           }
         } else {
           categoryId = (await findCategoryIdByName(name)) ?? null;
@@ -2156,46 +2274,66 @@ const app = new Elysia()
             await logAuditCompat({ action: "create", entity_type: "category", entity_id: categoryId, diff: { name } });
           }
         }
+      } else if (typeof (submission.payload as any)?.category === "string") {
+        const name = String((submission.payload as any).category).trim();
+        if (name) {
+          if (!dbEnabled) {
+            const cat = findJsonCategoryByName(name);
+            categoryId = cat?.id ?? null;
+            if (!categoryId) {
+              categoryId = randomUUID().replaceAll("-", "").slice(0, 8);
+              (data as any).categories.push({ id: categoryId, name, description: "", projects: [] });
+              await saveJsonFile(DATA_PATH, data);
+              await logAuditCompat({ action: "create", entity_type: "category", entity_id: categoryId, diff: { name } });
+            }
+          } else {
+            categoryId = (await findCategoryIdByName(name)) ?? null;
+            if (!categoryId) {
+              const created = await createCategory({ name });
+              categoryId = created.id;
+              await logAuditCompat({ action: "create", entity_type: "category", entity_id: categoryId, diff: { name } });
+            }
+          }
+        }
       }
-    }
 
       if (!dbEnabled) {
-      const targetCat = (data as any).categories.find((c: any) => String(c.id) === String(categoryId)) ?? (data as any).categories[0];
-      if (!targetCat || !Array.isArray(targetCat.projects)) {
-        set.status = 500;
-        return apiError(set, 500, "TARGET_CATEGORY_INVALID", "Target category invalid");
-      }
-      const project = {
-        name: projectInput.name,
-        developer: projectInput.developer,
-        status: projectInput.status,
-        recommendation: Array.isArray(projectInput.recommendation) ? projectInput.recommendation[0] ?? "" : (typeof projectInput.recommendation === "string" ? projectInput.recommendation : ""),
-        ai_usage_state: projectInput.ai_usage_state ?? "unknown",
-        github_url: projectInput.github_url,
-        avatar: projectInput.avatar,
-        icon: projectInput.icon,
-        banner: projectInput.banner,
-        description: projectInput.description,
-        keywords: projectInput.keywords,
-        stars: projectInput.stars,
-        language: projectInput.language,
-        last_update: projectInput.last_update,
-        version: projectInput.version
-      };
-      targetCat.projects.unshift(project);
-      submission.status = "approved";
-      submission.review_note = "";
-      submission.updated_at = new Date().toISOString();
-      setTimeout(() => {
-        void saveJsonFile(DATA_PATH, data);
-        void saveJsonFile(SUBMISSIONS_PATH, submissionsFile);
-      }, 0);
+        const targetCat = resolveJsonCategoryById(categoryId);
+        if (!targetCat || !Array.isArray(targetCat.projects)) {
+          set.status = 500;
+          return apiError(set, 500, "TARGET_CATEGORY_INVALID", "Target category invalid");
+        }
+        const project = {
+          name: projectInput.name,
+          developer: projectInput.developer,
+          status: projectInput.status,
+          recommendation: Array.isArray(projectInput.recommendation) ? projectInput.recommendation[0] ?? "" : (typeof projectInput.recommendation === "string" ? projectInput.recommendation : ""),
+          ai_usage_state: projectInput.ai_usage_state ?? "unknown",
+          github_url: projectInput.github_url,
+          avatar: projectInput.avatar,
+          icon: projectInput.icon,
+          banner: projectInput.banner,
+          description: projectInput.description,
+          keywords: projectInput.keywords,
+          stars: projectInput.stars,
+          language: projectInput.language,
+          last_update: projectInput.last_update,
+          version: projectInput.version
+        };
+        targetCat.projects.unshift(project);
+        submission.status = "approved";
+        submission.review_note = "";
+        submission.updated_at = new Date().toISOString();
+        await Promise.all([
+          saveJsonFile(DATA_PATH, data),
+          saveJsonFile(SUBMISSIONS_PATH, submissionsFile),
+        ]);
 
-      const projectId = encodeURIComponent(project.name);
-      void logAuditCompat({ action: "approve", entity_type: "submission", entity_id: id, diff: { project_id: projectId } });
-      void logAuditCompat({ action: "create", entity_type: "project", entity_id: projectId, diff: { from_submission: id } });
-      set.headers["content-type"] = "application/json; charset=utf-8";
-      return JSON.stringify({ success: true, project_id: projectId });
+        const projectId = encodeURIComponent(project.name);
+        void logAuditCompat({ action: "approve", entity_type: "submission", entity_id: id, diff: { project_id: projectId } });
+        void logAuditCompat({ action: "create", entity_type: "project", entity_id: projectId, diff: { from_submission: id } });
+        set.headers["content-type"] = "application/json; charset=utf-8";
+        return JSON.stringify({ success: true, project_id: projectId });
       }
 
       const bodyProject = input?.project as Record<string, unknown> | undefined;
@@ -2427,16 +2565,18 @@ const app = new Elysia()
     const capErr = await checkCap(user, set, "story:manage");
     if (capErr) return capErr;
     if (!dbEnabled) return apiError(set, 503, "UNAVAILABLE", "articles require database");
-    if (!user?.id) return apiError(set, 401, "UNAUTHORIZED", "login required");
-    await articleHeartbeat(String(params.id), user.id, user.name ?? "", user.avatar_url ?? "");
+    const uid = realUserId(user);
+    if (!uid) return apiError(set, 401, "UNAUTHORIZED", "login required");
+    await articleHeartbeat(String(params.id), uid, user.name ?? "", user.avatar_url ?? "");
     return { ok: true };
   })
   .delete("/api/admin/articles/:id/presence", async ({ params, set, user }) => {
     const capErr = await checkCap(user, set, "story:manage");
     if (capErr) return capErr;
     if (!dbEnabled) return apiError(set, 503, "UNAVAILABLE", "articles require database");
-    if (!user?.id) return apiError(set, 401, "UNAUTHORIZED", "login required");
-    await articleRemovePresence(String(params.id), user.id);
+    const uid = realUserId(user);
+    if (!uid) return apiError(set, 401, "UNAUTHORIZED", "login required");
+    await articleRemovePresence(String(params.id), uid);
     return { ok: true };
   })
   .get("/api/admin/articles/:id/presence", async ({ params, set, user }) => {
@@ -2456,7 +2596,8 @@ const app = new Elysia()
   })
   .post("/api/articles/:slug/comments", async ({ params, body, set, user }) => {
     if (!dbEnabled) return apiError(set, 503, "UNAVAILABLE", "articles require database");
-    if (!user?.id) return apiError(set, 401, "UNAUTHORIZED", "login required");
+    const uid = realUserId(user);
+    if (!uid) return apiError(set, 401, "UNAUTHORIZED", "login required");
     const articleId = await getArticleIdBySlug(String(params.slug));
     if (!articleId) return apiNotFound(set);
     const b = body as any;
@@ -2464,7 +2605,7 @@ const app = new Elysia()
       article_id: articleId,
       parent_id: b.parent_id ?? null,
       body: b.body ?? "",
-      author_user_id: user.id,
+      author_user_id: uid,
       author_username: user.name ?? "",
       author_role: "",
     });
@@ -2492,7 +2633,8 @@ const app = new Elysia()
   })
   .post("/api/article-comments/:id/replies", async ({ params, body, set, user }) => {
     if (!dbEnabled) return apiError(set, 503, "UNAVAILABLE", "articles require database");
-    if (!user?.id) return apiError(set, 401, "UNAUTHORIZED", "login required");
+    const uid = realUserId(user);
+    if (!uid) return apiError(set, 401, "UNAUTHORIZED", "login required");
     const parent = await getArticleComment(String(params.id));
     if (!parent) return apiNotFound(set);
     const b = body as any;
@@ -2500,7 +2642,7 @@ const app = new Elysia()
       article_id: parent.article_id,
       parent_id: parent.id,
       body: b.body ?? "",
-      author_user_id: user.id,
+      author_user_id: uid,
       author_username: user.name ?? "",
       author_role: "",
     });
@@ -2538,14 +2680,15 @@ const app = new Elysia()
     const capErr = await checkCap(user, set, "story:manage");
     if (capErr) return capErr;
     if (!dbEnabled) return apiError(set, 503, "UNAVAILABLE", "articles require database");
-    if (!user?.id) return apiError(set, 401, "UNAUTHORIZED", "login required");
+    const uid = realUserId(user);
+    if (!uid) return apiError(set, 401, "UNAUTHORIZED", "login required");
     const b = body as any;
     const annotation = await createArticleAnnotation({
       article_id: String(params.id),
       anchor_id: b.anchor_id ?? "",
       selected_text: b.selected_text ?? "",
       body: b.body ?? "",
-      author_user_id: user.id,
+      author_user_id: uid,
       author_username: user.name ?? "",
       author_role: "",
     });
@@ -2674,8 +2817,10 @@ const app = new Elysia()
     return { success: true };
   })
   .get("/api/uploads/*", async ({ params, set, query }) => {
-    const key = String((params as Record<string, string>)["*"] ?? "").replace(/^\/+/, "");
-    if (!key || key.includes("..")) {
+    let key: string;
+    try {
+      key = normalizeStorageKey(String((params as Record<string, string>)["*"] ?? ""));
+    } catch {
       set.status = 404;
       return apiNotFound(set);
     }
@@ -2710,7 +2855,7 @@ const app = new Elysia()
     if (checkRateLimit({ headers, path: "/api/upload", set })) {
       return uploadError(set, 429, "UPLOAD_RATE_LIMITED", "请求过于频繁，请稍后重试");
     }
-    const authErr = checkAuth(user, set);
+    const authErr = checkRealUser(user, set);
     if (authErr) return uploadError(set, 401, "UPLOAD_UNAUTHORIZED", "请先登录后再上传");
     if (!image) return uploadError(set, 400, "UPLOAD_MISSING_FILE", "未检测到上传文件");
     if (image.size > appConfig.uploadMaxBytes) {
@@ -2727,7 +2872,7 @@ const app = new Elysia()
         mime,
         namespace: "content",
         source: "upload",
-        uploaderId: user?.id,
+        uploaderId: userIdForForeignKey(user),
       });
       return { url: result.url, media_id: result.media?.id, storage_key: result.storage_key };
     } catch (err) {
@@ -2753,29 +2898,29 @@ const app = new Elysia()
       return uploadError(set, 400, "UPLOAD_UNSUPPORTED_TYPE", "仅支持 PNG、JPG、WEBP 格式");
     }
     try {
+      const uid = realUserId(user);
+      if (!uid) return uploadError(set, 403, "UPLOAD_FORBIDDEN", "Real user session required");
       const buffer = await bufferFromUploadFile(image);
       const result = await processImageUpload({
         buffer,
         mime,
         namespace: "avatars",
         source: "avatar",
-        uploaderId: user?.id,
+        uploaderId: uid,
       });
       const avatarUrl = result.url;
 
-      if (user?.id && !String(user.id).startsWith("local:")) {
-        await updateUserLogin(user.id, {
-          avatar_url: avatarUrl,
-          avatar_source: "upload",
-          upload_avatar_url: avatarUrl,
-        });
-      }
+      await updateUserLogin(uid, {
+        avatar_url: avatarUrl,
+        avatar_source: "upload",
+        upload_avatar_url: avatarUrl,
+      });
 
-      if (result.media?.id && user?.id) {
+      if (result.media?.id) {
         await upsertMediaReference({
           mediaId: result.media.id,
           entityType: "user",
-          entityId: String(user.id),
+          entityId: uid,
           fieldPath: "avatar",
         });
       }
@@ -2790,8 +2935,9 @@ const app = new Elysia()
     })
   })
   .patch("/api/user/avatar-source", async ({ body, user, set }) => {
-    const authErr = checkAuth(user, set);
+    const authErr = checkRealUser(user, set);
     if (authErr) return authErr;
+    const uid = realUserId(user)!;
     const raw = (body as any)?.source ?? (body as any)?.avatar_source;
     const source = String(raw ?? "").trim().toLowerCase();
     if (source !== "casdoor" && source !== "upload") {
@@ -2801,7 +2947,7 @@ const app = new Elysia()
       return apiBadRequest(set, "当前账户不支持设置头像来源");
     }
     try {
-      const updated = await updateUserAvatarPreference(String(user.id), source as "casdoor" | "upload");
+      const updated = await updateUserAvatarPreference(uid, source as "casdoor" | "upload");
       return { avatar_url: updated.avatar_url, avatar_source: updated.avatar_source };
     } catch (e: any) {
       if (e?.message === "MISSING_EXTERNAL_AVATAR") {
@@ -3111,7 +3257,7 @@ const app = new Elysia()
     return { success: true };
   })
   .get("/api/moderation/my", async ({ query, set, user }) => {
-    const authErr = checkAuth(user, set);
+    const authErr = checkRealUser(user, set);
     if (authErr) return authErr;
     const status = typeof query.status === "string" ? query.status : undefined;
     const page = typeof query.page === "string" ? Number(query.page) : undefined;
@@ -3123,7 +3269,7 @@ const app = new Elysia()
     return { comments, bugs };
   })
   .get("/api/notifications", async ({ query, set, user }) => {
-    const authErr = checkAuth(user, set);
+    const authErr = checkRealUser(user, set);
     if (authErr) return authErr;
     const unreadOnly = query.unreadOnly === "true";
     const page = typeof query.page === "string" ? Number(query.page) : undefined;
@@ -3131,7 +3277,7 @@ const app = new Elysia()
     return await listNotifications({ user_name: user.name, unreadOnly, page, pageSize });
   })
   .patch("/api/notifications/:id/read", async ({ params: { id }, set, user }) => {
-    const authErr = checkAuth(user, set);
+    const authErr = checkRealUser(user, set);
     if (authErr) return authErr;
     const updated = await markNotificationRead(id, user.name);
     if (!updated) {
@@ -3141,7 +3287,7 @@ const app = new Elysia()
     return updated;
   })
   .post("/api/notifications/read-all", async ({ set, user }) => {
-    const authErr = checkAuth(user, set);
+    const authErr = checkRealUser(user, set);
     if (authErr) return authErr;
     await markAllNotificationsRead(user.name);
     return { success: true };
@@ -3153,9 +3299,9 @@ const app = new Elysia()
     return { capabilities: allCaps };
   })
   .get("/api/user/capabilities", async ({ set, user }) => {
-    const authErr = checkAuth(user, set);
+    const authErr = checkRealUser(user, set);
     if (authErr) return authErr;
-    const info = await getUserCapabilitiesWithInfo(user.id, user.name);
+    const info = await getUserCapabilitiesWithInfo(realUserId(user)!, user.name);
     return info;
   })
   .get("/api/admin/users/:id/capabilities", async ({ params: { id }, set, user }) => {
@@ -3412,12 +3558,14 @@ const app = new Elysia()
   .patch("/api/user/name", async ({ body, user, set }) => {
     const capErr = await checkCap(user, set, "user:rename");
     if (capErr) return capErr;
+    const uid = realUserId(user);
+    if (!uid) return apiForbidden(set, "Real user session required");
     const payload = body as any;
     const newName = String(payload?.name ?? "").trim();
     if (!newName) return apiBadRequest(set, "用户名不能为空");
     try {
-      const updated = await renameUser({ userId: user.id, newName, source: "self" });
-      const session = await issueUserAuthToken(user.id);
+      const updated = await renameUser({ userId: uid, newName, source: "self" });
+      const session = await issueUserAuthToken(uid);
       if (session) setSessionCookie(set, session.token);
       return { name: updated.name, avatar_url: updated.avatar_url, token: session?.token };
     } catch (e: any) {
@@ -3461,6 +3609,23 @@ function buildProjectMediaFields(project: any): Array<{ url: string; fieldPath: 
   if (project.icon) fields.push({ url: project.icon, fieldPath: "icon" });
   if (project.banner) fields.push({ url: project.banner, fieldPath: "banner" });
   if (project.avatar) fields.push({ url: project.avatar, fieldPath: "avatar" });
+  const extra = project?.extra && typeof project.extra === "object" ? project.extra as Record<string, unknown> : {};
+  const visitExtra = (value: unknown, pathParts: string[]) => {
+    if (typeof value === "string") {
+      const url = normalizeInternalUploadUrl(value);
+      if (url) fields.push({ url, fieldPath: pathParts.join(".") });
+      return;
+    }
+    if (!value || typeof value !== "object") return;
+    if (Array.isArray(value)) {
+      value.forEach((item, index) => visitExtra(item, [...pathParts, String(index)]));
+      return;
+    }
+    for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+      visitExtra(child, [...pathParts, key]);
+    }
+  };
+  visitExtra(extra, ["extra"]);
   return fields;
 }
 

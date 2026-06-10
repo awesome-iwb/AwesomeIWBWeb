@@ -8,6 +8,7 @@ import {
 import { createOrGetMediaAssetFromUpload, findActiveMediaBySha256, type MediaAsset } from "./media";
 
 const ALLOWED_MIMES = ["image/png", "image/jpeg", "image/webp"] as const;
+const MAX_IMAGE_PIXELS = 40_000_000;
 
 export type ImageUploadNamespace = "avatars" | "content" | "projects";
 
@@ -69,6 +70,16 @@ export async function readImageDimensions(
   }
 }
 
+export function assertSafeImageDimensions(dimensions: { width: number | null; height: number | null }) {
+  const { width, height } = dimensions;
+  if (!width || !height || width <= 0 || height <= 0) {
+    throw new Error("UPLOAD_INVALID_IMAGE");
+  }
+  if (width * height > MAX_IMAGE_PIXELS) {
+    throw new Error("UPLOAD_IMAGE_TOO_LARGE");
+  }
+}
+
 export async function processImageUpload(input: ProcessImageUploadInput): Promise<ProcessImageUploadResult> {
   const mime = String(input.mime || "");
   if (!validateImageMime(mime)) {
@@ -85,6 +96,7 @@ export async function processImageUpload(input: ProcessImageUploadInput): Promis
   const hash = crypto.createHash("sha256").update(input.buffer).digest("hex");
   const filename = `${hash}.${ext}`;
   const { width, height } = await readImageDimensions(input.buffer);
+  assertSafeImageDimensions({ width, height });
 
   const existing = await findActiveMediaBySha256(hash);
   if (existing?.storage_key && (await fileExists(existing.storage_key))) {

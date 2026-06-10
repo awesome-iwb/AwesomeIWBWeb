@@ -1,6 +1,59 @@
 import { sql } from "../db/client";
+import { getAllCapabilityIds } from "./capabilities";
 
 const dbEnabled = Boolean(process.env.DATABASE_URL);
+
+const MAX_PAGE_TEXT = {
+  title: 120,
+  description: 500,
+  group: 80,
+  icon: 64,
+  capability: 80,
+};
+
+const ALLOWED_PAGE_PATHS = new Set([
+  "/",
+  "/today",
+  "/articles/:slug",
+  "/categories",
+  "/about",
+  "/compare",
+  "/submit",
+  "/me",
+  "/dev/dashboard",
+  "/dev/organizations",
+  "/dev/projects",
+  "/dev/bugs",
+  "/dev/comments",
+  "/admin/dashboard",
+  "/admin/stories",
+  "/admin/projects",
+  "/admin/review",
+  "/admin/users",
+  "/admin/developers",
+  "/admin/media",
+  "/admin/audit",
+  "/admin/analytics",
+  "/admin/routes",
+]);
+const VALID_CAPABILITIES = new Set(getAllCapabilityIds());
+
+function boundedText(value: unknown, max: number): string {
+  return String(value ?? "")
+    .replace(/[\u0000-\u001F\u007F]/g, "")
+    .trim()
+    .slice(0, max);
+}
+
+function normalizeSortIndex(value: unknown): number {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(-100000, Math.min(100000, Math.trunc(n)));
+}
+
+function normalizeBoolean(value: unknown, fallback: boolean): boolean {
+  return typeof value === "boolean" ? value : fallback;
+}
 
 export interface Page {
   id: string;
@@ -17,57 +70,129 @@ export interface Page {
   updated_at: string;
 }
 
+export function normalizePagePath(value: unknown): string {
+  const path = String(value ?? "").trim();
+  return ALLOWED_PAGE_PATHS.has(path) ? path : "";
+}
+
+export function normalizePageCapability(value: unknown): string | null {
+  const capability = boundedText(value, MAX_PAGE_TEXT.capability);
+  if (!capability) return "";
+  return VALID_CAPABILITIES.has(capability) ? capability : null;
+}
+
+function normalizePageRow(row: Page): Page | null {
+  const path = normalizePagePath(row.path);
+  if (!path) return null;
+  const capability = normalizePageCapability(row.required_capability);
+  return {
+    ...row,
+    path,
+    title: boundedText(row.title, MAX_PAGE_TEXT.title) || path,
+    description: boundedText(row.description, MAX_PAGE_TEXT.description),
+    group: boundedText(row.group, MAX_PAGE_TEXT.group),
+    icon: boundedText(row.icon, MAX_PAGE_TEXT.icon),
+    required_capability: capability ?? "invalid:capability",
+    is_visible: normalizeBoolean(row.is_visible, true),
+    is_enabled: capability === null ? false : normalizeBoolean(row.is_enabled, true),
+    sort_index: normalizeSortIndex(row.sort_index),
+  };
+}
+
+export function normalizePageInput(input: Partial<Omit<Page, "id" | "created_at" | "updated_at">>) {
+  const path = normalizePagePath((input as any)?.path);
+  const capability = normalizePageCapability((input as any)?.required_capability);
+  if (!path) throw new Error("invalid page path");
+  if (capability === null) throw new Error("invalid page capability");
+  return {
+    path,
+    title: boundedText((input as any)?.title, MAX_PAGE_TEXT.title) || path,
+    description: boundedText((input as any)?.description, MAX_PAGE_TEXT.description),
+    group: boundedText((input as any)?.group, MAX_PAGE_TEXT.group),
+    icon: boundedText((input as any)?.icon, MAX_PAGE_TEXT.icon),
+    required_capability: capability,
+    is_visible: normalizeBoolean((input as any)?.is_visible, true),
+    is_enabled: normalizeBoolean((input as any)?.is_enabled, true),
+    sort_index: normalizeSortIndex((input as any)?.sort_index),
+  };
+}
+
+export function normalizePagePatch(input: Partial<Omit<Page, "id" | "created_at" | "updated_at">>) {
+  const patch: Partial<Omit<Page, "id" | "created_at" | "updated_at">> = {};
+  if (Object.prototype.hasOwnProperty.call(input, "path")) {
+    const path = normalizePagePath((input as any).path);
+    if (!path) throw new Error("invalid page path");
+    patch.path = path;
+  }
+  if (Object.prototype.hasOwnProperty.call(input, "title")) patch.title = boundedText((input as any).title, MAX_PAGE_TEXT.title);
+  if (Object.prototype.hasOwnProperty.call(input, "description")) patch.description = boundedText((input as any).description, MAX_PAGE_TEXT.description);
+  if (Object.prototype.hasOwnProperty.call(input, "group")) patch.group = boundedText((input as any).group, MAX_PAGE_TEXT.group);
+  if (Object.prototype.hasOwnProperty.call(input, "icon")) patch.icon = boundedText((input as any).icon, MAX_PAGE_TEXT.icon);
+  if (Object.prototype.hasOwnProperty.call(input, "required_capability")) {
+    const capability = normalizePageCapability((input as any).required_capability);
+    if (capability === null) throw new Error("invalid page capability");
+    patch.required_capability = capability;
+  }
+  if (Object.prototype.hasOwnProperty.call(input, "is_visible")) patch.is_visible = normalizeBoolean((input as any).is_visible, true);
+  if (Object.prototype.hasOwnProperty.call(input, "is_enabled")) patch.is_enabled = normalizeBoolean((input as any).is_enabled, true);
+  if (Object.prototype.hasOwnProperty.call(input, "sort_index")) patch.sort_index = normalizeSortIndex((input as any).sort_index);
+  return patch;
+}
+
 export async function listPages(params?: { group?: string }): Promise<{ items: Page[] }> {
-  if (!dbEnabled) return { items: STATIC_PAGES };
+  if (!dbEnabled) return { items: STATIC_PAGES.map(normalizePageRow).filter((p): p is Page => Boolean(p)) };
   let items;
   if (params?.group) {
+    const group = boundedText(params.group, MAX_PAGE_TEXT.group);
     items = await sql()<Page[]>`
-      select * from pages where "group" = ${params.group} order by sort_index, path
+      select * from pages where "group" = ${group} order by sort_index, path
     `;
   } else {
     items = await sql()<Page[]>`
       select * from pages order by sort_index, path
     `;
   }
-  return { items };
+  return { items: items.map(normalizePageRow).filter((p): p is Page => Boolean(p)) };
 }
 
 export async function getPage(id: string): Promise<Page | null> {
-  if (!dbEnabled) return STATIC_PAGES.find(p => p.id === id) ?? null;
+  if (!dbEnabled) return STATIC_PAGES.map(normalizePageRow).find(p => p?.id === id) ?? null;
   const [row] = await sql()<Page[]>`select * from pages where id = ${id}`;
-  return row ?? null;
+  return row ? normalizePageRow(row) : null;
 }
 
 export async function createPage(input: Omit<Page, "id" | "created_at" | "updated_at">): Promise<Page> {
   if (!dbEnabled) throw new Error("Not available in JSON mode");
+  const safeInput = normalizePageInput(input);
   const [row] = await sql()<Page[]>`
     insert into pages (path, title, description, "group", icon, required_capability, is_visible, is_enabled, sort_index)
-    values (${input.path}, ${input.title}, ${input.description}, ${input.group}, ${input.icon}, ${input.required_capability}, ${input.is_visible}, ${input.is_enabled ?? true}, ${input.sort_index})
+    values (${safeInput.path}, ${safeInput.title}, ${safeInput.description}, ${safeInput.group}, ${safeInput.icon}, ${safeInput.required_capability}, ${safeInput.is_visible}, ${safeInput.is_enabled}, ${safeInput.sort_index})
     returning *
   `;
-  return row;
+  return normalizePageRow(row) ?? row;
 }
 
 export async function updatePage(id: string, input: Partial<Omit<Page, "id" | "created_at" | "updated_at">>): Promise<Page | null> {
   if (!dbEnabled) throw new Error("Not available in JSON mode");
   const existing = await getPage(id);
   if (!existing) return null;
+  const safeInput = normalizePagePatch(input);
   const [row] = await sql()<Page[]>`
     update pages set
-      path = COALESCE(${input.path}, path),
-      title = COALESCE(${input.title}, title),
-      description = COALESCE(${input.description}, description),
-      "group" = COALESCE(${input.group}, "group"),
-      icon = COALESCE(${input.icon}, icon),
-      required_capability = COALESCE(${input.required_capability}, required_capability),
-      is_visible = COALESCE(${input.is_visible}, is_visible),
-      is_enabled = COALESCE(${input.is_enabled}, is_enabled),
-      sort_index = COALESCE(${input.sort_index}, sort_index),
+      path = COALESCE(${safeInput.path}, path),
+      title = COALESCE(${safeInput.title}, title),
+      description = COALESCE(${safeInput.description}, description),
+      "group" = COALESCE(${safeInput.group}, "group"),
+      icon = COALESCE(${safeInput.icon}, icon),
+      required_capability = COALESCE(${safeInput.required_capability}, required_capability),
+      is_visible = COALESCE(${safeInput.is_visible}, is_visible),
+      is_enabled = COALESCE(${safeInput.is_enabled}, is_enabled),
+      sort_index = COALESCE(${safeInput.sort_index}, sort_index),
       updated_at = now()
     where id = ${id}
     returning *
   `;
-  return row ?? null;
+  return row ? normalizePageRow(row) : null;
 }
 
 export async function deletePage(id: string): Promise<boolean> {

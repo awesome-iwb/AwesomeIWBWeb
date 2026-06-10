@@ -79,7 +79,7 @@
             </div>
             <div class="space-y-2">
               <div class="text-base sm:text-sm font-extrabold text-muted-foreground">网站</div>
-              <a v-if="selectedOrg.website_url" :href="selectedOrg.website_url" target="_blank" class="text-base sm:text-sm text-emerald-600 hover:underline break-all">{{ selectedOrg.website_url }}</a>
+              <a v-if="selectedOrg.website_url" :href="safeExternalUrl(selectedOrg.website_url)" target="_blank" rel="noopener noreferrer" class="text-base sm:text-sm text-emerald-600 hover:underline break-all">{{ selectedOrg.website_url }}</a>
               <span v-else class="text-base sm:text-sm text-slate-400">-</span>
             </div>
           </div>
@@ -149,6 +149,7 @@
 <script setup lang="ts">
 import { ref, onMounted, watch, computed } from 'vue';
 import { adminFetch, formatAdminError } from '../../composables/useAdminFetch';
+import { safeExternalUrl } from '../../lib/safeUrl';
 import { useAuth } from '../../composables/useAuth';
 import { ListDetailLayout as uiListDetailLayout, EmptyState as uiEmptyState } from '../../components/ui';
 import { Badge, getStatusConfig } from '../../components/ui/badge';

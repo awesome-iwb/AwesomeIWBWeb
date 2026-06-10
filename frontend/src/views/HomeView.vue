@@ -10,6 +10,7 @@ import { useAnalytics } from '../composables/useAnalytics';
 import { globalState } from '../store';
 import { includesNormalized } from '../utils/search';
 import { resolveProjectDisplayTags } from '../lib/resolveProjectDisplayTags';
+import { stringifyJsonLd } from '../lib/jsonLd';
 import ProjectTagRow from '../components/projects/ProjectTagRow.vue';
 
 function cardTagsFor(project: Project, categoryName: string) {
@@ -45,7 +46,7 @@ useHead({
   script: [
     {
       type: 'application/ld+json',
-      innerHTML: JSON.stringify({
+      innerHTML: stringifyJsonLd({
         '@context': 'https://schema.org',
         '@type': 'WebSite',
         name: 'Awesome IWB',
@@ -60,7 +61,7 @@ useHead({
     },
     {
       type: 'application/ld+json',
-      innerHTML: JSON.stringify({
+      innerHTML: stringifyJsonLd({
         '@context': 'https://schema.org',
         '@type': 'Organization',
         name: 'Awesome IWB',

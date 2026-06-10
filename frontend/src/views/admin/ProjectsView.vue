@@ -109,7 +109,6 @@
             <div class="lg:col-span-1">
               <label class="block text-sm font-bold text-muted-foreground mb-2">所属分类</label>
               <select v-model="projectDraft.category_id" class="w-full px-4 py-3.5 lg:py-3 rounded-xl border border-border bg-card outline-none focus:border-emerald-500 text-base">
-                <option :value="null">未分类</option>
                 <option v-for="c in adminCategories" :key="c.id" :value="c.id">{{ c.name }}</option>
               </select>
             </div>
@@ -360,12 +359,12 @@
         <div class="space-y-3">
           <div v-for="c in categoryDrafts" :key="c.id" class="p-4 rounded-2xl border border-border bg-card">
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 items-center">
-              <input v-model="c.name" type="text" class="sm:col-span-1 px-3 py-2 rounded-xl border border-border bg-card outline-none focus:border-emerald-500" />
-              <input v-model="c.description" type="text" class="sm:col-span-2 px-3 py-2 rounded-xl border border-border bg-card outline-none focus:border-emerald-500" />
+              <input v-model="c.name" type="text" :disabled="isSystemCategory(c)" class="sm:col-span-1 px-3 py-2 rounded-xl border border-border bg-card outline-none focus:border-emerald-500 disabled:opacity-60" />
+              <input v-model="c.description" type="text" :disabled="isSystemCategory(c)" class="sm:col-span-2 px-3 py-2 rounded-xl border border-border bg-card outline-none focus:border-emerald-500 disabled:opacity-60" />
             </div>
             <div class="mt-3 flex gap-2">
-              <button @click="saveCategory(c)" class="flex-1 px-3 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold transition-colors">保存</button>
-              <button @click="deleteCategory(c)" class="px-3 py-2.5 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-bold transition-colors">删除</button>
+              <button @click="saveCategory(c)" :disabled="isSystemCategory(c)" class="flex-1 px-3 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed">保存</button>
+              <button @click="deleteCategory(c)" :disabled="isSystemCategory(c)" class="px-3 py-2.5 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed">删除</button>
             </div>
           </div>
           <ui-EmptyState v-if="categoryDrafts.length === 0" :icon="FolderOpen" title="暂无分类" />
@@ -454,6 +453,7 @@
 import { ref, onMounted, computed } from 'vue';
 import { Save, Plus, Inbox, FolderOpen, History, ScrollText, Package } from 'lucide-vue-next';
 import { adminFetch, formatAdminError, normalizeMediaUrl } from '../../composables/useAdminFetch';
+import { openBlankNoopener } from '../../lib/safeUrl';
 import SearchSelect from '../../components/admin/SearchSelect.vue';
 import ProjectMediaFields from '../../components/shared/ProjectMediaFields.vue';
 import { ListDetailLayout as uiListDetailLayout, EmptyState as uiEmptyState } from '../../components/ui';
@@ -466,6 +466,10 @@ import { resolveProjectDisplayTags } from '../../lib/resolveProjectDisplayTags';
 
 const memberRowKey = (m: any) => (m.user_id ? `u:${m.user_id}` : m.org_id ? `o:${m.org_id}` : `j:${m.joined_at ?? ''}`);
 const memberAvatarUrl = (m: any) => m.avatar_url || m.user_avatar_url || m.org_avatar_url || '';
+const UNCATEGORIZED_CATEGORY_ID = '00000000-0000-0000-0000-000000000001';
+const LEGACY_JSON_UNCATEGORIZED_CATEGORY_ID = 'uncat';
+const isUncategorizedCategory = (c: any) =>
+  c?.id === UNCATEGORIZED_CATEGORY_ID || c?.id === LEGACY_JSON_UNCATEGORIZED_CATEGORY_ID;
 
 const searchUsers = async (query: string) => {
   const qt = query.trim();
@@ -529,18 +533,34 @@ const onDeveloperSelect = (val: string | null) => {
 };
 
 const adminCategories = ref<any[]>([]);
+const uncategorizedCategory = computed(() =>
+  adminCategories.value.find(isUncategorizedCategory)
+);
+
+const normalizeAdminCategories = (rows: any[]) => {
+  const list = Array.isArray(rows) ? rows.map((c) => ({ ...c })) : [];
+  if (!list.some(isUncategorizedCategory)) {
+    list.push({
+      id: UNCATEGORIZED_CATEGORY_ID,
+      name: '未分类',
+      description: '',
+      sort_index: 2147483647,
+    });
+  }
+  return list.sort((a, b) => Number(a.sort_index ?? 0) - Number(b.sort_index ?? 0) || String(a.name ?? '').localeCompare(String(b.name ?? '')));
+};
 
 const fetchAdminCategories = async () => {
   try {
     const res = await adminFetch('/api/admin/categories');
     if (res.ok) {
-      adminCategories.value = await res.json();
+      adminCategories.value = normalizeAdminCategories(await res.json());
       return;
     }
   } catch {}
   try {
     const res = await adminFetch('/api/categories');
-    if (res.ok) adminCategories.value = await res.json();
+    if (res.ok) adminCategories.value = normalizeAdminCategories(await res.json());
   } catch {}
 };
 
@@ -683,7 +703,7 @@ const createNewProject = () => {
     banner: '',
     recommendation: '',
     keywords: '',
-    category_id: projectQuery.value.category || null
+    category_id: projectQuery.value.category || uncategorizedCategory.value?.id || UNCATEGORIZED_CATEGORY_ID
   });
 };
 
@@ -776,8 +796,8 @@ const onFilterByTag = async (tagId: string) => {
 const importJsonInput = ref<HTMLInputElement | null>(null);
 const importCsvInput = ref<HTMLInputElement | null>(null);
 
-const exportJson = () => window.open('/api/admin/projects/export.json', '_blank');
-const exportCsv = () => window.open('/api/admin/projects/export.csv', '_blank');
+const exportJson = () => openBlankNoopener('/api/admin/projects/export.json');
+const exportCsv = () => openBlankNoopener('/api/admin/projects/export.csv');
 
 const triggerImportJson = () => importJsonInput.value?.click();
 const triggerImportCsv = () => importCsvInput.value?.click();
@@ -1108,6 +1128,8 @@ const openCategoryManager = () => {
   newCategoryDescription.value = '';
 };
 
+const isSystemCategory = isUncategorizedCategory;
+
 const createCategory = async () => {
   if (!newCategoryName.value.trim()) return;
   const res = await adminFetch('/api/admin/categories', {
@@ -1124,6 +1146,7 @@ const createCategory = async () => {
 };
 
 const saveCategory = async (c: any) => {
+  if (isSystemCategory(c)) return;
   const res = await adminFetch(`/api/admin/categories/${c.id}`, {
     method: 'PUT',
     body: JSON.stringify({ name: c.name, description: c.description, sort_index: c.sort_index })
@@ -1138,6 +1161,7 @@ const saveCategory = async (c: any) => {
 };
 
 const deleteCategory = async (c: any) => {
+  if (isSystemCategory(c)) return;
   const ok = confirm(`确认删除分类：${c.name}？（分类下项目将变为未分类）`);
   if (!ok) return;
   const res = await adminFetch(`/api/admin/categories/${c.id}`, { method: 'DELETE' });
@@ -1147,6 +1171,7 @@ const deleteCategory = async (c: any) => {
     return;
   }
   await fetchAdminCategories();
+  await resetAndFetchProjects();
   openCategoryManager();
 };
 

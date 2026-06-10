@@ -27,8 +27,11 @@ export async function promoteToDev(userId: string): Promise<void> {
   const existing = new Set(existingRows.map(r => r.capability_id));
   const toAdd = [...USER_CAPABILITY_IDS, ...DEV_CAPABILITY_IDS].filter(id => !existing.has(id));
   if (toAdd.length > 0) {
-    const values = toAdd.map(cid => `('${userId}', '${cid}')`).join(", ");
-    await sql().unsafe(`insert into user_capabilities (user_id, capability_id) values ${values} on conflict do nothing`);
+    await sql()`
+      insert into user_capabilities (user_id, capability_id)
+      select ${userId}, unnest(${toAdd}::text[])
+      on conflict do nothing
+    `;
   }
   await sql()`insert into notifications (user_name, type, title, body) select name, 'role_promoted', '已升级为开发者', '您已获得开发者权限，可以访问开发者后台管理自己的项目。' from users where id = ${userId}`;
 }

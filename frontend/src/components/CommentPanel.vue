@@ -9,8 +9,7 @@ import {
 import { useAuth } from '../composables/useAuth';
 import { useApi } from '../composables/useApi';
 import { API } from '../api/endpoints';
-import MarkdownIt from 'markdown-it';
-import DOMPurify from 'dompurify';
+import { renderSafeMarkdown } from '../lib/safeMarkdown';
 
 type CommentKind = 'comment' | 'bug';
 
@@ -68,10 +67,8 @@ const { apiFetch } = useApi();
 const tab = ref<CommentKind>(props.initialTab ?? 'comment');
 watch(() => props.initialTab, (v) => { if (v) tab.value = v; });
 
-const md = new MarkdownIt({ breaks: true, linkify: true });
 const renderMarkdown = (text: string) => {
-  if (!text) return '';
-  return DOMPurify.sanitize(md.render(text));
+  return renderSafeMarkdown(text);
 };
 
 const mapFromApi = (item: any): Entry | null => {

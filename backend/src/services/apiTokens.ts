@@ -28,14 +28,12 @@ export async function findActiveTokenByHash(tokenHash: string): Promise<ApiToken
     }
     return null;
   }
-  const rows = await sql().unsafe(
-    `select id, token_hash, name, role, is_active, expires_at, last_used_at, created_at
-     from api_tokens
-     where token_hash = $1 and is_active = true
-     limit 1`,
-    [tokenHash]
-  );
-  const token = (rows as ApiToken[])[0] ?? null;
+  const [token] = await sql()<ApiToken[]>`
+    select id, token_hash, name, role, is_active, expires_at, last_used_at, created_at
+    from api_tokens
+    where token_hash = ${tokenHash} and is_active = true
+    limit 1
+  `;
   if (!token) return null;
   if (token.expires_at && new Date(token.expires_at) < new Date()) return null;
   return token;
@@ -52,10 +50,7 @@ export async function recordTokenUsage(tokenHash: string) {
     return;
   }
   try {
-    await sql().unsafe(
-      `update api_tokens set last_used_at = now() where token_hash = $1`,
-      [tokenHash]
-    );
+    await sql()`update api_tokens set last_used_at = now() where token_hash = ${tokenHash}`;
   } catch {}
 }
 
@@ -106,9 +101,10 @@ export async function revokeApiToken(id: string): Promise<boolean> {
     }
     return false;
   }
-  const result = await sql().unsafe(
-    `update api_tokens set is_active = false where id = $1`,
-    [id]
-  );
-  return (result as any[]).length > 0;
+  const rows = await sql()<Array<{ id: string }>>`
+    update api_tokens set is_active = false
+    where id = ${id}
+    returning id
+  `;
+  return rows.length > 0;
 }

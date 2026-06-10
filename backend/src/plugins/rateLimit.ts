@@ -1,11 +1,8 @@
 import { appConfig } from "../config";
+import { getClientIp } from "../security/clientIp";
 
 type Bucket = { count: number; resetAt: number };
 const buckets = new Map<string, Bucket>();
-
-function getClientIp(headers: Record<string, string | undefined>) {
-  return (headers["x-forwarded-for"] ?? headers["x-real-ip"] ?? "unknown").split(",")[0].trim();
-}
 
 export function checkRateLimit(input: { headers: Record<string, string | undefined>; path: string; set: any }) {
   const ip = getClientIp(input.headers);

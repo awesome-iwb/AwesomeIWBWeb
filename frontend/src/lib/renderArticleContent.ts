@@ -1,8 +1,8 @@
 import MarkdownIt from 'markdown-it';
-import DOMPurify from 'dompurify';
 import katex from 'katex';
 import hljs from 'highlight.js';
 import { replaceWikilinksForMarkdown } from './wikilink';
+import { isSafeContentUri, sanitizeHtml } from './sanitizeHtml';
 
 export type ArticleContentFormat = 'markdown' | 'html' | 'latex' | 'plain' | 'flarum';
 
@@ -70,6 +70,7 @@ const mathPlugin = (md: MarkdownIt) => {
 };
 
 const md = new MarkdownIt({ html: true, breaks: true, linkify: true });
+md.validateLink = isSafeContentUri;
 md.use(mathPlugin);
 
 // Custom code block renderer (fence)
@@ -103,32 +104,24 @@ md.renderer.rules.fence = (tokens, idx) => {
 };
 
 function sanitize(html: string) {
-  const sanitizeFn = (DOMPurify && typeof DOMPurify.sanitize === 'function')
-    ? DOMPurify.sanitize
-    : ((DOMPurify as any)?.default?.sanitize || (DOMPurify as any)?.sanitize);
-    
-  if (typeof sanitizeFn !== 'function') {
-    return html;
-  }
-  
-  return String(
-    sanitizeFn(html, {
+  return sanitizeHtml(html, {
       USE_PROFILES: { html: true, mathMl: true },
+      FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form'],
+      FORBID_ATTR: ['style'],
       ADD_TAGS: [
         'span', 'math', 'annotation', 'semantics', 'mrow', 'mi', 'mo', 'mn',
         'svg', 'path', 'circle', 'line', 'rect', 'input', 'blockquote',
         'figure', 'figcaption'
       ],
       ADD_ATTR: [
-        'class', 'style', 'aria-hidden', 'data-code', 'data-anchor',
+        'class', 'aria-hidden', 'data-code', 'data-anchor',
         'data-callout-type', 'data-poll-name', 'data-poll-options',
         'viewBox', 'fill', 'stroke', 'stroke-width',
         'stroke-linecap', 'stroke-linejoin', 'x', 'y', 'width', 'height',
         'rx', 'ry', 'x1', 'x2', 'y1', 'y2', 'd', 'cx', 'cy', 'r', 'type',
         'disabled', 'checked'
       ],
-    })
-  );
+    });
 }
 
 function escapeHtml(text: string) {
@@ -228,7 +221,7 @@ function renderPolls(html: string): string {
       const votes = Math.round(percent * 1.2);
       return `
 <div class="poll-option-item my-2.5 p-3 rounded-xl border border-border bg-card/50 hover:bg-accent/40 transition-all select-none cursor-pointer relative overflow-hidden group">
-  <div class="poll-option-progress absolute top-0 left-0 bottom-0 bg-brand-500/10 dark:bg-brand-400/15 transition-all duration-500" style="width: ${percent}%"></div>
+  <div class="poll-option-progress poll-option-progress-${percent} absolute top-0 left-0 bottom-0 bg-brand-500/10 dark:bg-brand-400/15 transition-all duration-500"></div>
   <div class="poll-option-content flex justify-between items-center relative z-10 text-sm">
     <span class="font-medium text-foreground">${opt}</span>
     <span class="text-xs font-bold text-brand-600 dark:text-brand-400">${votes} 票 (${percent}%)</span>
@@ -268,10 +261,8 @@ export function renderArticleContent(format: ArticleContentFormat, raw: string, 
   let html: string;
   switch (format) {
     case 'html':
-      if (enableAnchors) {
-        return injectBlockAnchors(source);
-      }
-      return source;
+      html = source;
+      break;
     case 'plain':
       return `<pre class="article-plain whitespace-pre-wrap">${escapeHtml(source)}</pre>`;
     case 'flarum':

@@ -38,25 +38,22 @@ export async function listNotifications(params: {
   const pageSize = Math.min(100, Math.max(1, params.pageSize ?? 20));
   const offset = (page - 1) * pageSize;
 
-  const conditions: string[] = [`user_name = $1`];
-  const queryParams: any[] = [params.user_name];
+  const db = sql();
+  const unreadFilter = params.unreadOnly ? db`and is_read = false` : db``;
 
-  if (params.unreadOnly) {
-    conditions.push(`is_read = false`);
-  }
-
-  const whereClause = `where ${conditions.join(" and ")}`;
-
-  const countQuery = `select count(*)::text as count from notifications ${whereClause}`;
-  const itemsQuery = `
+  const items = await db<Notification[]>`
     select id, user_name, type, title, body, data, is_read, created_at
-    from notifications ${whereClause}
+    from notifications
+    where user_name = ${params.user_name} ${unreadFilter}
     order by created_at desc
     limit ${pageSize} offset ${offset}
   `;
 
-  const items = await sql().unsafe(itemsQuery, queryParams) as Notification[];
-  const [{ count }] = await sql().unsafe(countQuery, queryParams) as Array<{ count: string }>;
+  const [{ count }] = await db<Array<{ count: string }>>`
+    select count(*)::text as count
+    from notifications
+    where user_name = ${params.user_name} ${unreadFilter}
+  `;
 
   return { items, page, pageSize, total: Number(count) };
 }

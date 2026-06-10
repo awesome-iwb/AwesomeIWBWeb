@@ -1,5 +1,6 @@
 import { sql } from "../db/client";
 import { getArticleById, type ArticleRow } from "./articles";
+import { normalizeArticleCoverImage } from "./articles";
 
 export interface ArticleRevisionRow {
   id: string;
@@ -99,7 +100,7 @@ export async function rollbackArticle(articleId: string, revisionId: string) {
       category = ${meta.category ?? ''},
       layout_type = ${meta.layout_type ?? 'hero'},
       content_format = ${meta.content_format ?? 'markdown'},
-      cover_image = ${meta.cover_image ?? ''},
+      cover_image = ${normalizeArticleCoverImage(meta.cover_image)},
       theme = ${meta.theme ?? 'dark'},
       projects = ${sql().json(meta.projects ?? [])},
       status = ${meta.status ?? 'draft'},
