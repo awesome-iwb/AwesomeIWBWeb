@@ -6,6 +6,7 @@ import CommandPalette from './components/CommandPalette.vue'
 import SiteFooter from './components/SiteFooter.vue'
 import MobileTabBar from './components/MobileTabBar.vue'
 import SiteReloadBanner from './components/SiteReloadBanner.vue'
+import UserNotificationHost from './components/UserNotificationHost.vue'
 import { globalState } from './store'
 import { useAuth } from './composables/useAuth'
 import { checkRemoteBuildAndMaybePrompt } from './siteReloadGate'
@@ -113,6 +114,7 @@ onBeforeUnmount(() => {
     </div>
 
     <MobileTabBar v-if="showMobileTabBar" />
+    <UserNotificationHost v-if="!isBackofficeRoute" />
     <SiteFooter v-if="!isBackofficeRoute" />
   </div>
 </template>

@@ -57,6 +57,10 @@ import {
   listNotifications,
   markNotificationRead,
   markAllNotificationsRead,
+  listNotificationCampaigns,
+  createNotificationCampaign,
+  updateNotificationCampaign,
+  sendNotificationCampaign,
 } from "./services/notifications";
 import { authPlugin, requireAuth, requireCapability } from "./plugins/auth";
 import { casdoorAuthPlugin } from "./plugins/casdoorAuth";
@@ -89,6 +93,15 @@ import { createOrganization, findOrganizationById, findOrganizationBySlug, listO
 import { createProjectClaim, listProjectClaims, approveProjectClaim, rejectProjectClaim, type ClaimStatus } from "./services/projectClaims";
 import { promoteToDev, demoteFromDev } from "./services/rolePromotion";
 import { listDevelopers, getDeveloperDetail } from "./services/developers";
+import {
+  getAgentDeveloperById,
+  getAgentProjectByKey,
+  listAgentDevelopers,
+  listAgentProjects,
+  mapAgentProject,
+  normalizeAgentPagination,
+  normalizeAgentSort,
+} from "./services/agentApi";
 import { recordPageView, recordClickEvent, recordSearchQuery, getAnalyticsOverview, clampAnalyticsDays } from "./services/analytics";
 import { listPages, createPage, updatePage, deletePage, syncPages } from "./services/pages";
 import {
@@ -275,6 +288,85 @@ function findJsonCategoryByName(name: string) {
   return ((data as any).categories ?? []).find((c: any) => String(c.name).trim().toLowerCase() === normalized);
 }
 
+function jsonTextMatches(value: unknown, query: string): boolean {
+  if (!query) return true;
+  if (Array.isArray(value)) return value.some((item) => jsonTextMatches(item, query));
+  return String(value ?? "").toLowerCase().includes(query);
+}
+
+function listJsonAgentProjects(params: {
+  q?: string;
+  category?: string;
+  sort?: "name" | "stars" | "updated";
+  page?: number;
+  pageSize?: number;
+}) {
+  ensureJsonUncategorizedCategory();
+  const { page, pageSize } = normalizeAgentPagination(params);
+  const offset = (page - 1) * pageSize;
+  const q = String(params.q ?? "").trim().toLowerCase();
+  const category = String(params.category ?? "").trim();
+  const sort = normalizeAgentSort(params.sort);
+  const flat: any[] = [];
+
+  for (const c of (data as any).categories ?? []) {
+    for (const p of c.projects ?? []) {
+      const row = {
+        ...withAiUsageState(p),
+        id: String(p.id ?? p.slug ?? p.name ?? ""),
+        slug: String(p.slug ?? encodeURIComponent(String(p.name ?? ""))),
+        category_id: String(c.id ?? c.name ?? ""),
+        category_name: c.name ?? "",
+        category_description: c.description ?? "",
+        registry_tags: Array.isArray(p.registry_tags) ? p.registry_tags : [],
+      };
+      flat.push(row);
+    }
+  }
+
+  const filtered = flat.filter((p) => {
+    if (category && String(p.category_id) !== category) return false;
+    if (!q) return true;
+    return (
+      jsonTextMatches(p.name, q) ||
+      jsonTextMatches(p.developer, q) ||
+      jsonTextMatches(p.description, q) ||
+      jsonTextMatches(p.keywords, q) ||
+      jsonTextMatches(p.recommendation, q) ||
+      jsonTextMatches(p.language, q)
+    );
+  });
+
+  filtered.sort((a, b) => {
+    if (sort === "stars") return Number(b.stars ?? 0) - Number(a.stars ?? 0) || String(a.name ?? "").localeCompare(String(b.name ?? ""));
+    if (sort === "updated") return String(b.last_update ?? "").localeCompare(String(a.last_update ?? "")) || String(a.name ?? "").localeCompare(String(b.name ?? ""));
+    return String(a.name ?? "").localeCompare(String(b.name ?? ""));
+  });
+
+  return {
+    items: filtered.slice(offset, offset + pageSize).map((p) => mapAgentProject(p, p.registry_tags)),
+    page,
+    pageSize,
+    total: filtered.length,
+  };
+}
+
+function getJsonAgentProjectByKey(key: string) {
+  const decoded = decodeURIComponent(key);
+  const projects = listJsonAgentProjects({ page: 1, pageSize: 100 }).items;
+  const bySlug = projects.find((p) => p.slug === decoded);
+  if (bySlug) return bySlug;
+  const byName = projects.filter((p) => p.name.toLowerCase() === decoded.toLowerCase());
+  return byName.length === 1 ? byName[0] : null;
+}
+
+function trySendCachedJson(headers: Record<string, string | undefined>, set: any, payload: unknown) {
+  applyAgentCache(set);
+  const etag = weakEtagFromJson(payload);
+  if (trySendNotModified(headers, set, etag)) return undefined;
+  return payload;
+}
+
 /**
  * Audit logger wrapper for both DB and JSON mode.
  *
@@ -416,6 +508,10 @@ function applyPublicShortCache(set: any, maxAgeSeconds: number) {
   set.headers["cache-control"] = `public, max-age=${maxAge}, stale-while-revalidate=${Math.max(maxAge, 60)}`;
 }
 
+function applyAgentCache(set: any) {
+  set.headers["cache-control"] = "public, max-age=60, stale-while-revalidate=300";
+}
+
 function weakEtagFromJson(payload: unknown) {
   const hash = crypto.createHash("sha1").update(JSON.stringify(payload)).digest("hex");
   return `W/\"${hash}\"`;
@@ -516,6 +612,87 @@ const app = new Elysia()
     timestamp: new Date().toISOString(),
     buildId: appConfig.deployBuildId
   }))
+  .get("/api/agent/health", () => ({
+    status: "ok",
+    api: "agent",
+    version: "1",
+    db: dbEnabled,
+    timestamp: new Date().toISOString(),
+    buildId: appConfig.deployBuildId
+  }))
+  .get("/api/agent/categories", async ({ set, headers }) => {
+    const payload = dbEnabled
+      ? { items: await listCategories() }
+      : {
+          items: ((data as any).categories ?? []).map((c: any) => ({
+            id: c.id ?? c.name,
+            name: c.name,
+            description: c.description ?? "",
+            sort_index: 0,
+          })),
+        };
+    return trySendCachedJson(headers, set, payload);
+  })
+  .get("/api/agent/tags", async ({ set, headers }) => {
+    const payload = dbEnabled ? { items: await listActiveTags() } : { items: [] };
+    return trySendCachedJson(headers, set, payload);
+  })
+  .get("/api/agent/projects", async ({ query, set, headers }) => {
+    const params = {
+      q: typeof query.q === "string" ? query.q : undefined,
+      category: typeof query.category === "string" ? query.category : undefined,
+      tag_id: typeof query.tag_id === "string" ? query.tag_id : undefined,
+      sort: normalizeAgentSort(query.sort),
+      page: Number(query.page),
+      pageSize: Number(query.pageSize),
+    };
+    const payload = dbEnabled ? await listAgentProjects(params) : listJsonAgentProjects(params);
+    return trySendCachedJson(headers, set, payload);
+  })
+  .get("/api/agent/search/projects", async ({ query, set, headers }) => {
+    if (checkRateLimit({ headers, path: "/api/agent/search/projects", set })) return apiError(set, 429, "RATE_LIMITED", "Too Many Requests");
+    const q = typeof query.q === "string" ? query.q.trim() : "";
+    if (!q) return apiBadRequest(set, "q is required");
+    const params = {
+      q,
+      category: typeof query.category === "string" ? query.category : undefined,
+      tag_id: typeof query.tag_id === "string" ? query.tag_id : undefined,
+      sort: normalizeAgentSort(query.sort),
+      page: Number(query.page),
+      pageSize: Number(query.pageSize),
+    };
+    const payload = dbEnabled ? await listAgentProjects(params) : listJsonAgentProjects(params);
+    return trySendCachedJson(headers, set, payload);
+  })
+  .get("/api/agent/projects/:slug", async ({ params: { slug }, set, headers }) => {
+    const project = dbEnabled ? await getAgentProjectByKey(decodeURIComponent(slug)) : getJsonAgentProjectByKey(slug);
+    if (!project) return apiNotFound(set, "Project not found");
+    return trySendCachedJson(headers, set, project);
+  })
+  .get("/api/agent/developers", async ({ query, set, headers }) => {
+    const payload = dbEnabled
+      ? await listAgentDevelopers({
+          q: typeof query.q === "string" ? query.q : undefined,
+          page: Number(query.page),
+          pageSize: Number(query.pageSize),
+        })
+      : { items: [], ...normalizeAgentPagination({ page: query.page, pageSize: query.pageSize }), total: 0 };
+    return trySendCachedJson(headers, set, payload);
+  })
+  .get("/api/agent/search/developers", async ({ query, set, headers }) => {
+    if (checkRateLimit({ headers, path: "/api/agent/search/developers", set })) return apiError(set, 429, "RATE_LIMITED", "Too Many Requests");
+    const q = typeof query.q === "string" ? query.q.trim() : "";
+    if (!q) return apiBadRequest(set, "q is required");
+    const payload = dbEnabled
+      ? await listAgentDevelopers({ q, page: Number(query.page), pageSize: Number(query.pageSize) })
+      : { items: [], ...normalizeAgentPagination({ page: query.page, pageSize: query.pageSize }), total: 0 };
+    return trySendCachedJson(headers, set, payload);
+  })
+  .get("/api/agent/developers/:id", async ({ params: { id }, set, headers }) => {
+    const developer = dbEnabled ? await getAgentDeveloperById(id) : null;
+    if (!developer) return apiNotFound(set, "Developer not found");
+    return trySendCachedJson(headers, set, developer);
+  })
   .post("/api/track/pageview", async ({ body, headers, set }) => {
     if (checkRateLimit({ headers, path: "/api/track/pageview", set })) return apiError(set, 429, "RATE_LIMITED", "Too Many Requests");
     const payload: any = body as any;
@@ -3268,18 +3445,77 @@ const app = new Elysia()
     ]);
     return { comments, bugs };
   })
+  .get("/api/admin/notifications", async ({ query, set, user }) => {
+    const capErr = await checkCap(user, set, "notification:manage");
+    if (capErr) return capErr;
+    if (!dbEnabled) return apiError(set, 503, "UNAVAILABLE", "notifications require database");
+    const status = query.status === "draft" || query.status === "sent" ? query.status : undefined;
+    const page = typeof query.page === "string" ? Number(query.page) : undefined;
+    const pageSize = typeof query.pageSize === "string" ? Number(query.pageSize) : undefined;
+    return await listNotificationCampaigns({ status, page, pageSize });
+  })
+  .post("/api/admin/notifications", async ({ body, set, user }) => {
+    const capErr = await checkCap(user, set, "notification:manage");
+    if (capErr) return capErr;
+    if (!dbEnabled) return apiError(set, 503, "UNAVAILABLE", "notifications require database");
+    try {
+      const created = await createNotificationCampaign(body, user?.name ?? "system");
+      if (created) {
+        await logAuditCompat({ action: "create_notification_campaign", entity_type: "notification_campaign", entity_id: created.id, diff: { status: created.status } }, user?.name);
+      }
+      return created;
+    } catch (e: any) {
+      const message = String(e?.message ?? "");
+      if (message === "TITLE_REQUIRED") return apiBadRequest(set, "标题不能为空");
+      if (message === "BODY_REQUIRED") return apiBadRequest(set, "正文不能为空");
+      if (message === "TARGET_USERS_REQUIRED") return apiBadRequest(set, "请至少填写一个接收用户名");
+      return apiBadRequest(set, "通知内容无效");
+    }
+  })
+  .patch("/api/admin/notifications/:id", async ({ params: { id }, body, set, user }) => {
+    const capErr = await checkCap(user, set, "notification:manage");
+    if (capErr) return capErr;
+    if (!dbEnabled) return apiError(set, 503, "UNAVAILABLE", "notifications require database");
+    try {
+      const updated = await updateNotificationCampaign(id, body, user?.name ?? "system");
+      if (!updated) return apiBadRequest(set, "通知不存在或已发送，不能继续编辑");
+      await logAuditCompat({ action: "update_notification_campaign", entity_type: "notification_campaign", entity_id: id }, user?.name);
+      return updated;
+    } catch (e: any) {
+      const message = String(e?.message ?? "");
+      if (message === "TITLE_REQUIRED") return apiBadRequest(set, "标题不能为空");
+      if (message === "BODY_REQUIRED") return apiBadRequest(set, "正文不能为空");
+      if (message === "TARGET_USERS_REQUIRED") return apiBadRequest(set, "请至少填写一个接收用户名");
+      return apiBadRequest(set, "通知内容无效");
+    }
+  })
+  .post("/api/admin/notifications/:id/send", async ({ params: { id }, set, user }) => {
+    const capErr = await checkCap(user, set, "notification:manage");
+    if (capErr) return capErr;
+    if (!dbEnabled) return apiError(set, 503, "UNAVAILABLE", "notifications require database");
+    const result = await sendNotificationCampaign(id, user?.name ?? "system");
+    if (result.status === "not_found") return apiNotFound(set);
+    if (result.status === "already_sent") return apiBadRequest(set, "通知已经发送，不能重复发送");
+    if (result.status === "missing_users") {
+      return apiBadRequest(set, `以下用户不存在或已停用：${result.missing.join(", ")}`);
+    }
+    await logAuditCompat({ action: "send_notification_campaign", entity_type: "notification_campaign", entity_id: id, diff: { sent_count: result.sent_count } }, user?.name);
+    return { success: true, campaign: result.campaign, sent_count: result.sent_count };
+  })
   .get("/api/notifications", async ({ query, set, user }) => {
     const authErr = checkRealUser(user, set);
     if (authErr) return authErr;
+    const userName = String(user?.name ?? "");
     const unreadOnly = query.unreadOnly === "true";
     const page = typeof query.page === "string" ? Number(query.page) : undefined;
     const pageSize = typeof query.pageSize === "string" ? Number(query.pageSize) : undefined;
-    return await listNotifications({ user_name: user.name, unreadOnly, page, pageSize });
+    return await listNotifications({ user_name: userName, unreadOnly, page, pageSize });
   })
   .patch("/api/notifications/:id/read", async ({ params: { id }, set, user }) => {
     const authErr = checkRealUser(user, set);
     if (authErr) return authErr;
-    const updated = await markNotificationRead(id, user.name);
+    const userName = String(user?.name ?? "");
+    const updated = await markNotificationRead(id, userName);
     if (!updated) {
       set.status = 404;
       return apiNotFound(set);
@@ -3289,7 +3525,8 @@ const app = new Elysia()
   .post("/api/notifications/read-all", async ({ set, user }) => {
     const authErr = checkRealUser(user, set);
     if (authErr) return authErr;
-    await markAllNotificationsRead(user.name);
+    const userName = String(user?.name ?? "");
+    await markAllNotificationsRead(userName);
     return { success: true };
   })
   .get("/api/capabilities", async ({ set, user }) => {

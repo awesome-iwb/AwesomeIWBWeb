@@ -17,6 +17,7 @@ import { AdminShell } from '../../components/ui';
 import {
   LayoutDashboard, FileText, Package, ClipboardCheck,
   Users, UserCog, Image, ScrollText, BarChart3, Route, RefreshCw,
+  Bell,
 } from 'lucide-vue-next';
 
 const router = useRouter();
@@ -45,6 +46,7 @@ const adminNavItems: NavItem[] = [
   { key: 'audit', label: '审计日志', to: '/admin/audit', icon: ScrollText, group: 'secondary', primary: false, cap: 'audit:read' },
   { key: 'routes', label: '路由管理', to: '/admin/routes', icon: Route, group: 'secondary', primary: false, cap: 'route:manage' },
   { key: 'analytics', label: '数据分析', to: '/admin/analytics', icon: BarChart3, group: 'secondary', primary: false, cap: 'analytics:read' },
+  { key: 'notifications', label: '通知管理', to: '/admin/notifications', icon: Bell, group: 'secondary', primary: false, cap: 'notification:manage' },
 ];
 
 const visibleNavItems = computed(() =>

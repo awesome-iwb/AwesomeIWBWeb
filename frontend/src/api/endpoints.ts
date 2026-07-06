@@ -72,6 +72,14 @@ export const API = {
     projectMembers: (id: string) => `/api/admin/projects/${encodeURIComponent(id)}/members`,
     userRename: (id: string) => `/api/admin/users/${encodeURIComponent(id)}/name`,
     syncGithub: '/api/admin/sync/github',
+    notifications: '/api/admin/notifications',
+    notificationDetail: (id: string) => `/api/admin/notifications/${encodeURIComponent(id)}`,
+    notificationSend: (id: string) => `/api/admin/notifications/${encodeURIComponent(id)}/send`,
+  },
+  notifications: {
+    list: '/api/notifications',
+    markRead: (id: string) => `/api/notifications/${encodeURIComponent(id)}/read`,
+    readAll: '/api/notifications/read-all',
   },
   dev: {
     projects: '/api/dev/projects',

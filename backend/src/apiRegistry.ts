@@ -12,6 +12,15 @@ export interface ApiRouteSpec {
 
 export const API_REGISTRY: ApiRouteSpec[] = [
   { id: 'health', method: 'GET', path: '/api/health', scope: 'public' },
+  { id: 'agent.health', method: 'GET', path: '/api/agent/health', scope: 'public' },
+  { id: 'agent.categories.list', method: 'GET', path: '/api/agent/categories', scope: 'public' },
+  { id: 'agent.tags.list', method: 'GET', path: '/api/agent/tags', scope: 'public' },
+  { id: 'agent.projects.list', method: 'GET', path: '/api/agent/projects', scope: 'public' },
+  { id: 'agent.projects.search', method: 'GET', path: '/api/agent/search/projects', scope: 'public' },
+  { id: 'agent.projects.detail', method: 'GET', path: '/api/agent/projects/:slug', scope: 'public' },
+  { id: 'agent.developers.list', method: 'GET', path: '/api/agent/developers', scope: 'public' },
+  { id: 'agent.developers.search', method: 'GET', path: '/api/agent/search/developers', scope: 'public' },
+  { id: 'agent.developers.detail', method: 'GET', path: '/api/agent/developers/:id', scope: 'public' },
   { id: 'categories.list', method: 'GET', path: '/api/categories', scope: 'public' },
   { id: 'projects.list', method: 'GET', path: '/api/projects', scope: 'public' },
   { id: 'projects.create.legacy', method: 'POST', path: '/api/projects', scope: 'public', deprecated: true },

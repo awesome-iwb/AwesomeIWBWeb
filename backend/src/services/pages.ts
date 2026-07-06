@@ -35,6 +35,7 @@ const ALLOWED_PAGE_PATHS = new Set([
   "/admin/audit",
   "/admin/analytics",
   "/admin/routes",
+  "/admin/notifications",
 ]);
 const VALID_CAPABILITIES = new Set(getAllCapabilityIds());
 
@@ -256,6 +257,7 @@ const SYNC_SOURCE = [
   { path: '/admin/audit', title: '审计日志', group: '运维', icon: 'ScrollText', required_capability: 'audit:read', is_visible: true, is_enabled: true, sort_index: 37 },
   { path: '/admin/analytics', title: '数据分析', group: '运维', icon: 'BarChart3', required_capability: 'analytics:read', is_visible: true, is_enabled: true, sort_index: 38 },
   { path: '/admin/routes', title: '路由管理', group: '运维', icon: 'Route', required_capability: 'route:manage', is_visible: true, is_enabled: true, sort_index: 39 },
+  { path: '/admin/notifications', title: '通知管理', group: '运维', icon: 'Bell', required_capability: 'notification:manage', is_visible: true, is_enabled: true, sort_index: 40 },
 ];
 
 const STATIC_PAGES: Page[] = SYNC_SOURCE.map((p, i) => ({
