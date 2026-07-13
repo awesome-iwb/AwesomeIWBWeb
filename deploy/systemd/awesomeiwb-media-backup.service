@@ -5,10 +5,9 @@ Requires=docker.service
 
 [Service]
 Type=oneshot
-WorkingDirectory=/opt/awesomeiwb
-EnvironmentFile=-/opt/awesomeiwb/deploy/.env
+WorkingDirectory=/
 EnvironmentFile=-/etc/awesomeiwb/media-backup.env
-ExecStart=/usr/bin/bash /opt/awesomeiwb/deploy/backup-media.sh
+ExecStart=/usr/bin/bash /usr/local/lib/awesomeiwb-media/backup-media.sh
 UMask=0077
 Nice=10
 IOSchedulingClass=best-effort

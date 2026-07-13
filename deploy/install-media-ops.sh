@@ -2,9 +2,15 @@
 set -euo pipefail
 
 APP_ROOT="${APP_ROOT:-/opt/awesomeiwb}"
+OPS_ROOT="/usr/local/lib/awesomeiwb-media"
+
+install -d -m 0755 "$OPS_ROOT"
+install -m 0755 "$APP_ROOT/deploy/backup-media.sh" "$OPS_ROOT/backup-media.sh"
+install -m 0755 "$APP_ROOT/deploy/verify-media-backup.sh" "$OPS_ROOT/verify-media-backup.sh"
+install -m 0755 "$APP_ROOT/deploy/prepare-media-storage.sh" "$OPS_ROOT/prepare-media-storage.sh"
 
 if [[ "${PREPARE_MEDIA_STORAGE:-true}" == "true" ]]; then
-  bash "$APP_ROOT/deploy/prepare-media-storage.sh"
+  bash "$OPS_ROOT/prepare-media-storage.sh"
 fi
 install -d -m 0750 /var/log/awesomeiwb
 install -m 0644 "$APP_ROOT/deploy/systemd/awesomeiwb-media-backup.service" /etc/systemd/system/awesomeiwb-media-backup.service
