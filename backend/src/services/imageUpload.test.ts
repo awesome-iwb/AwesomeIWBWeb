@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   assertSafeImageDimensions,
   extFromMime,
+  normalizeUploadedImage,
   validateImageMime,
   validateImageSignature,
 } from "../services/imageUpload";
@@ -34,6 +35,29 @@ describe("imageUpload helpers", () => {
     expect(() => assertSafeImageDimensions({ width: null, height: 1 })).toThrow("UPLOAD_INVALID_IMAGE");
     expect(() => assertSafeImageDimensions({ width: 100000, height: 100000 })).toThrow("UPLOAD_IMAGE_TOO_LARGE");
   });
+
+  test("normalizeUploadedImage rejects a declared MIME that does not match decoded content", async () => {
+    const sharp = await import("sharp");
+    const jpeg = await sharp.default({
+      create: { width: 2, height: 2, channels: 3, background: "#ffffff" },
+    }).jpeg().toBuffer();
+
+    await expect(normalizeUploadedImage(jpeg, "image/png")).rejects.toThrow("UPLOAD_MIME_MISMATCH");
+  }, 15_000);
+
+  test("normalizeUploadedImage decodes and re-encodes a supported image", async () => {
+    const sharp = await import("sharp");
+    const png = await sharp.default({
+      create: { width: 3, height: 2, channels: 4, background: "#336699" },
+    }).png().toBuffer();
+
+    const normalized = await normalizeUploadedImage(png, "image/png");
+    expect(normalized.mime).toBe("image/png");
+    expect(normalized.extension).toBe("png");
+    expect(normalized.width).toBe(3);
+    expect(normalized.height).toBe(2);
+    expect(validateImageSignature(normalized.buffer)).toBe(true);
+  }, 15_000);
 });
 
 describe("storage namespaces", () => {
@@ -61,10 +85,14 @@ describe("storage namespaces", () => {
 });
 
 describe("thumbnails", () => {
-  test("parseThumbWidth clamps invalid values", () => {
+  test("parseThumbWidth accepts only the fixed derivative presets", () => {
     expect(parseThumbWidth(undefined)).toBeNull();
+    expect(parseThumbWidth("128")).toBe(128);
     expect(parseThumbWidth("200")).toBe(200);
+    expect(parseThumbWidth("400")).toBe(400);
+    expect(parseThumbWidth("800")).toBe(800);
     expect(parseThumbWidth("-1")).toBeNull();
-    expect(parseThumbWidth("9999")).toBe(800);
+    expect(parseThumbWidth("201")).toBeNull();
+    expect(parseThumbWidth("9999")).toBeNull();
   });
 });

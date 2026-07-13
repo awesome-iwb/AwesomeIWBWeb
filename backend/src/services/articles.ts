@@ -428,7 +428,7 @@ export function buildArticleMediaFields(article: Pick<ArticleRow, "cover_image" 
   const fields: Array<{ url: string; fieldPath: string }> = [];
   if (article.cover_image) fields.push({ url: article.cover_image, fieldPath: "cover_image" });
   const content = article.content ?? "";
-  const urlRe = /(\/api\/uploads\/[a-zA-Z0-9._-]+)/g;
+  const urlRe = /(\/api\/uploads\/(?:[a-zA-Z0-9._-]+\/)*[a-zA-Z0-9._-]+)/g;
   let match: RegExpExecArray | null;
   let i = 0;
   while ((match = urlRe.exec(content)) !== null) {

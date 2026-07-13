@@ -10,7 +10,8 @@
     "import:data-json": "bun run src/scripts/import-data-json.ts",
     "import:feishu-base": "bun run src/scripts/import-feishu-base.ts",
     "sync:feishu-base": "bun run src/scripts/sync-feishu-base.ts",
-    "media:migrate-namespaces": "bun run src/scripts/migrate-upload-namespaces.ts",
+    "media:migrate-v2": "bun run src/scripts/migrate-local-media-v2.ts",
+    "media:audit": "bun run src/scripts/audit-media-integrity.ts",
     "media:purge-orphans": "bun run src/scripts/purge-orphan-media.ts",
     "media:backfill-refs": "bun run src/scripts/backfill-media-references.ts"
   },

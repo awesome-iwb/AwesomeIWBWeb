@@ -71,7 +71,7 @@ import { ensureSuperadminInitialized, SUPERADMIN_INITIAL_USERNAME, setLocalAccou
 import { listCapabilities, getUserCapabilitiesWithInfo, setUserCapabilities, isSuperadmin as isSuperadminUser, userHasCapability } from "./services/capabilities";
 import { getRoleTemplates } from "./services/capabilities";
 import { getDashboardData } from "./services/dashboard";
-import { getMediaAssetByStorageKey, getMediaReferences, listMediaAssets, restoreMedia, softDeleteMedia, getMediaTags, setMediaTags, batchTagMedia, batchSoftDeleteMedia, upsertMediaReference, upsertMediaReferencesForEntity } from "./services/media";
+import { getMediaAssetById, getMediaAssetByStorageKey, getMediaReferences, listMediaAssets, markMediaIntegrity, restoreMedia, softDeleteMediaSafely, getMediaTags, setMediaTags, batchTagMedia, batchSoftDeleteMedia, syncMediaReferencesForEntity } from "./services/media";
 import { normalizeStorageKey, readFile as storageReadFile, ensureRoot } from "./services/storage";
 import { bufferFromUploadFile, processImageUpload, validateImageMime } from "./services/imageUpload";
 import { getOrCreateThumbnail, parseThumbWidth } from "./services/thumbnails";
@@ -535,6 +535,15 @@ function mapImageUploadError(set: any, err: unknown) {
   }
   if (code === "UPLOAD_INVALID_SIGNATURE") {
     return uploadError(set, 400, code, "文件内容与图片格式不匹配");
+  }
+  if (code === "UPLOAD_MIME_MISMATCH") {
+    return uploadError(set, 400, code, "声明的图片类型与实际内容不一致");
+  }
+  if (code === "UPLOAD_ANIMATED_NOT_ALLOWED") {
+    return uploadError(set, 400, code, "暂不支持动画图片");
+  }
+  if (code === "UPLOAD_FILE_TOO_LARGE" || code === "UPLOAD_NORMALIZED_TOO_LARGE") {
+    return uploadError(set, 400, code, "图片文件超过允许大小");
   }
   if (code === "UPLOAD_INVALID_IMAGE") {
     return uploadError(set, 400, code, "无法识别图片内容");
@@ -1146,7 +1155,7 @@ const app = new Elysia()
       return { ...project, id, category_id: cat.id };
     }
     const created = await createProject(normalizeProjectInput(input));
-    await upsertMediaReferencesForEntity({ entityType: "project", entityId: created.id, fields: buildProjectMediaFields(normalizeProjectInput(input)) });
+    await syncMediaReferencesForEntity({ entityType: "project", entityId: created.id, fields: buildProjectMediaFields(created) });
     await logAuditCompat({ action: "create", entity_type: "project", entity_id: created.id }, user?.name);
     return created;
   })
@@ -1226,7 +1235,7 @@ const app = new Elysia()
       set.status = 404;
       return apiNotFound(set, "Project not found");
     }
-    await upsertMediaReferencesForEntity({ entityType: "project", entityId: id, fields: buildProjectMediaFields(normalizeProjectInput(body as any)) });
+    await syncMediaReferencesForEntity({ entityType: "project", entityId: id, fields: buildProjectMediaFields(updated) });
     await logAuditCompat({ action: "update", entity_type: "project", entity_id: id, diff: { before, after: updated } }, user?.name);
     return updated;
   })
@@ -1249,6 +1258,7 @@ const app = new Elysia()
     }
     const before = await getProjectById(id);
     const res = await deleteProject(id);
+    await syncMediaReferencesForEntity({ entityType: "project", entityId: id, fields: [] });
     await logAuditCompat({ action: "delete", entity_type: "project", entity_id: id, diff: { before } }, user?.name);
     return res;
   })
@@ -1603,6 +1613,13 @@ const app = new Elysia()
           }
         } else {
           const r = await upsertProjectBySlugOrName(normalized);
+          if (r.project) {
+            await syncMediaReferencesForEntity({
+              entityType: "project",
+              entityId: r.project.id,
+              fields: buildProjectMediaFields(r.project),
+            });
+          }
           if (r.action === "created") results.created++;
           if (r.action === "updated") results.updated++;
         }
@@ -1686,6 +1703,13 @@ const app = new Elysia()
           }
         } else {
           const r = await upsertProjectBySlugOrName(normalizeProjectInput(normalizedRow));
+          if (r.project) {
+            await syncMediaReferencesForEntity({
+              entityType: "project",
+              entityId: r.project.id,
+              fields: buildProjectMediaFields(r.project),
+            });
+          }
           if (r.action === "created") results.created++;
           if (r.action === "updated") results.updated++;
         }
@@ -1835,6 +1859,11 @@ const app = new Elysia()
       set.status = 404;
       return apiNotFound(set, "Revision not found");
     }
+    await syncMediaReferencesForEntity({
+      entityType: "project",
+      entityId: id,
+      fields: buildProjectMediaFields(updated),
+    });
     await logAuditCompat({ action: "rollback", entity_type: "project", entity_id: id, diff: { before, after: updated, revisionId } });
     return updated;
   })
@@ -1970,9 +1999,9 @@ const app = new Elysia()
     if (!updated) return apiNotFound(set, "Project not found");
     if (
       dbEnabled &&
-      ("icon" in updates || "banner" in updates || "avatar" in updates)
+      ("icon" in updates || "banner" in updates || "avatar" in updates || "extra" in updates)
     ) {
-      await upsertMediaReferencesForEntity({
+      await syncMediaReferencesForEntity({
         entityType: "project",
         entityId: id,
         fields: buildProjectMediaFields(updated),
@@ -2195,8 +2224,8 @@ const app = new Elysia()
     const payload = body as any;
     const updated = await updateOrganization(id, { name: payload?.name, description: payload?.description, website_url: payload?.website_url, avatar_url: payload?.avatar_url });
     if (!updated) return apiNotFound(set, "Organization not found");
-    if (dbEnabled && updated.avatar_url) {
-      await upsertMediaReferencesForEntity({
+    if (dbEnabled) {
+      await syncMediaReferencesForEntity({
         entityType: "organization",
         entityId: id,
         fields: [{ url: updated.avatar_url, fieldPath: "avatar_url" }],
@@ -2546,7 +2575,7 @@ const app = new Elysia()
         category_id: categoryId,
         developer_user_id: devUserForCreate,
       });
-      await upsertMediaReferencesForEntity({ entityType: "project", entityId: createdProject.id, fields: buildProjectMediaFields(projectInput) });
+      await syncMediaReferencesForEntity({ entityType: "project", entityId: createdProject.id, fields: buildProjectMediaFields(createdProject) });
       if (submitterId) {
         await ensureUserProjectOwnerMembership(createdProject.id, submitterId);
         await promoteToDev(submitterId);
@@ -2630,7 +2659,7 @@ const app = new Elysia()
         author_user_id: user?.id ?? null,
       });
       if (dbEnabled) {
-        await upsertMediaReferencesForEntity({
+        await syncMediaReferencesForEntity({
           entityType: "article",
           entityId: article.id,
           fields: buildArticleMediaFields(article),
@@ -2655,7 +2684,7 @@ const app = new Elysia()
     try {
       const article = await updateArticle(String(params.id), body as any);
       if (!article) return apiNotFound(set);
-      await upsertMediaReferencesForEntity({
+      await syncMediaReferencesForEntity({
         entityType: "article",
         entityId: article.id,
         fields: buildArticleMediaFields(article),
@@ -2683,6 +2712,7 @@ const app = new Elysia()
     const before = await getArticleById(String(params.id));
     if (!before) return apiNotFound(set);
     await deleteArticle(String(params.id));
+    await syncMediaReferencesForEntity({ entityType: "article", entityId: before.id, fields: [] });
     await logAuditCompat({ action: "delete", entity_type: "article", entity_id: before.id, diff: { before } }, user?.name);
     return { ok: true };
   })
@@ -2732,6 +2762,11 @@ const app = new Elysia()
     if (!dbEnabled) return apiError(set, 503, "UNAVAILABLE", "articles require database");
     const result = await rollbackArticle(String(params.id), String(params.revId));
     if (!result) return apiNotFound(set);
+    await syncMediaReferencesForEntity({
+      entityType: "article",
+      entityId: String(params.id),
+      fields: buildArticleMediaFields(result),
+    });
     await logAuditCompat(
       { action: "rollback", entity_type: "article", entity_id: String(params.id), diff: { revisionId: String(params.revId) } },
       user?.name,
@@ -2982,11 +3017,11 @@ const app = new Elysia()
       await fs.writeFile(path.join(dirPath, "meta.json"), JSON.stringify(meta, null, 2));
       await fs.writeFile(path.join(dirPath, "content.md"), content || "");
 
-      if (meta.cover && dbEnabled) {
-        await upsertMediaReferencesForEntity({
+      if (dbEnabled) {
+        await syncMediaReferencesForEntity({
           entityType: "story",
           entityId: safeId,
-          fields: [{ url: meta.cover, fieldPath: "cover" }],
+          fields: meta.cover ? [{ url: meta.cover, fieldPath: "cover" }] : [],
         });
       }
     }
@@ -2994,6 +3029,8 @@ const app = new Elysia()
     return { success: true };
   })
   .get("/api/uploads/*", async ({ params, set, query }) => {
+    // Never let a CDN retain transient verification/missing-file responses.
+    set.headers["cache-control"] = "no-store";
     let key: string;
     try {
       key = normalizeStorageKey(String((params as Record<string, string>)["*"] ?? ""));
@@ -3002,31 +3039,81 @@ const app = new Elysia()
       return apiNotFound(set);
     }
 
+    const asset = dbEnabled ? await getMediaAssetByStorageKey(key) : null;
+    let verifiedFile: Awaited<ReturnType<typeof storageReadFile>> = null;
     if (dbEnabled) {
-      const asset = await getMediaAssetByStorageKey(key);
-      if (asset?.status === "deleted") {
+      if (
+        !asset ||
+        asset.status !== "active" ||
+        asset.integrity_status === "missing" ||
+        asset.integrity_status === "corrupt"
+      ) {
+        set.status = 404;
+        return apiNotFound(set);
+      }
+
+      if (asset.blob_state === "pending") {
+        // Migration deliberately leaves legacy blobs pending until their first physical read.
+        // New v2 reservations must never be exposed before the upload transaction activates them.
+        if (asset.storage_layout !== "legacy") {
+          set.status = 404;
+          return apiNotFound(set);
+        }
+        verifiedFile = await storageReadFile(asset.object_key, asset.storage_layout);
+        if (!verifiedFile) {
+          await markMediaIntegrity({ mediaId: asset.id, integrity: "missing", error: "LEGACY_FILE_MISSING" });
+          set.status = 404;
+          return apiNotFound(set);
+        }
+        const expectedHash = String(asset.sha256 ?? "").trim().toLowerCase();
+        const actualHash = crypto.createHash("sha256").update(verifiedFile.buffer).digest("hex");
+        if (!/^[0-9a-f]{64}$/.test(expectedHash) || actualHash !== expectedHash) {
+          await markMediaIntegrity({ mediaId: asset.id, integrity: "corrupt", error: "SHA256_MISMATCH" });
+          set.status = 404;
+          return apiNotFound(set);
+        }
+        await markMediaIntegrity({ mediaId: asset.id, integrity: "verified" });
+      } else if (asset.blob_state !== "available") {
         set.status = 404;
         return apiNotFound(set);
       }
     }
 
-    const thumbWidth = parseThumbWidth((query as Record<string, unknown>)?.w);
+    const rawWidth = (query as Record<string, unknown>)?.w;
+    const thumbWidth = parseThumbWidth(rawWidth);
+    if (rawWidth != null && rawWidth !== "" && !thumbWidth) {
+      return uploadError(set, 400, "INVALID_THUMBNAIL_PRESET", "不支持的缩略图尺寸");
+    }
+
     if (thumbWidth) {
-      const thumb = await getOrCreateThumbnail(key, thumbWidth);
+      const thumb = await getOrCreateThumbnail(asset?.object_key ?? key, thumbWidth, {
+        sourceLayout: asset?.storage_layout ?? "legacy",
+        sourceSha256: asset?.sha256,
+        blobId: asset?.blob_id,
+      });
       if (thumb) {
         set.headers["content-type"] = thumb.mime;
-        set.headers["cache-control"] = "public, max-age=31536000, immutable";
+        set.headers["cache-control"] = "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400";
+        set.headers["x-content-type-options"] = "nosniff";
         return thumb.buffer;
       }
     }
 
-    const file = await storageReadFile(key);
-    if (!(await file.exists())) {
+    const file = verifiedFile ?? await storageReadFile(asset?.object_key ?? key, asset?.storage_layout ?? "legacy");
+    if (!file) {
+      if (asset) {
+        await markMediaIntegrity({ mediaId: asset.id, integrity: "missing", error: "MEDIA_FILE_MISSING" });
+      }
       set.status = 404;
       return apiNotFound(set);
     }
-    set.headers["cache-control"] = "public, max-age=31536000, immutable";
-    return file;
+    set.headers["content-type"] = asset?.mime || "application/octet-stream";
+    set.headers["content-length"] = String(file.size);
+    set.headers["cache-control"] = "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400";
+    set.headers["etag"] = `"sha256-${asset?.sha256 ?? "legacy"}"`;
+    set.headers["last-modified"] = file.modifiedAt.toUTCString();
+    set.headers["x-content-type-options"] = "nosniff";
+    return file.buffer;
   })
   .post("/api/upload", async ({ body: { image }, set, user, headers }) => {
     if (checkRateLimit({ headers, path: "/api/upload", set })) {
@@ -3087,20 +3174,21 @@ const app = new Elysia()
       });
       const avatarUrl = result.url;
 
-      await updateUserLogin(uid, {
+      const updatedUser = await updateUserLogin(uid, {
         avatar_url: avatarUrl,
         avatar_source: "upload",
         upload_avatar_url: avatarUrl,
       });
+      if (!updatedUser) return uploadError(set, 404, "USER_NOT_FOUND", "用户不存在");
 
-      if (result.media?.id) {
-        await upsertMediaReference({
-          mediaId: result.media.id,
-          entityType: "user",
-          entityId: uid,
-          fieldPath: "avatar",
-        });
-      }
+      await syncMediaReferencesForEntity({
+        entityType: "user",
+        entityId: uid,
+        fields: [
+          { url: updatedUser.avatar_url, fieldPath: "avatar_url" },
+          { url: updatedUser.upload_avatar_url, fieldPath: "upload_avatar_url" },
+        ],
+      });
 
       return { url: avatarUrl, media_id: result.media?.id, storage_key: result.storage_key };
     } catch (err) {
@@ -3125,6 +3213,14 @@ const app = new Elysia()
     }
     try {
       const updated = await updateUserAvatarPreference(uid, source as "casdoor" | "upload");
+      await syncMediaReferencesForEntity({
+        entityType: "user",
+        entityId: uid,
+        fields: [
+          { url: updated.avatar_url, fieldPath: "avatar_url" },
+          { url: updated.upload_avatar_url, fieldPath: "upload_avatar_url" },
+        ],
+      });
       return { avatar_url: updated.avatar_url, avatar_source: updated.avatar_source };
     } catch (e: any) {
       if (e?.message === "MISSING_EXTERNAL_AVATAR") {
@@ -3149,9 +3245,10 @@ const app = new Elysia()
     const mime = typeof query.mime === "string" ? query.mime : undefined;
     const source = typeof query.source === "string" ? query.source : undefined;
     const tag = typeof query.tag === "string" ? query.tag : undefined;
+    const integrity = typeof query.integrity === "string" ? query.integrity : undefined;
     const page = typeof query.page === "string" ? Number(query.page) : undefined;
     const pageSize = typeof query.pageSize === "string" ? Number(query.pageSize) : undefined;
-    return await listMediaAssets({ q, status, mime, source, tag }, { page, pageSize });
+    return await listMediaAssets({ q, status, mime, source, tag, integrity }, { page, pageSize });
   })
   .get("/api/admin/media/:id/references", async ({ params: { id }, set, user }) => {
     const capErr = await checkCap(user, set, "media:read");
@@ -3161,17 +3258,40 @@ const app = new Elysia()
   .delete("/api/admin/media/:id", async ({ params: { id }, set, user }) => {
     const capErr = await checkCap(user, set, "media:manage");
     if (capErr) return capErr;
-    const updated = await softDeleteMedia(id);
-    if (!updated) {
+    const result = await softDeleteMediaSafely(id);
+    if (!result.asset) {
       set.status = 404;
       return apiNotFound(set, "Media not found");
     }
+    if (result.blocked) {
+      set.status = 409;
+      return { code: "MEDIA_IN_USE", message: "媒体仍被业务内容引用，不能删除", ref_count: result.refCount };
+    }
     await logAuditCompat({ action: "soft_delete_media", entity_type: "media", entity_id: id }, user?.name);
-    return updated;
+    return result.asset;
   })
   .post("/api/admin/media/:id/restore", async ({ params: { id }, set, user }) => {
     const capErr = await checkCap(user, set, "media:manage");
     if (capErr) return capErr;
+    const current = await getMediaAssetById(id);
+    if (!current) {
+      set.status = 404;
+      return apiNotFound(set, "Media not found");
+    }
+    const file = await storageReadFile(current.object_key, current.storage_layout);
+    if (!file) {
+      await markMediaIntegrity({ mediaId: current.id, integrity: "missing", error: "MEDIA_FILE_MISSING" });
+      set.status = 409;
+      return { code: "MEDIA_FILE_MISSING", message: "原文件不存在，不能恢复为有效状态" };
+    }
+    const expectedHash = String(current.sha256 ?? "").trim().toLowerCase();
+    const actualHash = crypto.createHash("sha256").update(file.buffer).digest("hex");
+    if (!/^[0-9a-f]{64}$/.test(expectedHash) || actualHash !== expectedHash) {
+      await markMediaIntegrity({ mediaId: current.id, integrity: "corrupt", error: "SHA256_MISMATCH" });
+      set.status = 409;
+      return { code: "MEDIA_FILE_CORRUPT", message: "原文件校验失败，不能恢复为有效状态" };
+    }
+    await markMediaIntegrity({ mediaId: current.id, integrity: "verified" });
     const updated = await restoreMedia(id);
     if (!updated) {
       set.status = 404;
@@ -3306,6 +3426,7 @@ const app = new Elysia()
       set.status = 404;
       return apiNotFound(set, "User not found");
     }
+    await syncMediaReferencesForEntity({ entityType: "user", entityId: id, fields: [] });
     await logAuditCompat({ action: "delete_user", entity_type: "user", entity_id: id, diff: { name: target.name } }, user?.name);
     return { success: true };
   })
@@ -3663,8 +3784,18 @@ const app = new Elysia()
       if (!org) return apiNotFound(set, "Organization not found");
       return org;
     }
-    const updated = await updateOrganization(id, { name: payload?.name, description: payload?.description, website_url: payload?.website_url });
+    const updated = await updateOrganization(id, {
+      name: payload?.name,
+      description: payload?.description,
+      website_url: payload?.website_url,
+      avatar_url: payload?.avatar_url,
+    });
     if (!updated) return apiNotFound(set, "Organization not found");
+    await syncMediaReferencesForEntity({
+      entityType: "organization",
+      entityId: id,
+      fields: updated.avatar_url ? [{ url: updated.avatar_url, fieldPath: "avatar_url" }] : [],
+    });
     return updated;
   })
   .delete("/api/admin/organizations/:id", async ({ params: { id }, user, set }) => {
@@ -3672,6 +3803,7 @@ const app = new Elysia()
     if (capErr) return capErr;
     const deleted = await deleteOrganization(id);
     if (!deleted) return apiNotFound(set, "Organization not found");
+    await syncMediaReferencesForEntity({ entityType: "organization", entityId: id, fields: [] });
     await logAuditCompat({ actor: user?.name, action: "delete", entity_type: "organization", entity_id: id });
     return { ok: true };
   })

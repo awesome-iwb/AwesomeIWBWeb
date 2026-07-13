@@ -143,6 +143,8 @@ export const appConfig = {
   cookieDomain: process.env.COOKIE_DOMAIN?.trim() || "",
   sessionCookieName: process.env.SESSION_COOKIE_NAME?.trim() || "session",
   uploadMaxBytes: parsePositiveInt(process.env.UPLOAD_MAX_BYTES, 5 * 1024 * 1024),
+  uploadMaxPixels: parsePositiveInt(process.env.UPLOAD_MAX_PIXELS, 25_000_000),
+  uploadNormalizedMaxBytes: parsePositiveInt(process.env.UPLOAD_NORMALIZED_MAX_BYTES, 8 * 1024 * 1024),
   allowExternalImageUrl,
   externalImageAllowlist,
   rateLimitWindowMs: parsePositiveInt(process.env.RATE_LIMIT_WINDOW_MS, 60_000),
@@ -161,7 +163,8 @@ export const appConfig = {
   },
   cookieSecure,
   storage: {
-    root: process.env.STORAGE_ROOT?.trim() || "",
+    root: process.env.MEDIA_STORAGE_ROOT?.trim() || "",
+    legacyRoot: process.env.STORAGE_ROOT?.trim() || process.env.MEDIA_LEGACY_ROOT?.trim() || "",
     publicPrefix: process.env.STORAGE_PUBLIC_PREFIX?.trim() || "/api/uploads",
     grouping: (process.env.STORAGE_GROUPING?.trim() || "flat") as "flat" | "dated" | "entity",
   }

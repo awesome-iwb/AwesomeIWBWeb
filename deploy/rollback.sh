@@ -12,6 +12,21 @@ TAG="${1:-$(git describe --tags --abbrev=0 HEAD^)}"
 git fetch --tags
 git checkout "$TAG"
 
+if [[ -f "$APP_ROOT/deploy/prepare-media-storage.sh" ]]; then
+  bash "$APP_ROOT/deploy/prepare-media-storage.sh"
+else
+  echo "prepare-media-storage.sh is not present in $TAG; preserving existing runtime permissions"
+fi
+
+if [[ -f "$APP_ROOT/deploy/install-media-ops.sh" ]]; then
+  PREPARE_MEDIA_STORAGE=false bash "$APP_ROOT/deploy/install-media-ops.sh"
+else
+  systemctl disable --now awesomeiwb-media-backup.timer >/dev/null 2>&1 || true
+  if [[ -f "$APP_ROOT/deploy/cron.d/awesomeiwb-backup-uploads" ]]; then
+    install -m 0644 "$APP_ROOT/deploy/cron.d/awesomeiwb-backup-uploads" /etc/cron.d/awesomeiwb-backup-uploads
+  fi
+fi
+
 docker compose -f "$COMPOSE_FILE" build backend
 docker compose -f "$COMPOSE_FILE" up -d backend
 
