@@ -3,6 +3,8 @@ set -euo pipefail
 
 umask 077
 
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+VERIFY_SCRIPT="${MEDIA_BACKUP_VERIFY_SCRIPT:-$SCRIPT_DIR/verify-media-backup.sh}"
 APP_ROOT="${APP_ROOT:-/opt/awesomeiwb}"
 POSTGRES_CONTAINER="${POSTGRES_CONTAINER:-awesomeiwb-pg}"
 POSTGRES_USER="${POSTGRES_USER:-awesomeiwb}"
@@ -22,6 +24,7 @@ MARKER_TMP="${MARKER_PATH}.${STAMP}.partial"
 
 [[ "$BACKUP_ROOT" = /* && "$BACKUP_ROOT" != "/" ]] || { echo "unsafe MEDIA_BACKUP_ROOT: $BACKUP_ROOT" >&2; exit 1; }
 [[ "$RETENTION_DAYS" =~ ^[0-9]+$ && "$RETENTION_DAYS" -ge 1 ]] || { echo "invalid MEDIA_BACKUP_RETENTION_DAYS" >&2; exit 1; }
+[[ -f "$VERIFY_SCRIPT" ]] || { echo "backup verifier is missing: $VERIFY_SCRIPT" >&2; exit 1; }
 
 mkdir -p "$BACKUP_ROOT" "$(dirname "$LOCK_FILE")"
 exec 9>"$LOCK_FILE"
@@ -85,13 +88,13 @@ printf 'backup_id=%s\ncreated_at=%s\npostgres_db=%s\n' "$STAMP" "$(date -u +%FT%
 )
 
 mv "$PARTIAL_DIR" "$FINAL_DIR"
-bash "$APP_ROOT/deploy/verify-media-backup.sh" "$FINAL_DIR"
+bash "$VERIFY_SCRIPT" "$FINAL_DIR"
 
 REMOTE_VERIFIED=false
 if [[ -n "$REMOTE_ROOT" ]]; then
   mkdir -p "$REMOTE_ROOT"
   rsync -a --partial "$FINAL_DIR/" "$REMOTE_ROOT/$STAMP/"
-  bash "$APP_ROOT/deploy/verify-media-backup.sh" "$REMOTE_ROOT/$STAMP"
+  bash "$VERIFY_SCRIPT" "$REMOTE_ROOT/$STAMP"
   REMOTE_VERIFIED=true
 elif [[ "$REQUIRE_REMOTE" == "true" ]]; then
   echo "MEDIA_BACKUP_REQUIRE_REMOTE=true but MEDIA_BACKUP_REMOTE_DIR is empty" >&2

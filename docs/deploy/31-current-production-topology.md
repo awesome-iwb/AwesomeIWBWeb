@@ -14,6 +14,11 @@ This is the actual live topology for `https://aiwb.smart-teach.cn`.
 - That container path is backed by this host path:
   `/opt/1panel/apps/openresty/openresty/www/sites/aiwb.smart-teach.cn/dist`.
 - API traffic is proxied by OpenResty to `http://127.0.0.1:8081`.
+- The live API include is the host file
+  `/opt/1panel/apps/openresty/openresty/www/sites/aiwb.smart-teach.cn/proxy/api.conf`.
+- In its `/api/uploads/` location, immutable caching must apply only to
+  successful responses. Never add it with `always`, because media verification
+  404 responses deliberately carry `Cache-Control: no-store`.
 - Port `127.0.0.1:8081` is provided by Docker container `awesomeiwb-backend`.
 - PostgreSQL is Docker container `awesomeiwb-pg`.
 
