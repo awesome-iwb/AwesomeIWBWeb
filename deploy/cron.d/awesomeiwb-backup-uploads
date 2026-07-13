@@ -1,1 +1,2 @@
-30 3 * * * root UPLOADS_SOURCE_DIR=/opt/awesomeiwb/backend/runtime/uploads /opt/awesomeiwb/deploy/backup-uploads.sh >> /var/log/awesomeiwb/backup.log 2>&1
+# Disabled: awesomeiwb-media-backup.timer is the single scheduler for the
+# verified database + legacy + v2 media backup set.

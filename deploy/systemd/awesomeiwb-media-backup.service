@@ -1,0 +1,15 @@
+[Unit]
+Description=AwesomeIWB verified media and database backup
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/awesomeiwb
+EnvironmentFile=-/opt/awesomeiwb/deploy/.env
+EnvironmentFile=-/etc/awesomeiwb/media-backup.env
+ExecStart=/usr/bin/bash /opt/awesomeiwb/deploy/backup-media.sh
+UMask=0077
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7

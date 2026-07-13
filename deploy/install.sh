@@ -63,6 +63,10 @@ fi
 
 [ -f "$DEPLOY_DIR/.env" ] || { echo "缺少 $DEPLOY_DIR/.env (PG 容器变量)"; exit 1; }
 [ -f "$ENV_FILE" ] || { echo "缺少 $ENV_FILE (后端变量)"; exit 1; }
+if [ -f "$DEPLOY_DIR/prepare-media-storage.sh" ]; then
+  APP_UID="$(id -u "$APP_USER")" APP_GID="$(id -g "$APP_USER")" \
+    bash "$DEPLOY_DIR/prepare-media-storage.sh"
+fi
 set -a
 source "$DEPLOY_DIR/.env"
 set +a
@@ -91,6 +95,9 @@ rsync -a --delete dist/ "$FRONTEND_DIST_DIR/"
 cp "$DEPLOY_DIR/systemd/awesomeiwb-backend.service" /etc/systemd/system/awesomeiwb-backend.service
 systemctl daemon-reload
 systemctl enable --now awesomeiwb-backend
+if [ -f "$DEPLOY_DIR/install-media-ops.sh" ]; then
+  PREPARE_MEDIA_STORAGE=false bash "$DEPLOY_DIR/install-media-ops.sh"
+fi
 
 if [ "$WITH_HTTPS" -eq 1 ]; then
   SSL_CERT_PATH="${SSL_CERT_PATH:-}"

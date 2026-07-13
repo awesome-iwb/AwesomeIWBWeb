@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { normalizeArticleCoverImage, normalizeArticleInputForStorage } from "./articles";
+import { buildArticleMediaFields, normalizeArticleCoverImage, normalizeArticleInputForStorage } from "./articles";
 
 describe("articles", () => {
   test("accepts only clean site upload cover images", () => {
@@ -39,5 +39,16 @@ describe("articles", () => {
     expect(out.cover_image).toBe("");
     expect(out.projects).toHaveLength(20);
     expect(out.projects[0]).toEqual({ name: "Project", slug: "bad-slug" });
+  });
+
+  test("tracks legacy upload URLs with namespace directories in article content", () => {
+    expect(buildArticleMediaFields({
+      cover_image: "/api/uploads/content/cover.webp",
+      content: "![one](/api/uploads/content/a.webp) ![two](/api/uploads/projects/nested/b.png)",
+    })).toEqual([
+      { url: "/api/uploads/content/cover.webp", fieldPath: "cover_image" },
+      { url: "/api/uploads/content/a.webp", fieldPath: "content.asset_0" },
+      { url: "/api/uploads/projects/nested/b.png", fieldPath: "content.asset_1" },
+    ]);
   });
 });

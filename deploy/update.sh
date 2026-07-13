@@ -11,6 +11,11 @@ cd "$APP_ROOT"
 git fetch
 git reset --hard origin/main
 
+bash "$APP_ROOT/deploy/prepare-media-storage.sh"
+if [[ -f "$APP_ROOT/deploy/install-media-ops.sh" ]]; then
+  PREPARE_MEDIA_STORAGE=false bash "$APP_ROOT/deploy/install-media-ops.sh"
+fi
+
 docker compose -f "$COMPOSE_FILE" build backend
 docker compose -f "$COMPOSE_FILE" up -d backend
 
