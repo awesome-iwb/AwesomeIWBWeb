@@ -23,12 +23,28 @@ describe('notification UI wiring', () => {
     const app = read('src/App.vue');
 
     expect(app.includes('UserNotificationHost')).toBe(true);
-    expect(app.includes('<UserNotificationHost v-if="!isBackofficeRoute"')).toBe(true);
+    expect(app.includes('<UserNotificationHost v-if="showUserNotifications"')).toBe(true);
+    expect(app.includes("route.path.startsWith('/dev')")).toBe(true);
     expect(host.includes('right-5 top-24')).toBe(true);
     expect(host.includes('md:hidden')).toBe(true);
     expect(host.includes('pageSize: \'5\'')).toBe(true);
     expect(host.includes('slice(0, 3)')).toBe(true);
     expect(host.includes('API.notifications.markRead')).toBe(true);
+    expect(host.includes('action_url')).toBe(true);
+    expect(host.includes('rel="noopener noreferrer"')).toBe(true);
     expect(host.includes("window.setInterval(() => void loadNotices(), 60_000)")).toBe(true);
+  });
+
+  test('admin notification editor supports developer persistent campaigns', () => {
+    const view = read('src/views/admin/NotificationsView.vue');
+    const endpoints = read('src/api/endpoints.ts');
+
+    expect(view.includes('value="developers"')).toBe(true);
+    expect(view.includes('value="persistent"')).toBe(true);
+    expect(view.includes('dev_panel_access')).toBe(false);
+    expect(view.includes('访问开发者后台')).toBe(true);
+    expect(view.includes('action_url')).toBe(true);
+    expect(view.includes('archiveSelected')).toBe(true);
+    expect(endpoints.includes('notificationArchive')).toBe(true);
   });
 });

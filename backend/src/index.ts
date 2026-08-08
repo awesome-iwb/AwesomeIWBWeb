@@ -61,6 +61,7 @@ import {
   createNotificationCampaign,
   updateNotificationCampaign,
   sendNotificationCampaign,
+  archiveNotificationCampaign,
 } from "./services/notifications";
 import { authPlugin, requireAuth, requireCapability } from "./plugins/auth";
 import { casdoorAuthPlugin } from "./plugins/casdoorAuth";
@@ -3570,7 +3571,9 @@ const app = new Elysia()
     const capErr = await checkCap(user, set, "notification:manage");
     if (capErr) return capErr;
     if (!dbEnabled) return apiError(set, 503, "UNAVAILABLE", "notifications require database");
-    const status = query.status === "draft" || query.status === "sent" ? query.status : undefined;
+    const status = query.status === "draft" || query.status === "sent" || query.status === "active" || query.status === "archived"
+      ? query.status
+      : undefined;
     const page = typeof query.page === "string" ? Number(query.page) : undefined;
     const pageSize = typeof query.pageSize === "string" ? Number(query.pageSize) : undefined;
     return await listNotificationCampaigns({ status, page, pageSize });
@@ -3590,6 +3593,8 @@ const app = new Elysia()
       if (message === "TITLE_REQUIRED") return apiBadRequest(set, "标题不能为空");
       if (message === "BODY_REQUIRED") return apiBadRequest(set, "正文不能为空");
       if (message === "TARGET_USERS_REQUIRED") return apiBadRequest(set, "请至少填写一个接收用户名");
+      if (message === "ACTION_URL_REQUIRED") return apiBadRequest(set, "填写操作按钮文字时必须同时填写链接");
+      if (message === "ACTION_URL_INVALID") return apiBadRequest(set, "操作链接必须是有效的 HTTPS 地址");
       return apiBadRequest(set, "通知内容无效");
     }
   })
@@ -3607,6 +3612,8 @@ const app = new Elysia()
       if (message === "TITLE_REQUIRED") return apiBadRequest(set, "标题不能为空");
       if (message === "BODY_REQUIRED") return apiBadRequest(set, "正文不能为空");
       if (message === "TARGET_USERS_REQUIRED") return apiBadRequest(set, "请至少填写一个接收用户名");
+      if (message === "ACTION_URL_REQUIRED") return apiBadRequest(set, "填写操作按钮文字时必须同时填写链接");
+      if (message === "ACTION_URL_INVALID") return apiBadRequest(set, "操作链接必须是有效的 HTTPS 地址");
       return apiBadRequest(set, "通知内容无效");
     }
   })
@@ -3622,6 +3629,16 @@ const app = new Elysia()
     }
     await logAuditCompat({ action: "send_notification_campaign", entity_type: "notification_campaign", entity_id: id, diff: { sent_count: result.sent_count } }, user?.name);
     return { success: true, campaign: result.campaign, sent_count: result.sent_count };
+  })
+  .post("/api/admin/notifications/:id/archive", async ({ params: { id }, set, user }) => {
+    const capErr = await checkCap(user, set, "notification:manage");
+    if (capErr) return capErr;
+    if (!dbEnabled) return apiError(set, 503, "UNAVAILABLE", "notifications require database");
+    const result = await archiveNotificationCampaign(id, user?.name ?? "system");
+    if (result.status === "not_found") return apiNotFound(set);
+    if (result.status === "not_active") return apiBadRequest(set, "只有生效中的常驻通知可以归档");
+    await logAuditCompat({ action: "archive_notification_campaign", entity_type: "notification_campaign", entity_id: id }, user?.name);
+    return { success: true, campaign: result.campaign };
   })
   .get("/api/notifications", async ({ query, set, user }) => {
     const authErr = checkRealUser(user, set);

@@ -22,13 +22,15 @@ export type Notification = {
   title: string;
   body: string;
   data: Record<string, any>;
+  campaign_id: string | null;
   is_read: boolean;
   created_at: string;
 };
 
 export type NotificationCampaignLevel = "info" | "success" | "warning" | "danger";
-export type NotificationCampaignAudienceKind = "all" | "users";
-export type NotificationCampaignStatus = "draft" | "sent";
+export type NotificationCampaignAudienceKind = "all" | "users" | "developers";
+export type NotificationCampaignDeliveryMode = "snapshot" | "persistent";
+export type NotificationCampaignStatus = "draft" | "sent" | "active" | "archived";
 
 export type NotificationCampaign = {
   id: string;
@@ -37,6 +39,9 @@ export type NotificationCampaign = {
   level: NotificationCampaignLevel;
   audience_kind: NotificationCampaignAudienceKind;
   target_user_names: string[];
+  delivery_mode: NotificationCampaignDeliveryMode;
+  action_url: string;
+  action_label: string;
   status: NotificationCampaignStatus;
   sent_count: number;
   created_by: string;
@@ -50,6 +55,8 @@ export type NotificationCampaign = {
 const TITLE_LIMIT = 80;
 const BODY_LIMIT = 800;
 const TARGET_LIMIT = 200;
+const ACTION_URL_LIMIT = 500;
+const ACTION_LABEL_LIMIT = 30;
 
 function boundedText(value: unknown, limit: number): string {
   return String(value ?? "")
@@ -62,12 +69,42 @@ export function normalizeNotificationCampaignLevel(value: unknown): Notification
   return value === "success" || value === "warning" || value === "danger" ? value : "info";
 }
 
+export function normalizeNotificationDeliveryMode(value: unknown): NotificationCampaignDeliveryMode {
+  return value === "persistent" ? "persistent" : "snapshot";
+}
+
+export function normalizeNotificationAction(input: unknown): { action_url: string; action_label: string } {
+  const raw = input as any;
+  const action_url = boundedText(raw?.action_url ?? raw?.actionUrl, ACTION_URL_LIMIT);
+  const requestedLabel = boundedText(raw?.action_label ?? raw?.actionLabel, ACTION_LABEL_LIMIT);
+  if (!action_url) {
+    if (requestedLabel) throw new Error("ACTION_URL_REQUIRED");
+    return { action_url: "", action_label: "" };
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(action_url);
+  } catch {
+    throw new Error("ACTION_URL_INVALID");
+  }
+  if (parsed.protocol !== "https:" || parsed.username || parsed.password) {
+    throw new Error("ACTION_URL_INVALID");
+  }
+  return {
+    action_url: parsed.toString().slice(0, ACTION_URL_LIMIT),
+    action_label: requestedLabel || "查看详情",
+  };
+}
+
 export function normalizeNotificationAudience(input: unknown): {
   audience_kind: NotificationCampaignAudienceKind;
   target_user_names: string[];
 } {
   const raw = input as any;
-  const kind = raw?.kind === "users" || raw?.audience_kind === "users" ? "users" : "all";
+  const requestedKind = raw?.kind ?? raw?.audience_kind;
+  const kind: NotificationCampaignAudienceKind =
+    requestedKind === "users" || requestedKind === "developers" ? requestedKind : "all";
   const source = Array.isArray(raw?.target_user_names)
     ? raw.target_user_names
     : Array.isArray(raw?.userNames)
@@ -100,11 +137,15 @@ export function normalizeNotificationCampaignInput(input: unknown): {
   level: NotificationCampaignLevel;
   audience_kind: NotificationCampaignAudienceKind;
   target_user_names: string[];
+  delivery_mode: NotificationCampaignDeliveryMode;
+  action_url: string;
+  action_label: string;
 } {
   const raw = input as any;
   const title = boundedText(raw?.title, TITLE_LIMIT);
   const body = boundedText(raw?.body, BODY_LIMIT);
   const audience = normalizeNotificationAudience(raw?.audience ?? raw);
+  const action = normalizeNotificationAction(raw);
   if (!title) throw new Error("TITLE_REQUIRED");
   if (!body) throw new Error("BODY_REQUIRED");
   if (audience.audience_kind === "users" && audience.target_user_names.length === 0) {
@@ -114,7 +155,9 @@ export function normalizeNotificationCampaignInput(input: unknown): {
     title,
     body,
     level: normalizeNotificationCampaignLevel(raw?.level),
+    delivery_mode: normalizeNotificationDeliveryMode(raw?.delivery_mode ?? raw?.deliveryMode),
     ...audience,
+    ...action,
   };
 }
 
@@ -128,9 +171,70 @@ export async function createNotification(input: {
   const [row] = await sql()<Notification[]>`
     insert into notifications (user_name, type, title, body, data)
     values (${input.user_name}, ${input.type}, ${input.title}, ${input.body}, ${JSON.stringify(input.data ?? {})}::jsonb)
-    returning id, user_name, type, title, body, data, is_read, created_at
+    returning id, user_name, type, title, body, data, campaign_id, is_read, created_at
   `;
   return row ?? null;
+}
+
+async function materializePersistentNotifications(userName: string) {
+  const db = sql();
+  const inserted = await db<Array<{ campaign_id: string }>>`
+    insert into notifications (user_name, type, title, body, data, campaign_id)
+    select u.name,
+           'ops_notice',
+           c.title,
+           c.body,
+           jsonb_strip_nulls(jsonb_build_object(
+             'campaign_id', c.id::text,
+             'level', c.level,
+             'audience_kind', c.audience_kind,
+             'delivery_mode', c.delivery_mode,
+             'action_url', nullif(c.action_url, ''),
+             'action_label', nullif(c.action_label, '')
+           )),
+           c.id
+    from users u
+    cross join notification_campaigns c
+    where lower(u.name) = lower(${userName})
+      and u.is_active = true
+      and c.delivery_mode = 'persistent'
+      and c.status = 'active'
+      and (
+        c.audience_kind = 'all'
+        or (
+          c.audience_kind = 'developers'
+          and exists (
+            select 1
+            from user_capabilities uc
+            where uc.user_id = u.id
+              and uc.capability_id = 'dev_panel_access'
+          )
+        )
+        or (
+          c.audience_kind = 'users'
+          and exists (
+            select 1
+            from unnest(c.target_user_names) target_name
+            where lower(target_name) = lower(u.name)
+          )
+        )
+      )
+    on conflict do nothing
+    returning campaign_id
+  `;
+
+  if (inserted.length > 0) {
+    const campaignIds = [...new Set(inserted.map(row => row.campaign_id))];
+    await db`
+      update notification_campaigns c
+      set sent_count = (
+        select count(*)::integer
+        from notifications n
+        where n.campaign_id = c.id
+      )
+      where c.id = any(${campaignIds}::uuid[])
+    `;
+  }
 }
 
 export async function listNotifications(params: {
@@ -139,6 +243,8 @@ export async function listNotifications(params: {
   page?: number;
   pageSize?: number;
 }) {
+  await materializePersistentNotifications(params.user_name);
+
   const page = Math.max(1, params.page ?? 1);
   const pageSize = Math.min(100, Math.max(1, params.pageSize ?? 20));
   const offset = (page - 1) * pageSize;
@@ -147,7 +253,7 @@ export async function listNotifications(params: {
   const unreadFilter = params.unreadOnly ? db`and is_read = false` : db``;
 
   const items = await db<Notification[]>`
-    select id, user_name, type, title, body, data, is_read, created_at
+    select id, user_name, type, title, body, data, campaign_id, is_read, created_at
     from notifications
     where user_name = ${params.user_name} ${unreadFilter}
     order by created_at desc
@@ -168,7 +274,7 @@ export async function markNotificationRead(id: string, userName: string) {
     update notifications
     set is_read = true
     where id = ${id} and user_name = ${userName}
-    returning id, user_name, type, title, body, data, is_read, created_at
+    returning id, user_name, type, title, body, data, campaign_id, is_read, created_at
   `;
   return row ?? null;
 }
@@ -193,8 +299,9 @@ export async function listNotificationCampaigns(params: {
   const statusFilter = params.status ? db`where status = ${params.status}` : db``;
 
   const items = await db<NotificationCampaign[]>`
-    select id, title, body, level, audience_kind, target_user_names, status, sent_count,
-           created_by, updated_by, sent_by, sent_at, created_at, updated_at
+    select id, title, body, level, audience_kind, target_user_names, delivery_mode,
+           action_url, action_label, status, sent_count, created_by, updated_by,
+           sent_by, sent_at, created_at, updated_at
     from notification_campaigns
     ${statusFilter}
     order by created_at desc
@@ -212,14 +319,17 @@ export async function createNotificationCampaign(input: unknown, actor: string) 
   const safe = normalizeNotificationCampaignInput(input);
   const [row] = await sql()<NotificationCampaign[]>`
     insert into notification_campaigns (
-      title, body, level, audience_kind, target_user_names, created_by, updated_by
+      title, body, level, audience_kind, target_user_names, delivery_mode,
+      action_url, action_label, created_by, updated_by
     )
     values (
       ${safe.title}, ${safe.body}, ${safe.level}, ${safe.audience_kind},
-      ${safe.target_user_names}, ${actor}, ${actor}
+      ${safe.target_user_names}, ${safe.delivery_mode}, ${safe.action_url},
+      ${safe.action_label}, ${actor}, ${actor}
     )
-    returning id, title, body, level, audience_kind, target_user_names, status, sent_count,
-              created_by, updated_by, sent_by, sent_at, created_at, updated_at
+    returning id, title, body, level, audience_kind, target_user_names, delivery_mode,
+              action_url, action_label, status, sent_count, created_by, updated_by,
+              sent_by, sent_at, created_at, updated_at
   `;
   return row ?? null;
 }
@@ -233,18 +343,23 @@ export async function updateNotificationCampaign(id: string, input: unknown, act
         level = ${safe.level},
         audience_kind = ${safe.audience_kind},
         target_user_names = ${safe.target_user_names},
+        delivery_mode = ${safe.delivery_mode},
+        action_url = ${safe.action_url},
+        action_label = ${safe.action_label},
         updated_by = ${actor}
     where id = ${id} and status = 'draft'
-    returning id, title, body, level, audience_kind, target_user_names, status, sent_count,
-              created_by, updated_by, sent_by, sent_at, created_at, updated_at
+    returning id, title, body, level, audience_kind, target_user_names, delivery_mode,
+              action_url, action_label, status, sent_count, created_by, updated_by,
+              sent_by, sent_at, created_at, updated_at
   `;
   return row ?? null;
 }
 
 export async function getNotificationCampaign(id: string) {
   const [row] = await sql()<NotificationCampaign[]>`
-    select id, title, body, level, audience_kind, target_user_names, status, sent_count,
-           created_by, updated_by, sent_by, sent_at, created_at, updated_at
+    select id, title, body, level, audience_kind, target_user_names, delivery_mode,
+           action_url, action_label, status, sent_count, created_by, updated_by,
+           sent_by, sent_at, created_at, updated_at
     from notification_campaigns
     where id = ${id}
     limit 1
@@ -252,36 +367,68 @@ export async function getNotificationCampaign(id: string) {
   return row ?? null;
 }
 
-async function resolveCampaignRecipientsWithClient(db: any, campaign: NotificationCampaign) {
-  if (campaign.audience_kind === "all") {
-    const rows: Array<{ name: string }> = await db`
-      select name
-      from users
-      where is_active = true
-      order by created_at asc
-    `;
-    return { names: rows.map(r => r.name), missing: [] as string[] };
-  }
-
-  const requested = campaign.target_user_names;
+async function findMissingTargetUsers(db: any, campaign: NotificationCampaign) {
+  if (campaign.audience_kind !== "users") return [] as string[];
   const rows: Array<{ name: string }> = await db`
     select name
     from users
-    where is_active = true and lower(name) = any(${requested.map(name => name.toLowerCase())}::text[])
+    where is_active = true
+      and lower(name) = any(${campaign.target_user_names.map(name => name.toLowerCase())}::text[])
   `;
-  const foundByLower = new Map(rows.map(row => [row.name.toLowerCase(), row.name]));
-  const missing = requested.filter(name => !foundByLower.has(name.toLowerCase()));
-  return {
-    names: requested.map(name => foundByLower.get(name.toLowerCase())).filter(Boolean) as string[],
-    missing,
-  };
+  const found = new Set(rows.map(row => row.name.toLowerCase()));
+  return campaign.target_user_names.filter(name => !found.has(name.toLowerCase()));
+}
+
+async function insertCampaignRecipients(db: any, campaignId: string) {
+  return await db<Array<{ user_name: string }>>`
+    insert into notifications (user_name, type, title, body, data, campaign_id)
+    select u.name,
+           'ops_notice',
+           c.title,
+           c.body,
+           jsonb_strip_nulls(jsonb_build_object(
+             'campaign_id', c.id::text,
+             'level', c.level,
+             'audience_kind', c.audience_kind,
+             'delivery_mode', c.delivery_mode,
+             'action_url', nullif(c.action_url, ''),
+             'action_label', nullif(c.action_label, '')
+           )),
+           c.id
+    from notification_campaigns c
+    join users u on u.is_active = true
+    where c.id = ${campaignId}
+      and (
+        c.audience_kind = 'all'
+        or (
+          c.audience_kind = 'developers'
+          and exists (
+            select 1
+            from user_capabilities uc
+            where uc.user_id = u.id
+              and uc.capability_id = 'dev_panel_access'
+          )
+        )
+        or (
+          c.audience_kind = 'users'
+          and exists (
+            select 1
+            from unnest(c.target_user_names) target_name
+            where lower(target_name) = lower(u.name)
+          )
+        )
+      )
+    on conflict do nothing
+    returning user_name
+  `;
 }
 
 export async function sendNotificationCampaign(id: string, actor: string) {
   return await sql().begin(async db => {
     const [campaign] = await db<NotificationCampaign[]>`
-      select id, title, body, level, audience_kind, target_user_names, status, sent_count,
-             created_by, updated_by, sent_by, sent_at, created_at, updated_at
+      select id, title, body, level, audience_kind, target_user_names, delivery_mode,
+             action_url, action_label, status, sent_count, created_by, updated_by,
+             sent_by, sent_at, created_at, updated_at
       from notification_campaigns
       where id = ${id}
       for update
@@ -289,37 +436,51 @@ export async function sendNotificationCampaign(id: string, actor: string) {
     if (!campaign) return { status: "not_found" as const };
     if (campaign.status !== "draft") return { status: "already_sent" as const, campaign };
 
-    const recipients = await resolveCampaignRecipientsWithClient(db, campaign);
-    if (recipients.missing.length) {
-      return { status: "missing_users" as const, missing: recipients.missing, campaign };
-    }
-    if (campaign.audience_kind === "users" && recipients.names.length === 0) {
-      return { status: "missing_users" as const, missing: campaign.target_user_names, campaign };
+    const missing = await findMissingTargetUsers(db, campaign);
+    if (missing.length > 0) {
+      return { status: "missing_users" as const, missing, campaign };
     }
 
-    if (recipients.names.length > 0) {
-      await db`
-        insert into notifications (user_name, type, title, body, data)
-        select unnest(${recipients.names}::text[]), 'ops_notice', ${campaign.title}, ${campaign.body},
-               jsonb_build_object(
-                 'campaign_id', ${campaign.id},
-                 'level', ${campaign.level},
-                 'audience_kind', ${campaign.audience_kind}
-               )
-      `;
-    }
-
+    const recipients = await insertCampaignRecipients(db, campaign.id);
+    const nextStatus: NotificationCampaignStatus = campaign.delivery_mode === "persistent" ? "active" : "sent";
     const [updated] = await db<NotificationCampaign[]>`
       update notification_campaigns
-      set status = 'sent',
-          sent_count = ${recipients.names.length},
+      set status = ${nextStatus},
+          sent_count = ${recipients.length},
           sent_by = ${actor},
           sent_at = now(),
           updated_by = ${actor}
       where id = ${id}
-      returning id, title, body, level, audience_kind, target_user_names, status, sent_count,
-                created_by, updated_by, sent_by, sent_at, created_at, updated_at
+      returning id, title, body, level, audience_kind, target_user_names, delivery_mode,
+                action_url, action_label, status, sent_count, created_by, updated_by,
+                sent_by, sent_at, created_at, updated_at
     `;
-    return { status: "sent" as const, campaign: updated, sent_count: recipients.names.length };
+    return { status: "sent" as const, campaign: updated, sent_count: recipients.length };
+  });
+}
+
+export async function archiveNotificationCampaign(id: string, actor: string) {
+  return await sql().begin(async db => {
+    const [campaign] = await db<NotificationCampaign[]>`
+      select id, title, body, level, audience_kind, target_user_names, delivery_mode,
+             action_url, action_label, status, sent_count, created_by, updated_by,
+             sent_by, sent_at, created_at, updated_at
+      from notification_campaigns
+      where id = ${id}
+      for update
+    `;
+    if (!campaign) return { status: "not_found" as const };
+    if (campaign.delivery_mode !== "persistent" || campaign.status !== "active") {
+      return { status: "not_active" as const, campaign };
+    }
+    const [updated] = await db<NotificationCampaign[]>`
+      update notification_campaigns
+      set status = 'archived', updated_by = ${actor}
+      where id = ${id}
+      returning id, title, body, level, audience_kind, target_user_names, delivery_mode,
+                action_url, action_label, status, sent_count, created_by, updated_by,
+                sent_by, sent_at, created_at, updated_at
+    `;
+    return { status: "archived" as const, campaign: updated };
   });
 }

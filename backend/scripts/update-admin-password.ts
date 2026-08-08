@@ -9,7 +9,11 @@ const ARGON2_OPTIONS: argon2.Options & { raw?: false } = {
 };
 
 async function updatePassword() {
-  const newPassword = process.env.NEW_PASSWORD || "aiwb1246790";
+  const newPassword = process.env.NEW_PASSWORD;
+  if (!newPassword) {
+    console.error("NEW_PASSWORD environment variable is required");
+    process.exit(1);
+  }
   const passwordHash = await argon2.hash(newPassword, ARGON2_OPTIONS);
 
   console.log("Generated hash:", passwordHash);

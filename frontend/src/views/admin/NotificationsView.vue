@@ -17,12 +17,12 @@
           </button>
         </div>
 
-        <div class="flex gap-2 border-b border-border p-3">
+        <div class="flex flex-wrap gap-2 border-b border-border p-3">
           <button
             v-for="item in statusTabs"
             :key="item.value"
             type="button"
-            class="min-h-[40px] flex-1 rounded-xl px-3 py-2 text-sm font-bold transition-colors"
+            class="min-h-[40px] min-w-[92px] flex-1 rounded-xl px-3 py-2 text-sm font-bold transition-colors"
             :class="statusFilter === item.value ? 'bg-emerald-500 text-white' : 'bg-secondary text-muted-foreground hover:bg-accent'"
             @click="statusFilter = item.value"
           >
@@ -48,9 +48,9 @@
               </div>
               <span
                 class="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold"
-                :class="item.status === 'sent' ? 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300' : 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300'"
+                :class="statusClasses(item.status)"
               >
-                {{ item.status === 'sent' ? '已发送' : '草稿' }}
+                {{ statusLabel(item.status) }}
               </span>
             </div>
             <div class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
@@ -70,8 +70,8 @@
           <div class="flex flex-wrap items-start justify-between gap-3 border-b border-border p-4 lg:p-5">
             <div class="min-w-0">
               <h2 class="text-lg font-bold text-foreground">{{ draft.id ? '编辑通知' : '新建通知' }}</h2>
-              <p v-if="selected?.status === 'sent'" class="text-xs text-muted-foreground">
-                由 {{ selected.sent_by || '-' }} 发送，投递 {{ selected.sent_count }} 人
+              <p v-if="selected && selected.status !== 'draft'" class="text-xs text-muted-foreground">
+                由 {{ selected.sent_by || '-' }} {{ selected.delivery_mode === 'persistent' ? '激活' : '发送' }}，已投递 {{ selected.sent_count }} 人
               </p>
             </div>
             <div class="flex flex-wrap gap-2">
@@ -90,7 +90,17 @@
                 @click="sendDraft"
               >
                 <Send class="h-4 w-4" />
-                {{ isSending ? '发送中...' : '发送' }}
+                {{ isSending ? '处理中...' : draft.delivery_mode === 'persistent' ? '激活' : '发送' }}
+              </button>
+              <button
+                v-if="selected?.status === 'active'"
+                type="button"
+                class="inline-flex min-h-[44px] items-center gap-2 rounded-xl bg-slate-600 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-slate-700 disabled:opacity-50"
+                :disabled="isArchiving"
+                @click="archiveSelected"
+              >
+                <Archive class="h-4 w-4" />
+                {{ isArchiving ? '归档中...' : '归档' }}
               </button>
             </div>
           </div>
@@ -138,12 +148,54 @@
                 <span class="mt-1 block text-right text-xs text-muted-foreground">{{ draft.body.length }}/800</span>
               </label>
 
+              <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
+                <label class="block">
+                  <span class="mb-2 block text-sm font-bold text-muted-foreground">投递方式</span>
+                  <select
+                    v-model="draft.delivery_mode"
+                    class="w-full rounded-xl border border-border bg-card px-4 py-3 text-base outline-none transition-colors focus:border-emerald-500"
+                  >
+                    <option value="snapshot">单次通知</option>
+                    <option value="persistent">常驻通知</option>
+                  </select>
+                  <span class="mt-1 block text-xs text-muted-foreground">
+                    常驻通知会持续覆盖以后新加入、或以后获得相应权限的用户。
+                  </span>
+                </label>
+
+                <div class="space-y-3">
+                  <label class="block">
+                    <span class="mb-2 block text-sm font-bold text-muted-foreground">操作链接（可选）</span>
+                    <input
+                      v-model="draft.action_url"
+                      maxlength="500"
+                      inputmode="url"
+                      class="w-full rounded-xl border border-border bg-card px-4 py-3 text-base outline-none transition-colors focus:border-emerald-500"
+                      placeholder="https://qm.qq.com/..."
+                    />
+                  </label>
+                  <label v-if="draft.action_url" class="block">
+                    <span class="mb-2 block text-sm font-bold text-muted-foreground">按钮文字</span>
+                    <input
+                      v-model="draft.action_label"
+                      maxlength="30"
+                      class="w-full rounded-xl border border-border bg-card px-4 py-3 text-base outline-none transition-colors focus:border-emerald-500"
+                      placeholder="加入 QQ 群"
+                    />
+                  </label>
+                </div>
+              </div>
+
               <div class="rounded-2xl border border-border bg-card/80 p-4">
                 <div class="mb-3 text-sm font-bold text-muted-foreground">接收范围</div>
-                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
                   <label class="flex min-h-[48px] cursor-pointer items-center gap-3 rounded-xl border border-border px-4 py-3">
                     <input v-model="draft.audience_kind" type="radio" value="all" class="h-4 w-4" />
                     <span class="text-sm font-bold">全站广播</span>
+                  </label>
+                  <label class="flex min-h-[48px] cursor-pointer items-center gap-3 rounded-xl border border-border px-4 py-3">
+                    <input v-model="draft.audience_kind" type="radio" value="developers" class="h-4 w-4" />
+                    <span class="text-sm font-bold">开发者</span>
                   </label>
                   <label class="flex min-h-[48px] cursor-pointer items-center gap-3 rounded-xl border border-border px-4 py-3">
                     <input v-model="draft.audience_kind" type="radio" value="users" class="h-4 w-4" />
@@ -161,16 +213,21 @@
                   />
                   <span class="mt-1 block text-xs text-muted-foreground">预计投递 {{ targetUserNames.length }} 个用户</span>
                 </label>
+                <p v-else-if="draft.audience_kind === 'developers'" class="mt-4 text-sm text-muted-foreground">
+                  发送给拥有“访问开发者后台”权限的启用账户，不依赖旧的角色字段。
+                </p>
                 <p v-else class="mt-4 text-sm text-muted-foreground">发送给所有启用账户。</p>
               </div>
             </fieldset>
 
-            <div v-if="selected?.status === 'sent'" class="rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground">
+            <div v-if="selected && selected.status !== 'draft'" class="rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground">
               <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>发送人：{{ selected.sent_by || '-' }}</div>
                 <div>发送时间：{{ formatDateTime(selected.sent_at) }}</div>
                 <div>投递数量：{{ selected.sent_count }}</div>
                 <div>接收范围：{{ audienceLabel(selected) }}</div>
+                <div>投递方式：{{ selected.delivery_mode === 'persistent' ? '常驻通知' : '单次通知' }}</div>
+                <div>当前状态：{{ statusLabel(selected.status) }}</div>
               </div>
             </div>
           </div>
@@ -182,13 +239,14 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import { Plus, Save, Send } from 'lucide-vue-next';
+import { Archive, Plus, Save, Send } from 'lucide-vue-next';
 import { API } from '../../api/endpoints';
 import { adminFetch, formatAdminError, formatDateTime } from '../../composables/useAdminFetch';
 
-type CampaignStatus = 'draft' | 'sent';
+type CampaignStatus = 'draft' | 'sent' | 'active' | 'archived';
 type CampaignLevel = 'info' | 'success' | 'warning' | 'danger';
-type AudienceKind = 'all' | 'users';
+type AudienceKind = 'all' | 'users' | 'developers';
+type DeliveryMode = 'snapshot' | 'persistent';
 
 type NotificationCampaign = {
   id: string;
@@ -197,6 +255,9 @@ type NotificationCampaign = {
   level: CampaignLevel;
   audience_kind: AudienceKind;
   target_user_names: string[];
+  delivery_mode: DeliveryMode;
+  action_url: string;
+  action_label: string;
   status: CampaignStatus;
   sent_count: number;
   created_by: string;
@@ -213,12 +274,17 @@ type Draft = {
   body: string;
   level: CampaignLevel;
   audience_kind: AudienceKind;
+  delivery_mode: DeliveryMode;
+  action_url: string;
+  action_label: string;
 };
 
 const statusTabs: Array<{ label: string; value: CampaignStatus | '' }> = [
   { label: '全部', value: '' },
   { label: '草稿', value: 'draft' },
   { label: '已发送', value: 'sent' },
+  { label: '生效中', value: 'active' },
+  { label: '已归档', value: 'archived' },
 ];
 
 const campaigns = ref<NotificationCampaign[]>([]);
@@ -230,9 +296,10 @@ const total = ref(0);
 const isLoading = ref(false);
 const isSaving = ref(false);
 const isSending = ref(false);
+const isArchiving = ref(false);
 const error = ref('');
 
-const isReadonly = computed(() => selected.value?.status === 'sent');
+const isReadonly = computed(() => Boolean(selected.value && selected.value.status !== 'draft'));
 
 const targetUserNames = computed(() => {
   const seen = new Set<string>();
@@ -250,8 +317,23 @@ const targetUserNames = computed(() => {
 
 const audienceLabel = (item: Pick<NotificationCampaign, 'audience_kind' | 'target_user_names'>) => {
   if (item.audience_kind === 'all') return '全站广播';
+  if (item.audience_kind === 'developers') return '开发者';
   return `指定用户 ${item.target_user_names.length} 人`;
 };
+
+const statusLabel = (status: CampaignStatus) => ({
+  draft: '草稿',
+  sent: '已发送',
+  active: '生效中',
+  archived: '已归档',
+}[status]);
+
+const statusClasses = (status: CampaignStatus) => ({
+  draft: 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300',
+  sent: 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300',
+  active: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300',
+  archived: 'bg-slate-200 text-slate-700 dark:bg-slate-500/20 dark:text-slate-300',
+}[status]);
 
 function campaignToDraft(item: NotificationCampaign): Draft {
   return {
@@ -260,12 +342,23 @@ function campaignToDraft(item: NotificationCampaign): Draft {
     body: item.body,
     level: item.level,
     audience_kind: item.audience_kind,
+    delivery_mode: item.delivery_mode,
+    action_url: item.action_url,
+    action_label: item.action_label,
   };
 }
 
 function createDraft() {
   selected.value = null;
-  draft.value = { title: '', body: '', level: 'info', audience_kind: 'all' };
+  draft.value = {
+    title: '',
+    body: '',
+    level: 'info',
+    audience_kind: 'developers',
+    delivery_mode: 'persistent',
+    action_url: '',
+    action_label: '加入 QQ 群',
+  };
   targetUsersText.value = '';
   error.value = '';
 }
@@ -305,6 +398,9 @@ function buildPayload() {
     title: draft.value.title,
     body: draft.value.body,
     level: draft.value.level,
+    delivery_mode: draft.value.delivery_mode,
+    action_url: draft.value.action_url,
+    action_label: draft.value.action_url ? draft.value.action_label : '',
     audience: {
       kind: draft.value.audience_kind,
       userNames: draft.value.audience_kind === 'users' ? targetUserNames.value : [],
@@ -336,8 +432,13 @@ async function saveDraft() {
 
 async function sendDraft() {
   if (!draft.value?.id || isReadonly.value) return;
-  const target = draft.value.audience_kind === 'all' ? '所有启用用户' : `${targetUserNames.value.length} 个指定用户`;
-  if (!window.confirm(`确认发送给${target}？发送后不能编辑或重复发送。`)) return;
+  const target = draft.value.audience_kind === 'all'
+    ? '所有启用用户'
+    : draft.value.audience_kind === 'developers'
+      ? '所有开发者'
+      : `${targetUserNames.value.length} 个指定用户`;
+  const verb = draft.value.delivery_mode === 'persistent' ? '激活常驻通知' : '发送通知';
+  if (!window.confirm(`确认向${target}${verb}？生效后不能编辑；常驻通知可以稍后归档。`)) return;
   isSending.value = true;
   error.value = '';
   try {
@@ -350,6 +451,24 @@ async function sendDraft() {
     error.value = e instanceof Error ? e.message : '发送通知失败';
   } finally {
     isSending.value = false;
+  }
+}
+
+async function archiveSelected() {
+  if (!selected.value || selected.value.status !== 'active') return;
+  if (!window.confirm('确认归档这条常驻通知？归档后不会再投递给新的符合条件用户。')) return;
+  isArchiving.value = true;
+  error.value = '';
+  try {
+    const res = await adminFetch(API.admin.notificationArchive(selected.value.id), { method: 'POST' });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(formatAdminError(json, '归档通知失败', res.status));
+    if (json.campaign) selectCampaign(json.campaign);
+    await loadCampaigns();
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : '归档通知失败';
+  } finally {
+    isArchiving.value = false;
   }
 }
 

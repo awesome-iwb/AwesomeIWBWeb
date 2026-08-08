@@ -4,7 +4,7 @@ services:
     environment:
       POSTGRES_DB: awesome_iwb
       POSTGRES_USER: awesome_iwb
-      POSTGRES_PASSWORD: awesome_iwb_dev
+      POSTGRES_PASSWORD: CHANGE_ME
     ports:
       - "5432:5432"
     volumes:

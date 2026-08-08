@@ -11,7 +11,7 @@ INSTALL_DIR="${INSTALL_DIR:-/opt/awesome-iwb}"
 DB_MODE="${DB_MODE:-docker}"
 DB_NAME="${DB_NAME:-awesome_iwb}"
 DB_USER="${DB_USER:-awesome_iwb}"
-DB_PASSWORD="${DB_PASSWORD:-awesome_iwb_dev}"
+DB_PASSWORD="${DB_PASSWORD:-CHANGE_ME}"
 DB_HOST="${DB_HOST:-127.0.0.1}"
 DB_PORT="${DB_PORT:-5432}"
 

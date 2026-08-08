@@ -19,7 +19,7 @@ docker compose ps
 默认连接串示例（按你实际 compose 配置为准）：
 
 ```bash
-export DATABASE_URL='postgres://awesome_iwb:awesome_iwb_dev@127.0.0.1:5432/awesome_iwb'
+export DATABASE_URL='postgres://awesome_iwb:CHANGE_ME@127.0.0.1:5432/awesome_iwb'
 ```
 
 ## B. Linux 原生安装 PostgreSQL（推荐生产）

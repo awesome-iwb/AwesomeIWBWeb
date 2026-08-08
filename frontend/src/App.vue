@@ -23,6 +23,8 @@ const isBackofficeRoute = computed(() => {
   return path.startsWith('/admin') || path.startsWith('/dev') || path.startsWith('/ops');
 });
 
+const showUserNotifications = computed(() => !isBackofficeRoute.value || route.path.startsWith('/dev'));
+
 const showMobileTabBar = computed(() => {
   if (isBackofficeRoute.value) return false
   const meta = route.meta as any
@@ -114,7 +116,7 @@ onBeforeUnmount(() => {
     </div>
 
     <MobileTabBar v-if="showMobileTabBar" />
-    <UserNotificationHost v-if="!isBackofficeRoute" />
+    <UserNotificationHost v-if="showUserNotifications" />
     <SiteFooter v-if="!isBackofficeRoute" />
   </div>
 </template>

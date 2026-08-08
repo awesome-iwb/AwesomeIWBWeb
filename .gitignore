@@ -28,3 +28,16 @@ audit_remote.sh
 audit_remote.cmdtest.sh
 gen.cjs
 replace.js
+
+awesomeiwb-deploy.tgz
+_ext_*.html
+test_submit_page.py
+_tmp_*.ps1
+docs/ainnnnnnnnnnn.ass
+screenshot*.png
+mobile-admin*.png
+mobile-admin-login*.png
+.kilo/
+output/
+.omo/
+dist.tar.gz

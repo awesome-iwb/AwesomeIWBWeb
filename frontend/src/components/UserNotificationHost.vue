@@ -10,6 +10,15 @@
           <div class="min-w-0 flex-1">
             <h2 class="break-words text-sm font-bold text-foreground">{{ firstItem.title }}</h2>
             <p class="mt-1 whitespace-pre-line break-words text-sm leading-5 text-muted-foreground">{{ firstItem.body }}</p>
+            <a
+              v-if="actionUrl(firstItem)"
+              :href="actionUrl(firstItem) || undefined"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="mt-3 inline-flex min-h-[40px] items-center rounded-lg bg-blue-500 px-3 py-2 text-sm font-bold text-white transition-colors hover:bg-blue-600"
+            >
+              {{ firstItem.data?.action_label || '查看详情' }}
+            </a>
           </div>
           <button
             type="button"
@@ -36,6 +45,15 @@
             <div class="min-w-0 flex-1">
               <h2 class="break-words text-sm font-bold text-foreground">{{ item.title }}</h2>
               <p class="mt-1 whitespace-pre-line break-words text-sm leading-5 text-muted-foreground">{{ item.body }}</p>
+              <a
+                v-if="actionUrl(item)"
+                :href="actionUrl(item) || undefined"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="mt-3 inline-flex min-h-[40px] items-center rounded-lg bg-blue-500 px-3 py-2 text-sm font-bold text-white transition-colors hover:bg-blue-600"
+              >
+                {{ item.data?.action_label || '查看详情' }}
+              </a>
             </div>
             <button
               type="button"
@@ -66,6 +84,8 @@ type UserNotice = {
   body: string;
   data?: {
     level?: 'info' | 'success' | 'warning' | 'danger';
+    action_url?: string;
+    action_label?: string;
   };
   is_read: boolean;
   created_at: string;
@@ -124,6 +144,18 @@ function disposePolling() {
 
 function levelOf(item: UserNotice) {
   return item.data?.level ?? 'info';
+}
+
+function actionUrl(item: UserNotice) {
+  const value = item.data?.action_url;
+  if (!value) return null;
+  try {
+    const parsed = new URL(value);
+    if (parsed.protocol !== 'https:' || parsed.username || parsed.password) return null;
+    return parsed.toString();
+  } catch {
+    return null;
+  }
 }
 
 function levelIcon(item: UserNotice) {

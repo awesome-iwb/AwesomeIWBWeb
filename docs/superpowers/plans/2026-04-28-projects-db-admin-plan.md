@@ -47,7 +47,7 @@ services:
     environment:
       POSTGRES_DB: awesome_iwb
       POSTGRES_USER: awesome_iwb
-      POSTGRES_PASSWORD: awesome_iwb_dev
+      POSTGRES_PASSWORD: CHANGE_ME
     ports:
       - "5432:5432"
     volumes:
@@ -72,7 +72,7 @@ Expected:
 
 Create a local-only `.env` if desired (do not commit):
 ```bash
-DATABASE_URL=postgres://awesome_iwb:awesome_iwb_dev@127.0.0.1:5432/awesome_iwb
+DATABASE_URL=postgres://awesome_iwb:CHANGE_ME@127.0.0.1:5432/awesome_iwb
 ```
 
 ---
@@ -212,7 +212,7 @@ Temporarily add at backend startup (Task 4 will do permanently), or run a small 
 Run:
 ```bash
 cd /workspace/awesome-iwb/backend
-DATABASE_URL=postgres://awesome_iwb:awesome_iwb_dev@127.0.0.1:5432/awesome_iwb bun -e "import { migrate } from './src/db/migrate'; await migrate(); console.log('migrated')"
+DATABASE_URL=postgres://awesome_iwb:CHANGE_ME@127.0.0.1:5432/awesome_iwb bun -e "import { migrate } from './src/db/migrate'; await migrate(); console.log('migrated')"
 ```
 
 Expected:
@@ -391,7 +391,7 @@ const [{ totalStars }] = await sql()<Array<{ totalStars: number }>>`select coale
 Run backend:
 ```bash
 cd /workspace/awesome-iwb/backend
-DATABASE_URL=postgres://awesome_iwb:awesome_iwb_dev@127.0.0.1:5432/awesome_iwb bun run dev
+DATABASE_URL=postgres://awesome_iwb:CHANGE_ME@127.0.0.1:5432/awesome_iwb bun run dev
 ```
 
 Then:
@@ -476,7 +476,7 @@ In `backend/package.json`:
 
 ```bash
 cd /workspace/awesome-iwb/backend
-DATABASE_URL=postgres://awesome_iwb:awesome_iwb_dev@127.0.0.1:5432/awesome_iwb bun run import:data-json
+DATABASE_URL=postgres://awesome_iwb:CHANGE_ME@127.0.0.1:5432/awesome_iwb bun run import:data-json
 ```
 
 Expected:

@@ -75,6 +75,7 @@ export const API = {
     notifications: '/api/admin/notifications',
     notificationDetail: (id: string) => `/api/admin/notifications/${encodeURIComponent(id)}`,
     notificationSend: (id: string) => `/api/admin/notifications/${encodeURIComponent(id)}/send`,
+    notificationArchive: (id: string) => `/api/admin/notifications/${encodeURIComponent(id)}/archive`,
   },
   notifications: {
     list: '/api/notifications',
