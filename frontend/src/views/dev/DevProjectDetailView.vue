@@ -142,7 +142,7 @@
         </div>
       </div>
 
-      <ProjectGalleryEditor v-if="canEditGallery && project?.id" mode="dev" :project-id="project.id" />
+      <ProjectDetailImagesField v-if="canEditGallery && project?.id" mode="dev" :project-id="project.id" />
 
       <div class="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
         <div class="p-4 sm:p-6 border-b border-border bg-accent/50 dark:bg-slate-900/50 flex items-center justify-between">
@@ -200,7 +200,7 @@ import { API } from '../../api/endpoints';
 import { useAuth } from '../../composables/useAuth';
 import SearchSelect from '../../components/admin/SearchSelect.vue';
 import ProjectMediaFields from '../../components/shared/ProjectMediaFields.vue';
-import ProjectGalleryEditor from '../../components/projects/ProjectGalleryEditor.vue';
+import ProjectDetailImagesField from '../../components/projects/ProjectDetailImagesField.vue';
 import { LoadingSpinner as uiLoadingSpinner } from '../../components/ui';
 import { Avatar, AvatarImage, AvatarFallback } from '../../components/ui/avatar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';

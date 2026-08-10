@@ -116,6 +116,7 @@
 
           <div class="lg:col-span-2 space-y-5">
             <ProjectMediaFields v-model:icon="projectDraft.icon" v-model:banner="projectDraft.banner" />
+            <ProjectDetailImagesField v-if="projectDraft.id" mode="admin" :project-id="projectDraft.id" />
           </div>
 
           <div class="lg:col-span-2 space-y-5">
@@ -456,6 +457,7 @@ import { adminFetch, formatAdminError, normalizeMediaUrl } from '../../composabl
 import { openBlankNoopener } from '../../lib/safeUrl';
 import SearchSelect from '../../components/admin/SearchSelect.vue';
 import ProjectMediaFields from '../../components/shared/ProjectMediaFields.vue';
+import ProjectDetailImagesField from '../../components/projects/ProjectDetailImagesField.vue';
 import { ListDetailLayout as uiListDetailLayout, EmptyState as uiEmptyState } from '../../components/ui';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/card';
