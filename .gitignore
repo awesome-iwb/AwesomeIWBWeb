@@ -47,3 +47,8 @@ dist.tar.gz
 
 # 部署过程产生的临时打包
 backend-update.tar.gz
+
+# 服务器上的备份产物（pg_dump / uploads / media 打包），仅存在于部署机
+# 用根锚定，避免误伤将来源码里同名的 backup 目录
+/backup/
+/backups/
