@@ -11,7 +11,55 @@ const clientBuildId =
   process.env.VITE_CLIENT_BUILD_ID?.trim() ||
   (typeof fePkg?.version === 'string' && fePkg.version.trim() ? `fe@${fePkg.version.trim()}` : 'fe@0');
 
-const data = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../backend/src/data.json'), 'utf-8'));
+/**
+ * SSG 数据源：backend/src/data.json 是 gitignored 的运行时数据，
+ * 全新克隆 / `git reset --hard` 之后可能不存在。
+ * 优先级：AIWB_DATA_JSON 环境变量 > backend/src/data.json。
+ * 找不到时默认「响亮失败」，避免静默发布一个缺失全部项目详情页的站点；
+ * 只想构建外壳时设 AIWB_ALLOW_EMPTY_DATA=1 降级为空数据集。
+ */
+function loadSsgData(): { categories: any[] } {
+  const candidates = [
+    process.env.AIWB_DATA_JSON?.trim(),
+    path.resolve(__dirname, '../backend/src/data.json'),
+  ].filter(Boolean) as string[];
+
+  for (const file of candidates) {
+    const resolved = path.isAbsolute(file) ? file : path.resolve(__dirname, file);
+    if (!fs.existsSync(resolved)) continue;
+    try {
+      const parsed = JSON.parse(fs.readFileSync(resolved, 'utf-8'));
+      if (!Array.isArray(parsed?.categories)) {
+        throw new Error(`缺少 categories 数组（实际为 ${typeof parsed?.categories}）`);
+      }
+      return parsed;
+    } catch (err) {
+      throw new Error(
+        `[vite.config] SSG 数据源解析失败：${resolved}\n` +
+        `  原因：${err instanceof Error ? err.message : String(err)}`
+      );
+    }
+  }
+
+  if (process.env.AIWB_ALLOW_EMPTY_DATA === '1') {
+    console.warn(
+      '[vite.config] 未找到 data.json，已按 AIWB_ALLOW_EMPTY_DATA=1 降级：' +
+      '本次构建不会预渲染任何 /project/* 详情页。'
+    );
+    return { categories: [] };
+  }
+
+  throw new Error(
+    '[vite.config] 找不到 SSG 数据源 data.json，前端无法构建。\n' +
+    `  已尝试：\n${candidates.map((c) => `    - ${c}`).join('\n')}\n` +
+    '  该文件被 .gitignore 忽略，不随仓库分发。请任选其一：\n' +
+    '    1) 从部署备份恢复到 backend/src/data.json；\n' +
+    '    2) 设 AIWB_DATA_JSON=/绝对/路径/data.json 指向副本；\n' +
+    '    3) 设 AIWB_ALLOW_EMPTY_DATA=1 仅构建站点外壳（会丢失所有项目详情页预渲染）。'
+  );
+}
+
+const data = loadSsgData();
 const projectRoutes = data.categories.flatMap((c: any) => 
   c.projects.map((p: any) => `/project/${encodeURIComponent(p.name)}`)
 );
