@@ -84,6 +84,43 @@ export async function listCapabilities(): Promise<Capability[]> {
   return rows;
 }
 
+/**
+ * Sync the in-code capability registry into the `capabilities` table.
+ *
+ * The admin permission UI and role templates read the capability catalogue
+ * from the database, but the database is only mutated by migrations. When a
+ * capability is added to `ALL_CAPABILITIES` without a corresponding migration
+ * row, it never shows up in the UI and therefore can't be granted. Upserting
+ * from the code registry on every boot keeps the two in sync and makes the
+ * catalogue self-healing — e.g. it guarantees `notification:manage` surfaces
+ * even if migration 0049 was never applied to a restored database.
+ */
+export async function syncCapabilities(): Promise<void> {
+  if (!dbEnabled) return;
+  const caps = getAllCapabilities();
+  if (caps.length === 0) return;
+  const ids = caps.map(c => c.id);
+  const names = caps.map(c => c.name);
+  const categories = caps.map(c => c.category);
+  const descriptions = caps.map(c => c.description);
+  const sortIndices = caps.map(c => c.sort_index);
+  await sql()`
+    insert into capabilities (id, name, category, description, sort_index)
+    select * from unnest(
+      ${ids}::text[],
+      ${names}::text[],
+      ${categories}::text[],
+      ${descriptions}::text[],
+      ${sortIndices}::int[]
+    )
+    on conflict (id) do update set
+      name = excluded.name,
+      category = excluded.category,
+      description = excluded.description,
+      sort_index = excluded.sort_index
+  `;
+}
+
 export async function getUserCapabilities(userId: string): Promise<string[]> {
   if (!dbEnabled) return ALL_CAPABILITIES.map(c => c.id);
   const rows = await sql()<Array<{ capability_id: string }>>`

@@ -69,7 +69,7 @@ import { localAuthPlugin } from "./plugins/localAuth";
 import { listUsers, setUserRole, setUserActive, updateUserLogin, updateUserAvatarPreference, findUserByName, deleteUser, findUserById, bumpUserTokenVersion, createUser, getUserPublicProfile, getUserPublicComments, getUserPublicProjects, getUserPublicOrganizations, renameUser, issueUserAuthToken } from "./services/users";
 import { setSessionCookie } from "./utils/cookies";
 import { ensureSuperadminInitialized, SUPERADMIN_INITIAL_USERNAME, setLocalAccountPassword, validateSuperadminPassword } from "./services/localAccounts";
-import { listCapabilities, getUserCapabilitiesWithInfo, setUserCapabilities, isSuperadmin as isSuperadminUser, userHasCapability } from "./services/capabilities";
+import { listCapabilities, getUserCapabilitiesWithInfo, setUserCapabilities, isSuperadmin as isSuperadminUser, userHasCapability, syncCapabilities } from "./services/capabilities";
 import { getRoleTemplates } from "./services/capabilities";
 import { getDashboardData } from "./services/dashboard";
 import { getMediaAssetById, getMediaAssetByStorageKey, getMediaReferences, listMediaAssets, markMediaIntegrity, restoreMedia, softDeleteMediaSafely, getMediaTags, setMediaTags, batchTagMedia, batchSoftDeleteMedia, syncMediaReferencesForEntity } from "./services/media";
@@ -207,6 +207,7 @@ if (appConfig.isProduction && !dbEnabled) {
 }
 if (dbEnabled) {
   await migrate();
+  await syncCapabilities();
   await backfillUncategorizedProjects();
   await importStoriesFromFilesIfEmpty();
   await seedTagsFromProjectsIfEmpty();
