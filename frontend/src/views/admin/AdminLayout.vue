@@ -16,7 +16,7 @@ import { useAuth } from '../../composables/useAuth';
 import { AdminShell } from '../../components/ui';
 import {
   LayoutDashboard, FileText, Package, ClipboardCheck,
-  Users, UserCog, Image, Images, ScrollText, BarChart3, Route, RefreshCw,
+  Users, UserCog, Image, ScrollText, BarChart3, Route, RefreshCw,
   Bell,
 } from 'lucide-vue-next';
 
@@ -43,7 +43,6 @@ const adminNavItems: NavItem[] = [
   { key: 'users', label: '用户权限', to: '/admin/users', icon: Users, group: 'secondary', primary: false, cap: 'user:read' },
   { key: 'developers', label: '开发者与组织', to: '/admin/developers', icon: UserCog, group: 'secondary', primary: false, anyCaps: ['dev:developer_manage', 'org:review', 'claim:review'] },
   { key: 'media', label: '图床管理', to: '/admin/media', icon: Image, group: 'secondary', primary: false, cap: 'media:read' },
-  { key: 'gallery', label: '详情图管理', to: '/admin/gallery', icon: Images, group: 'secondary', primary: false, cap: 'gallery:manage' },
   { key: 'audit', label: '审计日志', to: '/admin/audit', icon: ScrollText, group: 'secondary', primary: false, cap: 'audit:read' },
   { key: 'routes', label: '路由管理', to: '/admin/routes', icon: Route, group: 'secondary', primary: false, cap: 'route:manage' },
   { key: 'analytics', label: '数据分析', to: '/admin/analytics', icon: BarChart3, group: 'secondary', primary: false, cap: 'analytics:read' },
