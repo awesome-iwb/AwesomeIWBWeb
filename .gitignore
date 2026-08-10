@@ -41,3 +41,9 @@ mobile-admin-login*.png
 output/
 .omo/
 dist.tar.gz
+
+# AI 助手的本地工作区：含运维脚本与明文凭据，禁止入库
+.workbuddy/
+
+# 部署过程产生的临时打包
+backend-update.tar.gz
