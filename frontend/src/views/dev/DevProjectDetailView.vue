@@ -142,6 +142,8 @@
         </div>
       </div>
 
+      <ProjectGalleryEditor v-if="canEditGallery && project?.id" mode="dev" :project-id="project.id" />
+
       <div class="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
         <div class="p-4 sm:p-6 border-b border-border bg-accent/50 dark:bg-slate-900/50 flex items-center justify-between">
           <h3 class="font-bold text-sm text-muted-foreground">项目成员</h3>
@@ -198,6 +200,7 @@ import { API } from '../../api/endpoints';
 import { useAuth } from '../../composables/useAuth';
 import SearchSelect from '../../components/admin/SearchSelect.vue';
 import ProjectMediaFields from '../../components/shared/ProjectMediaFields.vue';
+import ProjectGalleryEditor from '../../components/projects/ProjectGalleryEditor.vue';
 import { LoadingSpinner as uiLoadingSpinner } from '../../components/ui';
 import { Avatar, AvatarImage, AvatarFallback } from '../../components/ui/avatar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -229,6 +232,11 @@ const canEditPrimaryDeveloper = computed(
 
 const canEditOwnerAdminFields = computed(
   () => hasCapability('dev:project_admin') && isProjectOwner.value
+);
+
+const canEditGallery = computed(
+  () => hasCapability('dev:project_edit') &&
+    members.value.some((m) => m.role === 'owner' || m.role === 'collaborator')
 );
 
 const normalizeDevDraft = (j: any) => {

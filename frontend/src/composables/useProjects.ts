@@ -33,6 +33,35 @@ export interface ProjectDeveloper {
   org_avatar_url?: string;
 }
 
+/**
+ * 项目详情图轮播条目。
+ *
+ * 后端已把展示所需字段全部算好后下发，前端不再自行拼接视频地址：
+ * - `video_embed_url` / `video_page_url` 由后端按硬编码模板生成（provider + id），
+ *   前端直接使用，避免把用户输入的 URL 塞进 iframe src 造成 XSS。
+ * - `image_url` 只会是站内上传路径。
+ */
+export interface GalleryItem {
+  id: string;
+  project_id: string;
+  media_type: 'image' | 'text' | 'video_embed';
+  image_url: string;
+  title: string;
+  caption: string;
+  link_url: string;
+  linked_project_id: string | null;
+  linked_project_slug: string | null;
+  linked_project_name: string | null;
+  video_provider: 'bilibili' | 'tencent' | 'youku' | '';
+  video_id: string;
+  video_embed_url: string;
+  video_page_url: string;
+  sort_index: number;
+  is_enabled: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface Project {
   id?: string;
   slug?: string;
@@ -63,6 +92,7 @@ export interface Project {
   releases?: Release[];
   extra?: any;
   developers?: ProjectDeveloper[];
+  gallery?: GalleryItem[];
   registry_tags?: Array<{
     id: string;
     slug: string;
@@ -124,6 +154,9 @@ export function useProjects() {
       developer: String(p?.developer ?? ''),
       github_url: String(p?.github_url ?? ''),
       organization: p?.organization || p?.extra?.feishu?.organization || '',
+      // 仅详情接口会下发 gallery；列表接口没有，这里兜底成空数组，
+      // 让 detail 拉取失败回落到目录数据时也不会炸。
+      gallery: Array.isArray(p?.gallery) ? p.gallery : [],
       releases,
       ...(relations !== undefined ? { relations } : {}),
       ...(reviews !== undefined ? { reviews } : {})

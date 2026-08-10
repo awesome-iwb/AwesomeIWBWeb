@@ -7,6 +7,7 @@ import CommentPanel from '../components/CommentPanel.vue';
 import { resolveProjectDisplayTags } from '../lib/resolveProjectDisplayTags';
 import ProjectTagRow from '../components/projects/ProjectTagRow.vue';
 import ProjectTagGallery from '../components/projects/ProjectTagGallery.vue';
+import ProjectGallery from '../components/projects/ProjectGallery.vue';
 import { computeCursorFrames } from '../utils/captchaCursor';
 import { renderSafeMarkdown } from '../lib/safeMarkdown';
 import { stringifyJsonLd } from '../lib/jsonLd';
@@ -66,6 +67,8 @@ const developerAvatarUrl = computed(() => {
 const organizationName = computed(() => {
   return project.value?.organization || (project.value as any)?.extra?.feishu?.organization || '';
 });
+
+const galleryItems = computed(() => project.value?.gallery ?? []);
 
 const techStack = computed(() => {
   const tech = (project.value as any)?.extra?.feishu?.tech_stack;
@@ -649,6 +652,9 @@ if (allProjects.value.length === 0) {
 
       <!-- Divider -->
       <div class="h-px w-full bg-gradient-to-r from-transparent via-border to-transparent my-10"></div>
+
+      <!-- 详情图轮播：放在正文栅格之上，占满宽度，对齐 App Store 的截图区位置 -->
+      <ProjectGallery v-if="galleryItems.length" :items="galleryItems" />
 
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-10">
         

@@ -90,6 +90,26 @@ import {
   transferProjectUserOwnership,
   ensureUserProjectOwnerMembership,
 } from "./services/projectMembers";
+import {
+  listPublicGalleryItems,
+  listGalleryItems,
+  getGalleryItemById,
+  createGalleryItem,
+  updateGalleryItem,
+  deleteGalleryItem,
+  reorderGalleryItems,
+  listGalleryItemsForAdmin,
+  recordGalleryEvents,
+  getGalleryStats,
+  clearGalleryMediaReferencesForProject,
+} from "./services/projectGallery";
+import {
+  normalizeGalleryItemInput,
+  normalizeGalleryItemPatch,
+  normalizeGalleryOrderInput,
+  normalizeGalleryTrackPayload,
+  MAX_GALLERY_ITEMS_PER_PROJECT,
+} from "./domain/projectGalleryItem";
 import { createOrganization, findOrganizationById, findOrganizationBySlug, listOrganizations, updateOrganization, updateOrganizationStatus, deleteOrganization, getOrganizationMembers, addOrganizationMember, removeOrganizationMember, updateOrganizationMemberRole, getUserOrganizations, isOrgMember, isOrgAdminOrAbove, generateOrgSlug, validateOrgName, type OrganizationStatus } from "./services/organizations";
 import { createProjectClaim, listProjectClaims, approveProjectClaim, rejectProjectClaim, type ClaimStatus } from "./services/projectClaims";
 import { promoteToDev, demoteFromDev } from "./services/rolePromotion";
@@ -734,6 +754,14 @@ const app = new Elysia()
     setTimeout(() => { void recordSearchQuery({ query, resultsCount: Number(payload?.resultsCount ?? 0), userAgent: ua, ip }); }, 0);
     return { ok: true };
   })
+  .post("/api/track/gallery", async ({ body, headers, set }) => {
+    if (checkRateLimit({ headers, path: "/api/track/gallery", set })) return apiError(set, 429, "RATE_LIMITED", "Too Many Requests");
+    const payload: any = body as any;
+    const events = normalizeGalleryTrackPayload(payload?.events);
+    if (events.length === 0) return { ok: true };
+    setTimeout(() => { void recordGalleryEvents(events); }, 0);
+    return { ok: true };
+  })
   .get("/api/categories", async () => {
     if (!dbEnabled) {
       ensureJsonUncategorizedCategory();
@@ -792,7 +820,8 @@ const app = new Elysia()
       organizationName = orgs[0]?.name ?? null;
     }
     const registry_tags = await getTagsForProject(project.id);
-    return { ...project, developers: members, organization_name: organizationName, registry_tags };
+    const gallery = dbEnabled ? await listPublicGalleryItems(project.id) : [];
+    return { ...project, developers: members, organization_name: organizationName, registry_tags, gallery };
   })
   .get("/api/tags", async ({ set }) => {
     applyPublicShortCache(set, 300);
@@ -1261,6 +1290,7 @@ const app = new Elysia()
     const before = await getProjectById(id);
     const res = await deleteProject(id);
     await syncMediaReferencesForEntity({ entityType: "project", entityId: id, fields: [] });
+    await clearGalleryMediaReferencesForProject(id);
     await logAuditCompat({ action: "delete", entity_type: "project", entity_id: id, diff: { before } }, user?.name);
     return res;
   })
@@ -2013,6 +2043,71 @@ const app = new Elysia()
     const full = await getProjectById(id);
     const members = await getProjectMembers(id);
     return { ...(full ?? updated), members };
+  })
+  // ----- 详情图轮播（开发者端，复用 dev:project_edit + 项目成员归属）-----
+  .get("/api/dev/projects/:id/gallery", async ({ params: { id }, user, set }) => {
+    const capErr = await checkCap(user, set, "dev:project_edit");
+    if (capErr) return capErr;
+    if (!user) return apiUnauthorized(set);
+    const member = await isProjectMember(id, user.id);
+    if (!member) return apiForbidden(set, "Not a project member");
+    if (!dbEnabled) return { items: [] };
+    return { items: await listGalleryItems(id) };
+  })
+  .post("/api/dev/projects/:id/gallery", async ({ params: { id }, body, user, set }) => {
+    const capErr = await checkCap(user, set, "dev:project_edit");
+    if (capErr) return capErr;
+    if (!user) return apiUnauthorized(set);
+    const member = await isProjectMember(id, user.id);
+    if (!member) return apiForbidden(set, "Not a project member");
+    if (!dbEnabled) return apiError(set, 503, "UNAVAILABLE", "gallery requires database");
+    const normalized = normalizeGalleryItemInput(body);
+    if (!normalized.ok) return apiBadRequest(set, normalized.error);
+    try {
+      const item = await createGalleryItem({ projectId: id, input: normalized.value, actor: user.name });
+      if (!item) return apiError(set, 503, "UNAVAILABLE", "gallery requires database");
+      return { item };
+    } catch (e: any) {
+      if (e?.code === "GALLERY_FULL") return apiBadRequest(set, `每个项目最多 ${MAX_GALLERY_ITEMS_PER_PROJECT} 张详情图`);
+      return apiBadRequest(set, "详情图创建失败");
+    }
+  })
+  .patch("/api/dev/projects/:id/gallery/:itemId", async ({ params: { id, itemId }, body, user, set }) => {
+    const capErr = await checkCap(user, set, "dev:project_edit");
+    if (capErr) return capErr;
+    if (!user) return apiUnauthorized(set);
+    const member = await isProjectMember(id, user.id);
+    if (!member) return apiForbidden(set, "Not a project member");
+    if (!dbEnabled) return apiError(set, 503, "UNAVAILABLE", "gallery requires database");
+    const normalized = normalizeGalleryItemPatch(body);
+    if (!normalized.ok) return apiBadRequest(set, normalized.error);
+    if (Object.keys(normalized.value).length === 0) return apiBadRequest(set, "没有可更新的字段");
+    const item = await updateGalleryItem({ id: itemId, patch: normalized.value, actor: user.name, projectId: id });
+    if (!item) return apiNotFound(set, "详情图不存在或无权限");
+    return { item };
+  })
+  .delete("/api/dev/projects/:id/gallery/:itemId", async ({ params: { id, itemId }, user, set }) => {
+    const capErr = await checkCap(user, set, "dev:project_edit");
+    if (capErr) return capErr;
+    if (!user) return apiUnauthorized(set);
+    const member = await isProjectMember(id, user.id);
+    if (!member) return apiForbidden(set, "Not a project member");
+    if (!dbEnabled) return apiError(set, 503, "UNAVAILABLE", "gallery requires database");
+    const ok = await deleteGalleryItem({ id: itemId, projectId: id });
+    if (!ok) return apiNotFound(set, "详情图不存在或无权限");
+    return { success: true };
+  })
+  .post("/api/dev/projects/:id/gallery/reorder", async ({ params: { id }, body, user, set }) => {
+    const capErr = await checkCap(user, set, "dev:project_edit");
+    if (capErr) return capErr;
+    if (!user) return apiUnauthorized(set);
+    const member = await isProjectMember(id, user.id);
+    if (!member) return apiForbidden(set, "Not a project member");
+    if (!dbEnabled) return apiError(set, 503, "UNAVAILABLE", "gallery requires database");
+    const normalized = normalizeGalleryOrderInput((body as any)?.orders);
+    if (!normalized.ok) return apiBadRequest(set, normalized.error);
+    await reorderGalleryItems({ projectId: id, orders: normalized.value, actor: user.name });
+    return { success: true };
   })
   .get("/api/dev/projects/:id/members", async ({ params: { id }, user, set }) => {
     const capErr = await checkCap(user, set, "dev:project_admin");
@@ -3640,6 +3735,82 @@ const app = new Elysia()
     if (result.status === "not_active") return apiBadRequest(set, "只有生效中的常驻通知可以归档");
     await logAuditCompat({ action: "archive_notification_campaign", entity_type: "notification_campaign", entity_id: id }, user?.name);
     return { success: true, campaign: result.campaign };
+  })
+  // ----- 详情图轮播（运维端，gallery:manage）-----
+  .get("/api/admin/project-gallery", async ({ query, set, user }) => {
+    const capErr = await checkCap(user, set, "gallery:manage");
+    if (capErr) return capErr;
+    if (!dbEnabled) return { items: [], page: 1, pageSize: 50, total: 0 };
+    const projectId = typeof query.projectId === "string" ? query.projectId : undefined;
+    const page = typeof query.page === "string" ? Number(query.page) : undefined;
+    const pageSize = typeof query.pageSize === "string" ? Number(query.pageSize) : undefined;
+    return await listGalleryItemsForAdmin({ projectId, page, pageSize });
+  })
+  .get("/api/admin/project-gallery/stats", async ({ query, set, user }) => {
+    const capErr = await checkCap(user, set, "gallery:manage");
+    if (capErr) return capErr;
+    if (!dbEnabled) return { items: [] };
+    const from = typeof query.from === "string" ? query.from : undefined;
+    const to = typeof query.to === "string" ? query.to : undefined;
+    const limit = typeof query.limit === "string" ? Number(query.limit) : undefined;
+    return { items: await getGalleryStats({ from, to, limit }) };
+  })
+  .get("/api/admin/project-gallery/project/:projectId", async ({ params: { projectId }, set, user }) => {
+    const capErr = await checkCap(user, set, "gallery:manage");
+    if (capErr) return capErr;
+    if (!dbEnabled) return { items: [] };
+    return { items: await listGalleryItems(projectId) };
+  })
+  .post("/api/admin/project-gallery", async ({ body, set, user }) => {
+    const capErr = await checkCap(user, set, "gallery:manage");
+    if (capErr) return capErr;
+    if (!dbEnabled) return apiError(set, 503, "UNAVAILABLE", "gallery requires database");
+    const payload = body as any;
+    const projectId = String(payload?.project_id ?? "").trim();
+    if (!projectId) return apiBadRequest(set, "project_id 必填");
+    const project = await getProjectById(projectId);
+    if (!project) return apiBadRequest(set, "项目不存在");
+    const normalized = normalizeGalleryItemInput(payload);
+    if (!normalized.ok) return apiBadRequest(set, normalized.error);
+    try {
+      const item = await createGalleryItem({ projectId, input: normalized.value, actor: user?.name ?? "system" });
+      if (!item) return apiError(set, 503, "UNAVAILABLE", "gallery requires database");
+      return { item };
+    } catch (e: any) {
+      if (e?.code === "GALLERY_FULL") return apiBadRequest(set, `每个项目最多 ${MAX_GALLERY_ITEMS_PER_PROJECT} 张详情图`);
+      return apiBadRequest(set, "详情图创建失败");
+    }
+  })
+  .patch("/api/admin/project-gallery/:itemId", async ({ params: { itemId }, body, set, user }) => {
+    const capErr = await checkCap(user, set, "gallery:manage");
+    if (capErr) return capErr;
+    if (!dbEnabled) return apiError(set, 503, "UNAVAILABLE", "gallery requires database");
+    const normalized = normalizeGalleryItemPatch(body);
+    if (!normalized.ok) return apiBadRequest(set, normalized.error);
+    if (Object.keys(normalized.value).length === 0) return apiBadRequest(set, "没有可更新的字段");
+    const item = await updateGalleryItem({ id: itemId, patch: normalized.value, actor: user?.name ?? "system" });
+    if (!item) return apiNotFound(set, "详情图不存在");
+    return { item };
+  })
+  .delete("/api/admin/project-gallery/:itemId", async ({ params: { itemId }, set, user }) => {
+    const capErr = await checkCap(user, set, "gallery:manage");
+    if (capErr) return capErr;
+    if (!dbEnabled) return apiError(set, 503, "UNAVAILABLE", "gallery requires database");
+    const ok = await deleteGalleryItem({ id: itemId });
+    if (!ok) return apiNotFound(set, "详情图不存在");
+    return { success: true };
+  })
+  .post("/api/admin/project-gallery/reorder", async ({ body, set, user }) => {
+    const capErr = await checkCap(user, set, "gallery:manage");
+    if (capErr) return capErr;
+    if (!dbEnabled) return apiError(set, 503, "UNAVAILABLE", "gallery requires database");
+    const payload = body as any;
+    const projectId = String(payload?.project_id ?? "").trim();
+    if (!projectId) return apiBadRequest(set, "project_id 必填");
+    const normalized = normalizeGalleryOrderInput(payload?.orders);
+    if (!normalized.ok) return apiBadRequest(set, normalized.error);
+    await reorderGalleryItems({ projectId, orders: normalized.value, actor: user?.name ?? "system" });
+    return { success: true };
   })
   .get("/api/notifications", async ({ query, set, user }) => {
     const authErr = checkRealUser(user, set);

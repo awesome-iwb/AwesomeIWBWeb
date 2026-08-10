@@ -69,6 +69,7 @@ export const routes: RouteRecordRaw[] = [
       { path: 'analytics', name: 'admin-analytics', component: () => import('../views/admin/AnalyticsView.vue'), meta: { title: '数据分析', requiresCapability: 'analytics:read' } },
       { path: 'routes', name: 'admin-routes', component: () => import('../views/admin/RoutesView.vue'), meta: { title: '路由管理', requiresAuth: true, requiresCapability: 'route:manage' } },
       { path: 'notifications', name: 'admin-notifications', component: () => import('../views/admin/NotificationsView.vue'), meta: { title: '通知管理', requiresCapability: 'notification:manage' } },
+      { path: 'gallery', name: 'admin-project-gallery', component: () => import('../views/admin/ProjectGalleryView.vue'), meta: { title: '详情图管理', requiresCapability: 'gallery:manage' } },
       { path: 'sync', name: 'admin-sync', component: () => import('../views/admin/SyncSettingsView.vue'), meta: { title: '数据同步', requiresCapability: 'project:update' } },
       { path: 'organizations', redirect: () => ({ path: '/admin/developers', query: { tab: 'organizations' } }) },
       { path: 'claims', redirect: () => ({ path: '/admin/developers', query: { tab: 'claims' } }) },

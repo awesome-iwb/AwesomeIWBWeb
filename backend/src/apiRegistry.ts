@@ -30,6 +30,7 @@ export const API_REGISTRY: ApiRouteSpec[] = [
   { id: 'track.pageview', method: 'POST', path: '/api/track/pageview', scope: 'public' },
   { id: 'track.click', method: 'POST', path: '/api/track/click', scope: 'public' },
   { id: 'track.search', method: 'POST', path: '/api/track/search', scope: 'public' },
+  { id: 'track.gallery', method: 'POST', path: '/api/track/gallery', scope: 'public' },
 
   { id: 'feedback.list', method: 'GET', path: '/api/feedback', scope: 'public' },
   { id: 'feedback.create', method: 'POST', path: '/api/feedback', scope: 'auth' },
@@ -40,6 +41,12 @@ export const API_REGISTRY: ApiRouteSpec[] = [
   { id: 'submissions.create', method: 'POST', path: '/api/submissions', scope: 'public' },
   { id: 'submissions.create.alias', method: 'POST', path: '/api/submit', scope: 'public', deprecated: true, replacedBy: 'submissions.create' },
   { id: 'submissions.dev.create', method: 'POST', path: '/api/dev/submissions', scope: 'auth' },
+
+  { id: 'dev.projects.gallery.list', method: 'GET', path: '/api/dev/projects/:id/gallery', scope: 'auth' },
+  { id: 'dev.projects.gallery.create', method: 'POST', path: '/api/dev/projects/:id/gallery', scope: 'auth' },
+  { id: 'dev.projects.gallery.update', method: 'PATCH', path: '/api/dev/projects/:id/gallery/:itemId', scope: 'auth' },
+  { id: 'dev.projects.gallery.delete', method: 'DELETE', path: '/api/dev/projects/:id/gallery/:itemId', scope: 'auth' },
+  { id: 'dev.projects.gallery.reorder', method: 'POST', path: '/api/dev/projects/:id/gallery/reorder', scope: 'auth' },
 
   { id: 'articles.list', method: 'GET', path: '/api/articles', scope: 'public' },
   { id: 'articles.detail', method: 'GET', path: '/api/articles/:slug', scope: 'public' },
@@ -124,6 +131,14 @@ export const API_REGISTRY: ApiRouteSpec[] = [
   { id: 'admin.media.tags.patch', method: 'PATCH', path: '/api/admin/media/:id/tags', scope: 'admin' },
   { id: 'admin.media.batchTag', method: 'POST', path: '/api/admin/media/batch-tag', scope: 'admin' },
   { id: 'admin.media.batchDelete', method: 'POST', path: '/api/admin/media/batch-delete', scope: 'admin' },
+  { id: 'admin.projectGallery.list', method: 'GET', path: '/api/admin/project-gallery', scope: 'admin' },
+  { id: 'admin.projectGallery.stats', method: 'GET', path: '/api/admin/project-gallery/stats', scope: 'admin' },
+  { id: 'admin.projectGallery.byProject', method: 'GET', path: '/api/admin/project-gallery/project/:projectId', scope: 'admin' },
+  { id: 'admin.projectGallery.create', method: 'POST', path: '/api/admin/project-gallery', scope: 'admin' },
+  { id: 'admin.projectGallery.update', method: 'PATCH', path: '/api/admin/project-gallery/:itemId', scope: 'admin' },
+  { id: 'admin.projectGallery.delete', method: 'DELETE', path: '/api/admin/project-gallery/:itemId', scope: 'admin' },
+  { id: 'admin.projectGallery.reorder', method: 'POST', path: '/api/admin/project-gallery/reorder', scope: 'admin' },
+
   { id: 'admin.dashboard', method: 'GET', path: '/api/admin/dashboard', scope: 'admin' },
   { id: 'admin.analytics', method: 'GET', path: '/api/admin/analytics', scope: 'admin' },
   { id: 'admin.roleTemplates', method: 'GET', path: '/api/admin/role-templates', scope: 'admin' },

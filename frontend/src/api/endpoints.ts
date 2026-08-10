@@ -76,6 +76,12 @@ export const API = {
     notificationDetail: (id: string) => `/api/admin/notifications/${encodeURIComponent(id)}`,
     notificationSend: (id: string) => `/api/admin/notifications/${encodeURIComponent(id)}/send`,
     notificationArchive: (id: string) => `/api/admin/notifications/${encodeURIComponent(id)}/archive`,
+    projectGallery: '/api/admin/project-gallery',
+    projectGalleryStats: '/api/admin/project-gallery/stats',
+    projectGalleryByProject: (projectId: string) =>
+      `/api/admin/project-gallery/project/${encodeURIComponent(projectId)}`,
+    projectGalleryItem: (itemId: string) => `/api/admin/project-gallery/${encodeURIComponent(itemId)}`,
+    projectGalleryReorder: '/api/admin/project-gallery/reorder',
   },
   notifications: {
     list: '/api/notifications',
@@ -98,6 +104,10 @@ export const API = {
     organizationDetail: (id: string) => `/api/dev/organizations/${encodeURIComponent(id)}`,
     organizationMembers: (id: string) => `/api/dev/organizations/${encodeURIComponent(id)}/members`,
     projectClaims: '/api/dev/project-claims',
+    projectGallery: (id: string) => `/api/dev/projects/${encodeURIComponent(id)}/gallery`,
+    projectGalleryItem: (id: string, itemId: string) =>
+      `/api/dev/projects/${encodeURIComponent(id)}/gallery/${encodeURIComponent(itemId)}`,
+    projectGalleryReorder: (id: string) => `/api/dev/projects/${encodeURIComponent(id)}/gallery/reorder`,
   },
   users: {
     profile: (name: string) => `/api/users/${encodeURIComponent(name)}/profile`,
